@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Flame, Utensils, Zap, Clock, AlertCircle, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed, PlayCircle, X, ExternalLink, Youtube } from 'lucide-react';
+import { RestTimer } from './ui/RestTimer';
+import { Flame, Utensils, Zap, Clock, AlertCircle, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed, PlayCircle, X, ExternalLink, Youtube, Timer } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -116,9 +118,10 @@ interface ExerciseItemProps {
   isChecked: boolean;
   onToggle: () => void;
   onPreview: () => void;
+  onStartTimer: () => void;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked, onToggle, onPreview }) => (
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked, onToggle, onPreview, onStartTimer }) => (
   <div 
     className={`
       group relative pl-4 py-3 border-l-2 transition-all duration-300
@@ -157,27 +160,44 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
           </div>
         </div>
         
-        <div 
-          onClick={onToggle}
-          className="cursor-pointer"
-        >
-          <div className={`flex items-center gap-4 text-sm mb-2 ${isChecked ? 'opacity-50' : 'text-gray-300'}`}>
-            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" /> {exercise.sets} Sets</span>
-            <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /> {exercise.reps} Reps</span>
-          </div>
-          
-          {exercise.equipment && (
-            <div className={`text-xs mb-1 flex items-center gap-1 ${isChecked ? 'opacity-50' : 'text-gray-400'}`}>
-              <Dumbbell className="w-3 h-3" /> {exercise.equipment}
+        <div className="flex items-center justify-between">
+          <div 
+            onClick={onToggle}
+            className="cursor-pointer"
+          >
+            <div className={`flex items-center gap-4 text-sm mb-2 ${isChecked ? 'opacity-50' : 'text-gray-300'}`}>
+              <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" /> {exercise.sets} Sets</span>
+              <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /> {exercise.reps} Reps</span>
             </div>
-          )}
-          
-          {exercise.notes && (
-            <p className={`text-xs italic bg-black/20 p-2 rounded-lg border border-white/5 ${isChecked ? 'text-emerald-200/50' : 'text-gray-400'}`}>
-              💡 {exercise.notes}
-            </p>
-          )}
+            
+            {exercise.equipment && (
+              <div className={`text-xs mb-1 flex items-center gap-1 ${isChecked ? 'opacity-50' : 'text-gray-400'}`}>
+                <Dumbbell className="w-3 h-3" /> {exercise.equipment}
+              </div>
+            )}
+          </div>
+
+          {/* Rest Timer Trigger */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartTimer();
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-cyan-300 font-bold transition-all active:scale-95 hover:border-cyan-500/30"
+          >
+            <Timer className="w-3.5 h-3.5" />
+            Nghỉ
+          </button>
         </div>
+          
+        {exercise.notes && (
+          <p 
+            onClick={onToggle}
+            className={`text-xs italic bg-black/20 p-2 rounded-lg border border-white/5 mt-2 cursor-pointer ${isChecked ? 'text-emerald-200/50' : 'text-gray-400'}`}
+          >
+            💡 {exercise.notes}
+          </p>
+        )}
       </div>
     </div>
   </div>
@@ -221,6 +241,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [userNote, setUserNote] = useState('');
   const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
   
+  // Timer State
+  const [isTimerOpen, setIsTimerOpen] = useState(false);
+  
   // Store checked state as: "easy-0": true, "medium-2": false
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
 
@@ -259,6 +282,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           onClose={() => setPreviewExercise(null)} 
         />
       )}
+
+      {/* Rest Timer Modal */}
+      <RestTimer 
+        isOpen={isTimerOpen} 
+        onClose={() => setIsTimerOpen(false)} 
+        defaultDuration={60}
+      />
 
       {/* Header Summary */}
       <div className="text-center space-y-2 mb-4">
@@ -329,6 +359,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                  isChecked={!!checkedState[`${selectedLevel}-${idx}`]}
                  onToggle={() => handleToggle(idx)}
                  onPreview={() => setPreviewExercise(ex)}
+                 onStartTimer={() => setIsTimerOpen(true)}
                />
              ))}
            </div>
