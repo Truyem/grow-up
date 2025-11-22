@@ -1,7 +1,13 @@
-const DISCORD_BOT_TOKEN = process.env.DISCORD_TOKEN || "MTA5NTMyNjE0MTk3MzI3MDU4OQ.GP97Hq.hkXz73fWNjY2N7bEFLPO43ycaXWp6aZag5TM-I";
+
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
 const TARGET_USER_ID = "817401534463213628";
 
 export const sendDiscordCheckIn = async (note: string): Promise<boolean> => {
+  if (!DISCORD_BOT_TOKEN) {
+    console.error("Discord Bot Token is missing.");
+    return false;
+  }
+
   try {
     // 1. Create DM Channel with the user
     const channelResponse = await fetch('https://discord.com/api/v10/users/@me/channels', {
