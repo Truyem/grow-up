@@ -4,6 +4,7 @@ import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem } f
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
+import { AnalysisView } from './components/AnalysisView';
 import { generateDailyPlan } from './services/geminiService';
 import { Sparkles, History } from 'lucide-react';
 
@@ -15,7 +16,7 @@ const INITIAL_USER_DATA: UserInput = {
   soreMuscles: [MuscleGroup.None], // Default to No Soreness
 };
 
-type ViewMode = 'input' | 'plan' | 'history';
+type ViewMode = 'input' | 'plan' | 'history' | 'analysis';
 
 export default function App() {
   const [userData, setUserData] = useState<UserInput>(INITIAL_USER_DATA);
@@ -142,6 +143,12 @@ export default function App() {
               history={workoutHistory}
               onBack={() => setViewMode('input')}
               onDelete={handleDeleteHistoryItem}
+              onAnalyze={() => setViewMode('analysis')}
+            />
+          ) : viewMode === 'analysis' ? (
+            <AnalysisView 
+              history={workoutHistory} 
+              onBack={() => setViewMode('history')} 
             />
           ) : (
             <div className="max-w-2xl mx-auto space-y-4">

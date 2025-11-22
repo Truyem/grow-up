@@ -39,6 +39,7 @@ interface ExercisePreviewModalProps {
 const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ exercise, onClose }) => {
   // Construct a query string for YouTube
   const query = encodeURIComponent(`${exercise.name} exercise tutorial form`);
+  const searchUrl = `https://www.youtube.com/results?search_query=${query}`;
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
@@ -57,17 +58,32 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ exercise, o
           </button>
         </div>
 
-        {/* Video Container - Aspect Ratio 16:9 */}
-        <div className="relative w-full aspect-video bg-black">
-          <iframe 
-            className="absolute inset-0 w-full h-full"
-            src={`https://www.youtube.com/embed?listType=search&list=${query}`}
-            title="Exercise Demo"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          ></iframe>
-        </div>
+        {/* Video Placeholder / Link Area */}
+        {/* Note: YouTube Embed 'listType=search' is currently broken/restricted by YouTube. 
+            Replaced with a direct link card for better UX. */}
+        <a 
+          href={searchUrl}
+          target="_blank" 
+          rel="noreferrer"
+          className="relative w-full aspect-video bg-black group overflow-hidden block"
+        >
+          {/* Background Gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black/50 to-black z-0" />
+          
+          {/* Play Button & Text Centered */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 transition-transform duration-300 group-hover:scale-105">
+             <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.5)] mb-4 group-hover:bg-red-500 transition-colors">
+                <PlayCircle className="w-10 h-10 text-white fill-white" />
+             </div>
+             <h4 className="text-xl font-bold text-white mb-1">Xem hướng dẫn trên YouTube</h4>
+             <p className="text-sm text-gray-400 px-6 text-center">
+               Nhấn vào đây để mở danh sách video hướng dẫn kỹ thuật chuẩn cho bài tập này.
+             </p>
+          </div>
+
+          {/* Hover Effect Overlay */}
+          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
+        </a>
 
         {/* Footer / Notes */}
         <div className="p-5 space-y-3">
@@ -88,15 +104,6 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ exercise, o
               " {exercise.notes} "
             </p>
           )}
-
-          <a 
-            href={`https://www.youtube.com/results?search_query=${query}`} 
-            target="_blank" 
-            rel="noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 mt-2 rounded-xl bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-600/20 transition-all text-sm font-semibold"
-          >
-            <ExternalLink className="w-4 h-4" /> Xem thêm kết quả trên YouTube
-          </a>
         </div>
       </div>
     </div>

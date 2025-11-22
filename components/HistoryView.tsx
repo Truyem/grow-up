@@ -2,25 +2,38 @@
 import React from 'react';
 import { WorkoutHistoryItem } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2, BarChart3 } from 'lucide-react';
 
 interface HistoryViewProps {
   history: WorkoutHistoryItem[];
   onBack: () => void;
   onDelete: (timestamp: number) => void;
+  onAnalyze?: () => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDelete }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDelete, onAnalyze }) => {
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4 mb-6">
-        <button 
-          onClick={onBack}
-          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <h2 className="text-2xl font-bold text-white">Lịch sử tập luyện</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onBack}
+            className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h2 className="text-2xl font-bold text-white">Lịch sử tập luyện</h2>
+        </div>
+        
+        {onAnalyze && history.length > 0 && (
+          <button 
+            onClick={onAnalyze}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg transition-all hover:scale-105"
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="hidden sm:inline">Thống kê</span>
+          </button>
+        )}
       </div>
 
       {history.length === 0 ? (
