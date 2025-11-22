@@ -57,13 +57,18 @@ export default function App() {
     const now = new Date();
     const todayDateStr = now.toLocaleDateString('vi-VN');
     
+    const exercisesSummary = completedExercises.length > 0 
+      ? completedExercises.join(', ') 
+      : "Không có bài tập";
+
     const newItem: WorkoutHistoryItem = {
       date: todayDateStr,
       timestamp: now.getTime(),
       levelSelected,
       summary,
       completedExercises,
-      userNotes: userNotes || ""
+      userNotes: userNotes || "",
+      exercisesSummary
     };
 
     // Logic: Update existing entry if today, else prepend

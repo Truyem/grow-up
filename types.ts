@@ -1,3 +1,4 @@
+
 export enum FatigueLevel {
   Fresh = 'Khỏe',
   Normal = 'Bình thường',
@@ -69,4 +70,5 @@ export interface WorkoutHistoryItem {
   summary: string;
   completedExercises: string[];
   userNotes?: string;
+  exercisesSummary?: string;
 }

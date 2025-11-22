@@ -31,7 +31,7 @@ const FALLBACK_PLAN: DailyPlan = {
         exercises: [
           { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board" },
           { name: "Dumbbell Goblet Squat", sets: 4, reps: "12", equipment: "Tạ 10kg" },
-          { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực" }
+          { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg" }
         ]
       },
       hard: {
@@ -39,8 +39,8 @@ const FALLBACK_PLAN: DailyPlan = {
         description: "Tăng cơ tối đa, cường độ cao.",
         exercises: [
           { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao" },
-          { name: "BFR Bicep Curls", sets: 4, reps: "20", isBFR: true, equipment: "Tạ 4kg + Band", notes: "Nghỉ 30s" },
-          { name: "Dumbbell Lunges", sets: 3, reps: "12/leg", equipment: "2 tạ 10kg" }
+          { name: "BFR Bicep Curls", sets: 4, reps: "20", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Nghỉ 30s, tập chậm cảm nhận cơ" },
+          { name: "Goblet Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg" }
         ]
       }
     }
@@ -212,7 +212,12 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       1. Easy (Nhẹ): Active recovery hoặc Cardio nhẹ.
       2. Medium (Vừa): Kích thích cơ chuẩn.
       3. Hard (Thử thách): Overload.
-      Dụng cụ: Push-up board (Red/Blue/Yellow/Green), Tạ đơn (4,8,10kg), Dây 15kg, BFR.
+      
+      DỤNG CỤ CÓ SẴN (Sử dụng triệt để):
+      - Board chống đẩy: Red=Vai (Shoulder), Blue=Ngực (Chest), Yellow=Lưng (Back), Green=Tay sau (Triceps).
+      - BFR Bands: Hỗ trợ pump/hypertrophy cho tay/chân (kết hợp tạ nhẹ).
+      - Tạ đơn (Dumbbells): 4kg, 8kg, 10kg (Có thể là tạ lẻ, ưu tiên bài Goblet hoặc Unilateral).
+      - Dây kháng lực: 15kg.
 
       YÊU CẦU DINH DƯỠNG:
       - Calo ~1600-1750, Protein ~100-110g.

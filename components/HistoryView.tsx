@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { WorkoutHistoryItem } from '../types';
 import { GlassCard } from './ui/GlassCard';
@@ -75,6 +76,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2 uppercase tracking-wide">
                         <Dumbbell className="w-3 h-3" /> Bài đã hoàn thành
                       </div>
+                      
+                      {item.exercisesSummary && (
+                         <div className="mb-2 text-xs text-cyan-300/80 italic border-b border-white/5 pb-2">
+                           {item.exercisesSummary}
+                         </div>
+                      )}
+
                       {item.completedExercises && item.completedExercises.length > 0 ? (
                         <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
                           {item.completedExercises.map((ex, i) => (
