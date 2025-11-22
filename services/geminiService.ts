@@ -230,7 +230,7 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
