@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, AlertCircle, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed, PlayCircle, X, ExternalLink, Youtube, Timer } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed, PlayCircle, ExternalLink, Timer } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -30,85 +30,6 @@ const ColorBadge: React.FC<{ color?: string }> = ({ color }) => {
     <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-black uppercase tracking-wider shadow-lg ${colors[color] || 'bg-gray-500'}`}>
       {color} ({translations[color]})
     </span>
-  );
-};
-
-interface ExercisePreviewModalProps {
-  exercise: Exercise;
-  onClose: () => void;
-}
-
-const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ exercise, onClose }) => {
-  // Construct a query string for YouTube
-  const query = encodeURIComponent(`${exercise.name} exercise tutorial form`);
-  const searchUrl = `https://www.youtube.com/results?search_query=${query}`;
-  
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div 
-        className="relative w-full max-w-2xl bg-[#1a1f2e] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/5">
-          <div className="flex items-center gap-3">
-            <Youtube className="w-6 h-6 text-red-500" />
-            <h3 className="text-lg font-bold text-white truncate pr-4">{exercise.name}</h3>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Video Placeholder / Link Area */}
-        {/* Note: YouTube Embed 'listType=search' is currently broken/restricted by YouTube. 
-            Replaced with a direct link card for better UX. */}
-        <a 
-          href={searchUrl}
-          target="_blank" 
-          rel="noreferrer"
-          className="relative w-full aspect-video bg-black group overflow-hidden block"
-        >
-          {/* Background Gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black/50 to-black z-0" />
-          
-          {/* Play Button & Text Centered */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 transition-transform duration-300 group-hover:scale-105">
-             <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.5)] mb-4 group-hover:bg-red-500 transition-colors">
-                <PlayCircle className="w-10 h-10 text-white fill-white" />
-             </div>
-             <h4 className="text-xl font-bold text-white mb-1">Xem hướng dẫn trên YouTube</h4>
-             <p className="text-sm text-gray-400 px-6 text-center">
-               Nhấn vào đây để mở danh sách video hướng dẫn kỹ thuật chuẩn cho bài tập này.
-             </p>
-          </div>
-
-          {/* Hover Effect Overlay */}
-          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none" />
-        </a>
-
-        {/* Footer / Notes */}
-        <div className="p-5 space-y-3">
-          <div className="flex flex-wrap gap-2 mb-2">
-            <ColorBadge color={exercise.colorCode} />
-            {exercise.isBFR && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-500 text-white">BFR</span>
-            )}
-            {exercise.equipment && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-700 text-gray-300 border border-gray-600">
-                {exercise.equipment}
-              </span>
-            )}
-          </div>
-          
-          {exercise.notes && (
-            <p className="text-sm text-gray-300 italic bg-white/5 p-3 rounded-xl border border-white/5">
-              " {exercise.notes} "
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -139,15 +60,16 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
 
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
-          {/* Name is now a button to trigger preview */}
+          {/* Name is now a button to trigger direct YouTube link */}
           <button 
             onClick={onPreview}
             className={`text-left font-bold text-lg transition-all flex items-center gap-2 hover:underline decoration-cyan-500/50 decoration-2 underline-offset-4
               ${isChecked ? 'text-emerald-400 line-through decoration-emerald-500/50 opacity-70' : 'text-white group-hover:text-cyan-300'}
             `}
+            title="Xem hướng dẫn trên YouTube"
           >
             {exercise.name}
-            <PlayCircle className={`w-4 h-4 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
+            <ExternalLink className={`w-3.5 h-3.5 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
           </button>
           
           <div className="flex gap-2">
@@ -239,7 +161,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [selectedLevel, setSelectedLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
-  const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
   
   // Timer State
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -262,6 +183,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     }));
   };
 
+  const handleOpenYouTube = (exerciseName: string) => {
+    const query = encodeURIComponent(`${exerciseName} exercise tutorial form`);
+    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
+  };
+
   const handleComplete = () => {
     setIsCompleted(true);
     
@@ -275,14 +201,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-      {/* Modal for Exercise Preview */}
-      {previewExercise && (
-        <ExercisePreviewModal 
-          exercise={previewExercise} 
-          onClose={() => setPreviewExercise(null)} 
-        />
-      )}
-
+      
       {/* Rest Timer Modal */}
       <RestTimer 
         isOpen={isTimerOpen} 
@@ -358,7 +277,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                  index={idx} 
                  isChecked={!!checkedState[`${selectedLevel}-${idx}`]}
                  onToggle={() => handleToggle(idx)}
-                 onPreview={() => setPreviewExercise(ex)}
+                 onPreview={() => handleOpenYouTube(ex.name)}
                  onStartTimer={() => setIsTimerOpen(true)}
                />
              ))}
@@ -366,8 +285,8 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
              <div className="flex gap-2 items-center text-xs text-gray-500">
-                <AlertCircle className="w-4 h-4" />
-                <span>Bấm vào tên bài tập để xem hướng dẫn (Video).</span>
+                <ExternalLink className="w-4 h-4" />
+                <span>Bấm vào tên bài tập để tìm hướng dẫn trên YouTube (Tab mới).</span>
              </div>
 
              {/* Notes Section */}
@@ -386,57 +305,4 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
              
              <button 
                onClick={handleComplete}
-               disabled={isCompleted}
-               className={`
-                 w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
-                 ${isCompleted 
-                    ? 'bg-green-500/20 text-green-400 cursor-default' 
-                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg'}
-               `}
-             >
-               {isCompleted ? (
-                 <> <CheckCircle2 className="w-5 h-5" /> Đã lưu lịch sử tập! </>
-               ) : (
-                 <> <CheckCircle2 className="w-5 h-5" /> Hoàn thành bài tập này </>
-               )}
-             </button>
-           </div>
-        </GlassCard>
-
-        {/* Nutrition Column */}
-        <GlassCard title="Dinh Dưỡng (Nutrition)" icon={<Utensils className="w-6 h-6" />}>
-          <div className="flex justify-between items-center mb-6 bg-black/20 p-4 rounded-xl">
-             <div className="text-center">
-               <div className="text-2xl font-bold text-white">{plan.nutrition.totalCalories}</div>
-               <div className="text-xs text-gray-400 uppercase">Kcal</div>
-             </div>
-             <div className="h-8 w-px bg-white/10"></div>
-             <div className="text-center">
-               <div className="text-2xl font-bold text-emerald-400">{plan.nutrition.totalProtein}</div>
-               <div className="text-xs text-gray-400 uppercase">Protein (g)</div>
-             </div>
-          </div>
-          
-          <div className="space-y-3">
-            {plan.nutrition.meals.map((meal, idx) => (
-              <MealItem key={idx} meal={meal} />
-            ))}
-          </div>
-
-          <div className="mt-6 text-xs text-gray-400 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-            🍔 <strong>Tip:</strong> {plan.nutrition.advice}
-          </div>
-        </GlassCard>
-      </div>
-
-      <div className="flex justify-center mt-8">
-        <button 
-          onClick={onReset}
-          className="px-8 py-3 rounded-full border border-white/20 hover:bg-white/10 text-gray-300 transition-all text-sm font-medium"
-        >
-          Thiết lập lại (Trang chủ)
-        </button>
-      </div>
-    </div>
-  );
-};
+               disabled={
