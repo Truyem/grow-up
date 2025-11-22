@@ -195,7 +195,7 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       : "Chưa có lịch sử tập trong tuần này.";
 
     const prompt = `
-      Bạn là PT Online chuyên nghiệp. Hãy thiết kế lịch tập và thực đơn 1 ngày cho nam, 61kg, 1m60, tình trạng skinny-fat.
+      Bạn là PT Online chuyên nghiệp. Hãy thiết kế lịch tập và thực đơn 1 ngày cho nam, 61kg, 1m60, đang trong hành trình "Grow Up" (Body Recomposition - Tăng cơ giảm mỡ).
       
       THÔNG TIN:
       - Hôm nay: ${todayStr}
@@ -218,6 +218,8 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       - Calo ~1600-1750, Protein ~100-110g.
       - NGUYÊN LIỆU GIỚI HẠN: Ức gà, Cá, Trứng, Đậu/Đậu phụ, Sữa, Cơm, Khoai lang.
       - KHÔNG kê thực phẩm chức năng.
+
+      QUAN TRỌNG: TUYỆT ĐỐI KHÔNG nhắc đến từ "skinny-fat" trong bất kỳ nội dung nào của kết quả trả về. Hãy dùng các từ ngữ tích cực như "Grow Up", "Tăng cường", "Săn chắc".
 
       Trả về JSON đúng định dạng Schema.
     `;

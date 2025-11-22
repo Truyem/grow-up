@@ -176,7 +176,7 @@ ${exerciseListStr}`;
               <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
-              Daily <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Fix</span>
+              Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
             </h1>
             <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
               Lịch trình tập luyện thông minh. Tự động điều chỉnh theo lịch sử và thể trạng.
