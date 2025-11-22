@@ -135,11 +135,16 @@ ${exerciseListStr}`;
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
       
-      {/* Ambient Background Animation (Liquid Glass Effect) */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/30 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-600/30 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-1/3 w-96 h-96 bg-pink-600/30 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000"></div>
+      {/* Background Image (Same as Liquid Glass but static) */}
+      <div className="fixed inset-0 z-0">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: `url('https://images.pexels.com/photos/268533/pexels-photo-268533.jpeg?cs=srgb&dl=pexels-pixabay-268533.jpg&fm=jpg')` 
+          }}
+        />
+        {/* Dark Overlay for readability */}
+        <div className="absolute inset-0 bg-black/80" />
       </div>
 
       {/* Content Layer */}
@@ -216,7 +221,7 @@ ${exerciseListStr}`;
 
         {/* Footer */}
         <div className="mt-20 text-center text-xs text-gray-600">
-          <p>Powered by Google Gemini 2.5 Flash • Glassmorphism UI</p>
+          <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
         </div>
       </div>
     </div>

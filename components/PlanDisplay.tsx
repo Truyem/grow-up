@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Flame, Utensils, Zap, Clock, AlertCircle, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, AlertCircle, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -89,16 +89,34 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
 );
 
 const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
-  <div className="bg-white/5 rounded-xl p-4 border border-white/5 hover:bg-white/10 transition-colors">
-    <div className="flex justify-between items-center mb-2">
-      <h4 className="font-bold text-emerald-300">{meal.name}</h4>
-      <div className="text-xs font-mono text-gray-400">
-        {meal.calories} kcal | {meal.protein}g Pro
+  <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1">
+    {/* Decorative Background Icon */}
+    <div className="absolute -bottom-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
+       <UtensilsCrossed className="w-24 h-24 text-white" />
+    </div>
+    
+    <div className="relative z-10 flex gap-4">
+      {/* Meal Icon */}
+      <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-emerald-500/30 transition-colors">
+         <UtensilsCrossed className="w-6 h-6 text-emerald-300" />
+      </div>
+      
+      <div className="flex-1">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
+          <h4 className="font-bold text-lg text-white group-hover:text-emerald-300 transition-colors">{meal.name}</h4>
+          
+          {/* Macros Badges */}
+          <div className="flex gap-2 text-xs font-bold mt-1 sm:mt-0">
+             <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
+             <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
+          </div>
+        </div>
+        
+        <p className="text-sm text-gray-400 leading-relaxed border-t border-white/5 pt-2">
+          {meal.description}
+        </p>
       </div>
     </div>
-    <p className="text-sm text-gray-300 leading-relaxed">
-      {meal.description}
-    </p>
   </div>
 );
 
