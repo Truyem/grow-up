@@ -19,6 +19,13 @@ const INITIAL_USER_DATA: UserInput = {
 
 type ViewMode = 'input' | 'plan' | 'history' | 'analysis';
 
+// Helper to match the date format used in service
+const getTodayString = () => {
+  const now = new Date();
+  const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  return `${days[now.getDay()]}, ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+};
+
 export default function App() {
   const [userData, setUserData] = useState<UserInput>(INITIAL_USER_DATA);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
@@ -26,8 +33,9 @@ export default function App() {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('input');
 
-  // Load local history on mount
+  // Load local history and cached plan on mount
   useEffect(() => {
+    // 1. Load History
     const savedHistory = localStorage.getItem('gym_history');
     if (savedHistory) {
       try {
@@ -36,22 +44,52 @@ export default function App() {
         console.error("Failed to load history", e);
       }
     }
+
+    // 2. Load Cached Plan (Today's Plan)
+    const cachedPlanStr = localStorage.getItem('daily_plan_cache');
+    if (cachedPlanStr) {
+      try {
+        const cachedPlan = JSON.parse(cachedPlanStr) as DailyPlan;
+        const todayStr = getTodayString();
+        
+        // Only load if the plan is for TODAY
+        if (cachedPlan.date === todayStr) {
+          setPlan(cachedPlan);
+          setViewMode('plan');
+          console.log("Loaded cached plan for today:", todayStr);
+        } else {
+          // Plan is old, clear it
+          localStorage.removeItem('daily_plan_cache');
+        }
+      } catch (e) {
+        console.error("Failed to load cached plan", e);
+        localStorage.removeItem('daily_plan_cache');
+      }
+    }
   }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
     // Pass workout history to the service
     const generatedPlan = await generateDailyPlan(userData, workoutHistory);
+    
     setPlan(generatedPlan);
     setViewMode('plan');
-    setLoading(false);
     
+    // Save to local storage cache
+    localStorage.setItem('daily_plan_cache', JSON.stringify(generatedPlan));
+    
+    setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleReset = () => {
-    setPlan(null);
-    setViewMode('input');
+    // Optional: Confirm before resetting if user wants to generate a DIFFERENT plan for today
+    if (window.confirm("Bạn có muốn tạo lại kế hoạch mới không? Kế hoạch hiện tại của hôm nay sẽ bị xóa.")) {
+      setPlan(null);
+      localStorage.removeItem('daily_plan_cache'); // Clear cache so we can generate new one
+      setViewMode('input');
+    }
   };
 
   const handleCompleteWorkout = async (
