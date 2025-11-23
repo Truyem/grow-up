@@ -14,7 +14,7 @@ const getCurrentDate = () => {
 const FALLBACK_PLAN: DailyPlan = {
   date: getCurrentDate(),
   workout: {
-    summary: "Kế hoạch dự phòng (Offline). Chọn mức độ phù hợp với sức khỏe của bạn.",
+    summary: "Kế hoạch dự phòng (Offline). Vui lòng kiểm tra API Key hoặc kết nối mạng.",
     levels: {
       easy: {
         levelName: "Nhẹ nhàng (Light)",
@@ -173,8 +173,12 @@ const responseSchema: Schema = {
 };
 
 export const generateDailyPlan = async (user: UserInput, history: WorkoutHistoryItem[]): Promise<DailyPlan> => {
+  // Debug log to check if Key exists (masking the actual key for security)
+  console.log("Checking API Key...", API_KEY ? "Present (Length: " + API_KEY.length + ")" : "Missing");
+
   if (!API_KEY) {
     console.warn("API Key missing, returning fallback plan.");
+    alert("Không tìm thấy API Key! Đang sử dụng lịch mẫu (Fallback).");
     await new Promise(resolve => setTimeout(resolve, 1500));
     return FALLBACK_PLAN;
   }
@@ -230,7 +234,7 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash', // Reverted to stable model
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -249,7 +253,10 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
     throw new Error("Empty response from AI");
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error Detail:", error);
+    // Alert the user so they know WHY it failed
+    alert(`Lỗi kết nối AI: ${(error as any).message || "Unknown error"}. Đang hiển thị lịch mẫu.`);
+    
     return {
       ...FALLBACK_PLAN,
       date: getCurrentDate() // Always return current date even in fallback

@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckCircle2, Dumbbell, Battery, BatteryCharging, BatteryFull, Circle, CheckSquare, PenLine, UtensilsCrossed, PlayCircle, ExternalLink, Timer } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, Battery, BatteryCharging, BatteryFull, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -305,4 +305,58 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
              
              <button 
                onClick={handleComplete}
-               disabled={
+               disabled={isCompleted}
+               className={`
+                 w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2
+                 ${isCompleted 
+                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default' 
+                   : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98]'}
+               `}
+             >
+               {isCompleted ? (
+                 <>
+                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành
+                 </>
+               ) : (
+                 "Hoàn Thành Buổi Tập"
+               )}
+             </button>
+           </div>
+        </GlassCard>
+
+        {/* Nutrition Column */}
+        <GlassCard title="Dinh Dưỡng Hôm Nay" icon={<Utensils className="w-6 h-6" />}>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-black/20 rounded-xl p-4 text-center border border-white/5">
+              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Calories</p>
+              <p className="text-2xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
+            </div>
+            <div className="bg-black/20 rounded-xl p-4 text-center border border-white/5">
+              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Protein</p>
+              <p className="text-2xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
+            </div>
+          </div>
+
+          <div className="mb-4 text-sm text-gray-300 italic bg-white/5 p-3 rounded-lg border-l-2 border-yellow-500">
+             " {plan.nutrition.advice} "
+          </div>
+
+          <div className="space-y-4">
+            {plan.nutrition.meals.map((meal, index) => (
+              <MealItem key={index} meal={meal} />
+            ))}
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="text-center pt-8">
+        <button 
+          onClick={onReset}
+          className="text-sm text-gray-500 hover:text-white transition-colors underline decoration-gray-700 hover:decoration-white underline-offset-4"
+        >
+          ← Tạo kế hoạch mới
+        </button>
+      </div>
+    </div>
+  );
+};
