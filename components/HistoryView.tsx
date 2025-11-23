@@ -2,7 +2,7 @@
 import React from 'react';
 import { WorkoutHistoryItem } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2, BarChart3, Utensils } from 'lucide-react';
 
 interface HistoryViewProps {
   history: WorkoutHistoryItem[];
@@ -10,6 +10,11 @@ interface HistoryViewProps {
   onDelete: (timestamp: number) => void;
   onAnalyze?: () => void;
 }
+
+const formatCurrency = (amount?: number) => {
+  if (amount === undefined) return '';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+};
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDelete, onAnalyze }) => {
   return (
@@ -84,7 +89,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                     </div>
                   </div>
 
-                  <div className="space-y-3 mt-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                    {/* Exercise Summary */}
                     <div className="bg-black/20 rounded-lg p-3">
                       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2 uppercase tracking-wide">
                         <Dumbbell className="w-3 h-3" /> Bài đã hoàn thành
@@ -99,7 +105,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                       {item.completedExercises && item.completedExercises.length > 0 ? (
                         <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
                           {item.completedExercises.map((ex, i) => (
-                            <li key={i}>{ex}</li>
+                            <li key={i} className="truncate">{ex}</li>
                           ))}
                         </ul>
                       ) : (
@@ -107,15 +113,34 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                       )}
                     </div>
 
-                    {item.userNotes && (
-                      <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-yellow-500/70 text-xs mb-1 uppercase tracking-wide">
-                          <FileText className="w-3 h-3" /> Ghi chú
+                    {/* Nutrition Summary */}
+                    {item.nutrition && (
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
+                        <div className="flex items-center justify-between text-emerald-400/80 text-xs mb-2 uppercase tracking-wide">
+                          <span className="flex items-center gap-2"><Utensils className="w-3 h-3" /> Thực đơn đã lưu</span>
+                          {item.nutrition.totalCost && (
+                            <span className="text-yellow-400 font-bold">{formatCurrency(item.nutrition.totalCost)}</span>
+                          )}
                         </div>
-                        <p className="text-sm text-yellow-100/80 italic">"{item.userNotes}"</p>
+                        <div className="space-y-2">
+                          {item.nutrition.meals.map((meal, idx) => (
+                            <div key={idx} className="text-xs">
+                              <span className="font-bold text-emerald-200">{meal.name}:</span> <span className="text-gray-400">{meal.description}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
+
+                  {item.userNotes && (
+                    <div className="mt-3 bg-yellow-500/5 border border-yellow-500/10 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-yellow-500/70 text-xs mb-1 uppercase tracking-wide">
+                        <FileText className="w-3 h-3" /> Ghi chú
+                      </div>
+                      <p className="text-sm text-yellow-100/80 italic">"{item.userNotes}"</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </GlassCard>

@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
-import { FatigueLevel, MuscleGroup, UserInput } from '../types';
+import { FatigueLevel, MuscleGroup, UserInput, Intensity } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, AlertCircle } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -12,12 +13,30 @@ interface UserFormProps {
 
 export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSubmit, isLoading }) => {
   const [currentDate, setCurrentDate] = useState('');
+  const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
+
+  // Auto-switch to Easy if tired or very sore
+  useEffect(() => {
+    const isTired = userData.fatigue === FatigueLevel.Tired;
+    const manySoreMuscles = userData.soreMuscles.filter(m => m !== MuscleGroup.None).length >= 2;
+
+    if (isTired || manySoreMuscles) {
+      if (userData.selectedIntensity !== Intensity.Easy) {
+        setUserData(prev => ({ ...prev, selectedIntensity: Intensity.Easy }));
+        setSuggestionMessage("Hệ thống tự động chọn mức độ 'Nhẹ nhàng' để giúp cơ thể bạn phục hồi tốt nhất.");
+        
+        // Clear message after 5 seconds
+        const timer = setTimeout(() => setSuggestionMessage(null), 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [userData.fatigue, userData.soreMuscles, setUserData]);
   
   const handleMuscleChange = (muscle: MuscleGroup) => {
     setUserData(prev => {
@@ -40,6 +59,15 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
 
       return { ...prev, soreMuscles: newSore };
     });
+  };
+
+  const getIntensityLabel = (intensity: Intensity) => {
+    switch (intensity) {
+      case Intensity.Easy: return "Nhẹ nhàng (Cardio/Recovery)";
+      case Intensity.Medium: return "Vừa sức (Hypertrophy)";
+      case Intensity.Hard: return "Thử thách (Overload)";
+      default: return "";
+    }
   };
 
   return (
@@ -122,6 +150,53 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
         </div>
       </GlassCard>
 
+      {/* Intensity Selection */}
+      <GlassCard title="Mục tiêu hôm nay" icon={<BatteryCharging className="w-6 h-6" />}>
+        <div className="space-y-3">
+          {suggestionMessage && (
+             <div className="flex items-start gap-3 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 text-sm animate-fade-in">
+               <AlertCircle className="w-5 h-5 flex-shrink-0" />
+               <p>{suggestionMessage}</p>
+             </div>
+          )}
+          
+          <label className="block text-sm text-gray-300">Chọn cường độ tập luyện:</label>
+          <div className="grid grid-cols-1 gap-3">
+            {/* Easy option removed from manual selection, but preserved in logic for auto-recovery */}
+
+            <button
+              onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
+              className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
+                userData.selectedIntensity === Intensity.Medium
+                  ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <BatteryCharging className="w-6 h-6 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-bold">Vừa sức (Normal)</div>
+                <div className="text-xs opacity-70">Tăng cơ (Hypertrophy), tiêu chuẩn.</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
+              className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
+                userData.selectedIntensity === Intensity.Hard
+                  ? 'bg-red-500/20 border-red-500 text-red-300'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <BatteryFull className="w-6 h-6 flex-shrink-0" />
+              <div className="text-left">
+                <div className="font-bold">Thử thách (Hard)</div>
+                <div className="text-xs opacity-70">Cường độ cao, Overload, đẩy giới hạn.</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </GlassCard>
+
       <button
         onClick={onSubmit}
         disabled={isLoading}
@@ -142,11 +217,11 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Đang phân tích dữ liệu...
+            Đang tạo lịch {getIntensityLabel(userData.selectedIntensity).split('(')[0].trim()}...
           </span>
         ) : (
           <span className="relative z-10 flex items-center justify-center gap-2">
-             <Activity className="w-5 h-5" /> Tạo Lịch Tập Hôm Nay
+             <Activity className="w-5 h-5" /> Tạo Lịch Tập Ngay
           </span>
         )}
       </button>

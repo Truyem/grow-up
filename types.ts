@@ -14,12 +14,18 @@ export enum MuscleGroup {
   None = 'Không đau',
 }
 
+export enum Intensity {
+  Easy = 'easy',
+  Medium = 'medium',
+  Hard = 'hard',
+}
+
 export interface UserInput {
   weight: number;
   height: number;
   fatigue: FatigueLevel;
   soreMuscles: MuscleGroup[];
-  // Day is now handled automatically, removing manual input
+  selectedIntensity: Intensity;
 }
 
 export interface Exercise {
@@ -37,6 +43,7 @@ export interface Meal {
   calories: number;
   protein: number;
   description: string;
+  estimatedPrice: number; // Price in VND
 }
 
 export interface WorkoutLevel {
@@ -49,15 +56,12 @@ export interface DailyPlan {
   date: string;
   workout: {
     summary: string;
-    levels: {
-      easy: WorkoutLevel;
-      medium: WorkoutLevel;
-      hard: WorkoutLevel;
-    }
+    detail: WorkoutLevel; // Changed from 'levels' object to single 'detail'
   };
   nutrition: {
     totalCalories: number;
     totalProtein: number;
+    totalCost: number; // Total daily cost in VND
     meals: Meal[];
     advice: string;
   };
@@ -71,4 +75,10 @@ export interface WorkoutHistoryItem {
   completedExercises: string[];
   userNotes?: string;
   exercisesSummary?: string;
+  nutrition?: { // Added nutrition to history
+    totalCalories: number;
+    totalProtein: number;
+    totalCost?: number;
+    meals: Meal[];
+  };
 }

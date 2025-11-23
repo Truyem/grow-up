@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
@@ -13,7 +13,8 @@ const INITIAL_USER_DATA: UserInput = {
   weight: 61,
   height: 160,
   fatigue: FatigueLevel.Normal,
-  soreMuscles: [MuscleGroup.None], // Default to No Soreness
+  soreMuscles: [MuscleGroup.None],
+  selectedIntensity: Intensity.Medium, // Default to Medium
 };
 
 type ViewMode = 'input' | 'plan' | 'history' | 'analysis';
@@ -53,8 +54,13 @@ export default function App() {
     setViewMode('input');
   };
 
-  // Called when user finishes a workout in PlanDisplay
-  const handleCompleteWorkout = async (levelSelected: string, summary: string, completedExercises: string[], userNotes: string) => {
+  const handleCompleteWorkout = async (
+    levelSelected: string, 
+    summary: string, 
+    completedExercises: string[], 
+    userNotes: string,
+    nutrition: { totalCalories: number; totalProtein: number; totalCost: number; meals: Meal[] }
+  ) => {
     const now = new Date();
     const todayDateStr = now.toLocaleDateString('vi-VN');
     
@@ -69,23 +75,20 @@ export default function App() {
       summary,
       completedExercises,
       userNotes: userNotes || "",
-      exercisesSummary
+      exercisesSummary,
+      nutrition // Save nutrition to history
     };
 
-    // Logic: Update existing entry if today, else prepend
     let updatedHistory: WorkoutHistoryItem[] = [];
     const existingIndex = workoutHistory.findIndex(h => h.date === todayDateStr);
 
     if (existingIndex >= 0) {
-      // Update existing
       updatedHistory = [...workoutHistory];
       updatedHistory[existingIndex] = newItem;
     } else {
-      // Add new
       updatedHistory = [newItem, ...workoutHistory];
     }
 
-    // Save to state and LocalStorage
     setWorkoutHistory(updatedHistory);
     localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
   };
@@ -125,7 +128,7 @@ export default function App() {
               Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
             </h1>
             <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
-              Lịch trình tập luyện thông minh.
+              Lịch trình tập luyện thông minh & Sáng tạo.
             </p>
           </div>
         )}
@@ -159,7 +162,6 @@ export default function App() {
                  isLoading={loading}
                />
                
-               {/* History Button */}
                <button 
                  onClick={() => setViewMode('history')}
                  className="w-full py-3 rounded-2xl font-semibold text-gray-400 bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] hover:text-white hover:shadow-lg"
@@ -171,7 +173,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Footer */}
         <div className="mt-20 text-center text-xs text-gray-600">
           <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
         </div>

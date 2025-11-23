@@ -3,13 +3,17 @@ import React, { useState } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, Battery, BatteryCharging, BatteryFull, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, Wallet } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
   onReset: () => void;
-  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string) => void;
+  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition']) => void;
 }
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+};
 
 const ColorBadge: React.FC<{ color?: string }> = ({ color }) => {
   if (!color) return null;
@@ -50,7 +54,6 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
     `}
   >
     <div className="flex items-start gap-4">
-      {/* Checkbox UI - Clickable Area for Toggling */}
       <div 
         onClick={onToggle}
         className={`mt-1 cursor-pointer transition-colors ${isChecked ? 'text-emerald-400' : 'text-gray-600 group-hover:text-cyan-400'}`}
@@ -60,7 +63,6 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
 
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
-          {/* Name is now a button to trigger direct YouTube link */}
           <button 
             onClick={onPreview}
             className={`text-left font-bold text-lg transition-all flex items-center gap-2 hover:underline decoration-cyan-500/50 decoration-2 underline-offset-4
@@ -99,7 +101,6 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
             )}
           </div>
 
-          {/* Rest Timer Trigger */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -127,13 +128,11 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
 
 const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
   <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1">
-    {/* Decorative Background Icon */}
     <div className="absolute -bottom-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
        <UtensilsCrossed className="w-24 h-24 text-white" />
     </div>
     
     <div className="relative z-10 flex gap-4">
-      {/* Meal Icon */}
       <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-emerald-500/30 transition-colors">
          <UtensilsCrossed className="w-6 h-6 text-emerald-300" />
       </div>
@@ -142,10 +141,10 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
           <h4 className="font-bold text-lg text-white group-hover:text-emerald-300 transition-colors">{meal.name}</h4>
           
-          {/* Macros Badges */}
-          <div className="flex gap-2 text-xs font-bold mt-1 sm:mt-0">
+          <div className="flex flex-wrap gap-2 text-xs font-bold mt-1 sm:mt-0">
              <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
              <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
+             <span className="px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 border border-yellow-500/30">~{formatCurrency(meal.estimatedPrice)}</span>
           </div>
         </div>
         
@@ -158,29 +157,20 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
 );
 
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete }) => {
-  const [selectedLevel, setSelectedLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
-  
-  // Timer State
   const [isTimerOpen, setIsTimerOpen] = useState(false);
-  
-  // Store checked state as: "easy-0": true, "medium-2": false
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
 
-  const currentWorkout: WorkoutLevel = plan.workout.levels[selectedLevel];
+  const currentWorkout: WorkoutLevel = plan.workout.detail;
   const totalExercises = currentWorkout.exercises.length;
   
-  // Calculate progress for current level
-  const checkedCount = currentWorkout.exercises.filter((_, idx) => checkedState[`${selectedLevel}-${idx}`]).length;
+  const checkedCount = currentWorkout.exercises.filter((_, idx) => checkedState[`ex-${idx}`]).length;
   const progressPercent = Math.round((checkedCount / totalExercises) * 100);
 
   const handleToggle = (index: number) => {
-    const key = `${selectedLevel}-${index}`;
-    setCheckedState(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const key = `ex-${index}`;
+    setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleOpenYouTube = (exerciseName: string) => {
@@ -190,26 +180,27 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   const handleComplete = () => {
     setIsCompleted(true);
-    
-    // Filter exercises that are checked for the current level
     const completedExercisesList = currentWorkout.exercises
-      .filter((_, idx) => checkedState[`${selectedLevel}-${idx}`])
+      .filter((_, idx) => checkedState[`ex-${idx}`])
       .map(ex => ex.name);
 
-    onComplete(currentWorkout.levelName, plan.workout.summary, completedExercisesList, userNote);
+    onComplete(
+      currentWorkout.levelName, 
+      plan.workout.summary, 
+      completedExercisesList, 
+      userNote,
+      plan.nutrition
+    );
   };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-      
-      {/* Rest Timer Modal */}
       <RestTimer 
         isOpen={isTimerOpen} 
         onClose={() => setIsTimerOpen(false)} 
         defaultDuration={60}
       />
 
-      {/* Header Summary */}
       <div className="text-center space-y-2 mb-4">
          <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400 mb-2">
             {plan.date}
@@ -222,30 +213,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         </p>
       </div>
 
-      {/* Difficulty Selector Tabs */}
-      <div className="flex p-1 bg-black/30 rounded-2xl border border-white/5 backdrop-blur-md">
-        <button 
-          onClick={() => setSelectedLevel('easy')}
-          className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${selectedLevel === 'easy' ? 'bg-emerald-500/20 text-emerald-400 shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <Battery className="w-4 h-4" /> Nhẹ nhàng
-        </button>
-        <button 
-          onClick={() => setSelectedLevel('medium')}
-          className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${selectedLevel === 'medium' ? 'bg-blue-500/20 text-blue-400 shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <BatteryCharging className="w-4 h-4" /> Vừa sức
-        </button>
-        <button 
-          onClick={() => setSelectedLevel('hard')}
-          className={`flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${selectedLevel === 'hard' ? 'bg-red-500/20 text-red-400 shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <BatteryFull className="w-4 h-4" /> Thử thách
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Workout Column */}
         <GlassCard 
           title={`Bài Tập: ${currentWorkout.levelName}`} 
           icon={<Flame className="w-6 h-6" />}
@@ -255,7 +223,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
              {currentWorkout.description}
            </p>
 
-           {/* Progress Bar */}
            <div className="mb-4">
               <div className="flex justify-between text-xs mb-1">
                  <span className="text-gray-400">Tiến độ</span>
@@ -272,10 +239,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
            <div className="space-y-2 mt-2">
              {currentWorkout.exercises.map((ex, idx) => (
                <ExerciseItem 
-                 key={`${selectedLevel}-${idx}`} 
+                 key={`ex-${idx}`} 
                  exercise={ex} 
                  index={idx} 
-                 isChecked={!!checkedState[`${selectedLevel}-${idx}`]}
+                 isChecked={!!checkedState[`ex-${idx}`]}
                  onToggle={() => handleToggle(idx)}
                  onPreview={() => handleOpenYouTube(ex.name)}
                  onStartTimer={() => setIsTimerOpen(true)}
@@ -286,13 +253,12 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
              <div className="flex gap-2 items-center text-xs text-gray-500">
                 <ExternalLink className="w-4 h-4" />
-                <span>Bấm vào tên bài tập để tìm hướng dẫn trên YouTube (Tab mới).</span>
+                <span>Bấm vào tên bài tập để tìm hướng dẫn trên YouTube.</span>
              </div>
 
-             {/* Notes Section */}
              <div>
                 <label className="flex items-center gap-2 text-sm text-gray-300 mb-2">
-                  <PenLine className="w-4 h-4" /> Ghi chú buổi tập (Cảm nhận, tạ, đau mỏi...)
+                  <PenLine className="w-4 h-4" /> Ghi chú buổi tập
                 </label>
                 <textarea 
                   value={userNote}
@@ -324,21 +290,20 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
            </div>
         </GlassCard>
 
-        {/* Nutrition Column */}
-        <GlassCard title="Dinh Dưỡng Hôm Nay" icon={<Utensils className="w-6 h-6" />}>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-black/20 rounded-xl p-4 text-center border border-white/5">
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Calories</p>
-              <p className="text-2xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
+        <GlassCard title="Thực Đơn Sinh Viên (<80k)" icon={<Utensils className="w-6 h-6" />}>
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
+              <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
+              <p className="text-xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
             </div>
-            <div className="bg-black/20 rounded-xl p-4 text-center border border-white/5">
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Protein</p>
-              <p className="text-2xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
+            <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
+              <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Protein</p>
+              <p className="text-xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
             </div>
-          </div>
-
-          <div className="mb-4 text-sm text-gray-300 italic bg-white/5 p-3 rounded-lg border-l-2 border-yellow-500">
-             " {plan.nutrition.advice} "
+            <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
+              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền</p>
+              <p className="text-sm font-bold text-yellow-300">{formatCurrency(plan.nutrition.totalCost)}</p>
+            </div>
           </div>
 
           <div className="space-y-4">
