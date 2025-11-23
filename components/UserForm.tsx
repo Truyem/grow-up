@@ -210,7 +210,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
           overflow-hidden
         `}
       >
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
         {isLoading ? (
           <span className="flex items-center justify-center gap-2 relative z-10">
             <svg className="animate-spin h-5 w-5 text-cyan-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

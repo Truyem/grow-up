@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, Wallet } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, Wallet, ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -200,11 +200,23 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         onClose={() => setIsTimerOpen(false)} 
         defaultDuration={60}
       />
+      
+      {/* Top Header with Back Button */}
+      <div className="flex items-center justify-between mb-2">
+        <button 
+          onClick={onReset}
+          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/70 hover:text-white"
+          title="Quay lại màn hình tạo lịch"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400">
+          {plan.date}
+        </div>
+        <div className="w-12"></div> {/* Spacer for balance */}
+      </div>
 
-      <div className="text-center space-y-2 mb-4">
-         <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400 mb-2">
-            {plan.date}
-         </div>
+      <div className="text-center space-y-2 mb-6">
         <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300">
           Kế Hoạch Tập Luyện
         </h2>
@@ -314,12 +326,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         </GlassCard>
       </div>
 
-      <div className="text-center pt-8">
+      <div className="text-center pt-8 pb-4">
         <button 
           onClick={onReset}
-          className="text-sm text-gray-500 hover:text-white transition-colors underline decoration-gray-700 hover:decoration-white underline-offset-4"
+          className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 mx-auto"
         >
-          ← Tạo kế hoạch mới
+          <RefreshCw className="w-4 h-4" />
+          Tạo Kế Hoạch Mới
         </button>
       </div>
     </div>

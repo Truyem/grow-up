@@ -84,12 +84,10 @@ export default function App() {
   };
 
   const handleReset = () => {
-    // Optional: Confirm before resetting if user wants to generate a DIFFERENT plan for today
-    if (window.confirm("Bạn có muốn tạo lại kế hoạch mới không? Kế hoạch hiện tại của hôm nay sẽ bị xóa.")) {
-      setPlan(null);
-      localStorage.removeItem('daily_plan_cache'); // Clear cache so we can generate new one
-      setViewMode('input');
-    }
+    // Direct reset without confirmation dialog to ensure button responsiveness
+    setPlan(null);
+    localStorage.removeItem('daily_plan_cache'); // Clear cache so we can generate new one
+    setViewMode('input');
   };
 
   const handleCompleteWorkout = async (
