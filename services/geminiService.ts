@@ -1,8 +1,8 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem } from "../types";
 
-// Guidelines requires API Key to be accessed via process.env.API_KEY
-const API_KEY = process.env.API_KEY || process.env.API_KEY;
+// Use Vite's environment variable (must be prefixed with VITE_)
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 // Helper to get current formatted date
 const getCurrentDate = () => {
@@ -178,9 +178,9 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
   console.log("Checking API Key...", API_KEY ? "Present (Length: " + API_KEY.length + ")" : "Missing");
 
   if (!API_KEY) {
-    console.warn("API Key missing (process.env.API_KEY). Returning fallback plan.");
+    console.warn("API Key missing (VITE_API_KEY). Returning fallback plan.");
     // Clearer alert for user
-    alert("Không tìm thấy biến môi trường 'API_KEY'! Đang sử dụng lịch mẫu. Hãy kiểm tra file .env hoặc cấu hình deployment.");
+    alert("Không tìm thấy biến môi trường 'VITE_API_KEY'! Đang sử dụng lịch mẫu. Hãy kiểm tra file .env hoặc cấu hình deployment.");
     await new Promise(resolve => setTimeout(resolve, 1500));
     return FALLBACK_PLAN;
   }
