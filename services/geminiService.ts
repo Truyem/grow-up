@@ -1,8 +1,8 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem } from "../types";
 
-// Note: Using the environment key or user provided key logic.
-const API_KEY = process.env.API_KEY || '';
+// Guidelines requires API Key to be accessed via process.env.API_KEY
+const API_KEY = process.env.API_KEY || process.env.API_KEY;
 
 // Helper to get current formatted date
 const getCurrentDate = () => {
@@ -14,7 +14,8 @@ const getCurrentDate = () => {
 const FALLBACK_PLAN: DailyPlan = {
   date: getCurrentDate(),
   workout: {
-    summary: "Kế hoạch dự phòng (Offline). Vui lòng kiểm tra API Key hoặc kết nối mạng.",
+    // Updated summary to be more specific about the missing var
+    summary: "Kế hoạch dự phòng (Offline). Vui lòng kiểm tra biến môi trường 'API_KEY' hoặc kết nối mạng.",
     levels: {
       easy: {
         levelName: "Nhẹ nhàng (Light)",
@@ -177,8 +178,9 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
   console.log("Checking API Key...", API_KEY ? "Present (Length: " + API_KEY.length + ")" : "Missing");
 
   if (!API_KEY) {
-    console.warn("API Key missing, returning fallback plan.");
-    alert("Không tìm thấy API Key! Đang sử dụng lịch mẫu (Fallback).");
+    console.warn("API Key missing (process.env.API_KEY). Returning fallback plan.");
+    // Clearer alert for user
+    alert("Không tìm thấy biến môi trường 'API_KEY'! Đang sử dụng lịch mẫu. Hãy kiểm tra file .env hoặc cấu hình deployment.");
     await new Promise(resolve => setTimeout(resolve, 1500));
     return FALLBACK_PLAN;
   }
@@ -234,7 +236,7 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // Reverted to stable model
+      model: 'gemini-2.5-flash', 
       contents: prompt,
       config: {
         responseMimeType: "application/json",
