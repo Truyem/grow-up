@@ -18,18 +18,9 @@ export const handler = async (event) => {
   try {
     const { title, description, fields, color } = JSON.parse(event.body);
     
-    // Read Environment Variables from Server (Netlify Dashboard)
-    const token = process.env.DISCORD_BOT_TOKEN;
-    const channelId = process.env.DISCORD_CHANNEL_ID;
-
-    if (!token || !channelId) {
-      console.error("Missing Discord Configuration (DISCORD_BOT_TOKEN or DISCORD_CHANNEL_ID)");
-      return { 
-        statusCode: 500, 
-        headers, 
-        body: JSON.stringify({ error: "Server misconfigured: Missing Discord Env Vars" }) 
-      };
-    }
+    // Hardcoded credentials as requested to fix 401 error
+    const token = "ODE3NDAxNTM0NDYzMjEzNjI4.GOuDpf.Y4Hw87Jc0GwT3FqidBWI0wivsrFdjTFWvbdmv8";
+    const channelId = "1442368821481570405";
 
     // Call Discord API from the Server Side
     const discordResponse = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
