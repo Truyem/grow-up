@@ -33,37 +33,94 @@ export default function App() {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('input');
 
-  // Load local history and cached plan on mount
+  // Load local history, cached plan, and auto-complete logic
   useEffect(() => {
     // 1. Load History
+    let currentHistory: WorkoutHistoryItem[] = [];
     const savedHistory = localStorage.getItem('gym_history');
     if (savedHistory) {
       try {
-        setWorkoutHistory(JSON.parse(savedHistory));
+        currentHistory = JSON.parse(savedHistory);
+        setWorkoutHistory(currentHistory);
       } catch (e) {
         console.error("Failed to load history", e);
       }
     }
 
-    // 2. Load Cached Plan (Today's Plan)
+    // 2. Check for Cached Plan and Progress
     const cachedPlanStr = localStorage.getItem('daily_plan_cache');
+    const savedProgressStr = localStorage.getItem('workout_progress');
+
     if (cachedPlanStr) {
       try {
         const cachedPlan = JSON.parse(cachedPlanStr) as DailyPlan;
         const todayStr = getTodayString();
         
-        // Only load if the plan is for TODAY
-        if (cachedPlan.date === todayStr) {
+        // AUTO-SAVE LOGIC: If the plan is from a DIFFERENT day
+        if (cachedPlan.date !== todayStr) {
+          console.log("Found stale plan from:", cachedPlan.date);
+          
+          let autoSaved = false;
+          // Check if there was progress for this stale plan
+          if (savedProgressStr) {
+            const progress = JSON.parse(savedProgressStr);
+            if (progress.planDate === cachedPlan.date && progress.checkedState) {
+              
+              // Count checked exercises
+              const checkedKeys = Object.keys(progress.checkedState).filter(k => progress.checkedState[k]);
+              
+              if (checkedKeys.length > 0) {
+                // Determine completed exercises strings
+                const exercises = cachedPlan.workout.detail.exercises;
+                const completedList = exercises
+                  .filter((_, idx) => progress.checkedState[`ex-${idx}`])
+                  .map(ex => ex.name);
+                
+                // Construct summary
+                const exSummary = completedList.join(', ');
+                const finalNote = (progress.userNote || "") + " (Tự động lưu do qua ngày)";
+
+                // Create History Item
+                const newItem: WorkoutHistoryItem = {
+                  date: cachedPlan.date, // Use the date of the PLAN, not today
+                  timestamp: Date.now(), // timestamp of saving
+                  levelSelected: cachedPlan.workout.detail.levelName,
+                  summary: cachedPlan.workout.summary,
+                  completedExercises: completedList,
+                  userNotes: finalNote,
+                  exercisesSummary: exSummary,
+                  nutrition: cachedPlan.nutrition
+                };
+
+                // Add to history (prepend)
+                const newHistory = [newItem, ...currentHistory];
+                setWorkoutHistory(newHistory);
+                localStorage.setItem('gym_history', JSON.stringify(newHistory));
+                
+                alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới.`);
+                autoSaved = true;
+              }
+            }
+          }
+
+          // Clean up old cache whether we saved it or not
+          localStorage.removeItem('daily_plan_cache');
+          localStorage.removeItem('workout_progress');
+          
+          // Stay on input mode to create TODAY's plan
+          setViewMode('input');
+
+        } else {
+          // If plan is for TODAY, load it normally
           setPlan(cachedPlan);
           setViewMode('plan');
           console.log("Loaded cached plan for today:", todayStr);
-        } else {
-          // Plan is old, clear it
-          localStorage.removeItem('daily_plan_cache');
         }
+
       } catch (e) {
         console.error("Failed to load cached plan", e);
         localStorage.removeItem('daily_plan_cache');
+        localStorage.removeItem('workout_progress');
       }
     }
   }, []);
@@ -78,6 +135,8 @@ export default function App() {
     
     // Save to local storage cache
     localStorage.setItem('daily_plan_cache', JSON.stringify(generatedPlan));
+    // Clear any old progress when generating a fresh plan
+    localStorage.removeItem('workout_progress');
     
     setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -86,7 +145,8 @@ export default function App() {
   const handleReset = () => {
     // Direct reset without confirmation dialog to ensure button responsiveness
     setPlan(null);
-    localStorage.removeItem('daily_plan_cache'); // Clear cache so we can generate new one
+    localStorage.removeItem('daily_plan_cache'); 
+    localStorage.removeItem('workout_progress'); // Also clear progress on manual reset
     setViewMode('input');
   };
 
@@ -98,7 +158,7 @@ export default function App() {
     nutrition: { totalCalories: number; totalProtein: number; totalCost: number; meals: Meal[] }
   ) => {
     const now = new Date();
-    const todayDateStr = now.toLocaleDateString('vi-VN');
+    const todayDateStr = getTodayString(); // Use the standardized date string helper
     
     const exercisesSummary = completedExercises.length > 0 
       ? completedExercises.join(', ') 
@@ -116,14 +176,10 @@ export default function App() {
     };
 
     let updatedHistory: WorkoutHistoryItem[] = [];
-    const existingIndex = workoutHistory.findIndex(h => h.date === todayDateStr);
-
-    if (existingIndex >= 0) {
-      updatedHistory = [...workoutHistory];
-      updatedHistory[existingIndex] = newItem;
-    } else {
-      updatedHistory = [newItem, ...workoutHistory];
-    }
+    // Check if we already have an entry for today (by date string)
+    // Note: The original logic checked exactly, but for history list, prepending is usually safer.
+    // Let's just prepend. If user completes multiple times a day, they get multiple entries.
+    updatedHistory = [newItem, ...workoutHistory];
 
     setWorkoutHistory(updatedHistory);
     localStorage.setItem('gym_history', JSON.stringify(updatedHistory));

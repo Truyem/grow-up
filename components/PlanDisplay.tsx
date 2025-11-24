@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, Wallet, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -168,6 +168,36 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const checkedCount = currentWorkout.exercises.filter((_, idx) => checkedState[`ex-${idx}`]).length;
   const progressPercent = Math.round((checkedCount / totalExercises) * 100);
 
+  // Restore progress from local storage on mount
+  useEffect(() => {
+    const savedProgressStr = localStorage.getItem('workout_progress');
+    if (savedProgressStr) {
+      try {
+        const savedProgress = JSON.parse(savedProgressStr);
+        // Only restore if the saved progress matches the current plan's date
+        if (savedProgress.planDate === plan.date) {
+          setCheckedState(savedProgress.checkedState || {});
+          setUserNote(savedProgress.userNote || '');
+        }
+      } catch (e) {
+        console.error("Failed to restore progress", e);
+      }
+    }
+  }, [plan.date]);
+
+  // Save progress to local storage whenever it changes
+  useEffect(() => {
+    if (!isCompleted) { // Don't save if already marked completed
+      const progressData = {
+        planDate: plan.date,
+        checkedState,
+        userNote,
+        lastUpdated: Date.now()
+      };
+      localStorage.setItem('workout_progress', JSON.stringify(progressData));
+    }
+  }, [checkedState, userNote, plan.date, isCompleted]);
+
   const handleToggle = (index: number) => {
     const key = `ex-${index}`;
     setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));
@@ -183,6 +213,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     const completedExercisesList = currentWorkout.exercises
       .filter((_, idx) => checkedState[`ex-${idx}`])
       .map(ex => ex.name);
+
+    // Clear the progress cache since we are finishing it
+    localStorage.removeItem('workout_progress');
 
     onComplete(
       currentWorkout.levelName, 
