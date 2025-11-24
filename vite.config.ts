@@ -8,7 +8,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      'process.env.DISCORD_BOT_TOKEN': JSON.stringify(env.DISCORD_BOT_TOKEN),
+      'process.env.DISCORD_CHANNEL_ID': JSON.stringify(env.DISCORD_CHANNEL_ID)
     }
   };
 });
