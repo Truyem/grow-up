@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -156,11 +156,14 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
   </div>
 );
 
+type FilterType = 'All' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Dumbbell' | 'Band';
+
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
+  const [activeFilter, setActiveFilter] = useState<FilterType>('All');
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
   const totalExercises = currentWorkout.exercises.length;
@@ -205,7 +208,39 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   const handleOpenYouTube = (exerciseName: string) => {
     const query = encodeURIComponent(`${exerciseName} exercise tutorial form`);
-    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
+    
+    // Device Detection
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isMobile = /android|ipad|iphone|ipod/i.test(userAgent);
+
+    if (isMobile) {
+      const isIOS = /ipad|iphone|ipod/i.test(userAgent);
+      const isAndroid = /android/i.test(userAgent);
+      
+      const webUrl = `https://www.youtube.com/results?search_query=${query}`;
+
+      // Attempt Deep Linking to App
+      if (isIOS) {
+         window.location.href = `youtube://results?search_query=${query}`;
+      } else if (isAndroid) {
+         window.location.href = `vnd.youtube://results?search_query=${query}`;
+      } else {
+         window.open(webUrl, '_blank');
+         return;
+      }
+
+      // Fallback to Web URL if App doesn't open (and page is still visible)
+      // Using setTimeout to verify if user left the page
+      setTimeout(() => {
+        if (!document.hidden) {
+           window.location.href = webUrl;
+        }
+      }, 2500);
+
+    } else {
+      // Desktop: Open in new tab
+      window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
+    }
   };
 
   const handleComplete = () => {
@@ -225,6 +260,37 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       plan.nutrition
     );
   };
+
+  // Filter Logic
+  const filteredExercises = currentWorkout.exercises.filter(ex => {
+    if (activeFilter === 'All') return true;
+    
+    // Color/Muscle Filtering
+    if (['Red', 'Blue', 'Yellow', 'Green'].includes(activeFilter)) {
+      return ex.colorCode === activeFilter;
+    }
+    
+    // Equipment Filtering
+    if (activeFilter === 'Dumbbell') {
+      return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
+    }
+    
+    if (activeFilter === 'Band') {
+      return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
+    }
+
+    return true;
+  });
+
+  const filterOptions: { id: FilterType; label: string; color: string }[] = [
+    { id: 'All', label: 'Tất cả', color: 'bg-white/10 text-white' },
+    { id: 'Red', label: 'Vai (Red)', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
+    { id: 'Blue', label: 'Ngực (Blue)', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    { id: 'Yellow', label: 'Lưng (Yellow)', color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
+    { id: 'Green', label: 'Tay sau (Green)', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
+    { id: 'Dumbbell', label: 'Tạ đơn', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    { id: 'Band', label: 'Dây/BFR', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -268,9 +334,28 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
              {currentWorkout.description}
            </p>
 
+           {/* Filter Bar */}
+           <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+              <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              {filterOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setActiveFilter(opt.id)}
+                  className={`
+                    flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all
+                    ${activeFilter === opt.id 
+                      ? `${opt.color} border-current shadow-[0_0_10px_rgba(255,255,255,0.1)]` 
+                      : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'}
+                  `}
+                >
+                  {opt.label}
+                </button>
+              ))}
+           </div>
+
            <div className="mb-4">
               <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-400">Tiến độ</span>
+                 <span className="text-gray-400">Tiến độ (Tổng thể)</span>
                  <span className={`font-bold ${progressPercent === 100 ? 'text-emerald-400' : 'text-cyan-400'}`}>{progressPercent}%</span>
               </div>
               <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
@@ -282,17 +367,28 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
            </div>
 
            <div className="space-y-2 mt-2">
-             {currentWorkout.exercises.map((ex, idx) => (
-               <ExerciseItem 
-                 key={`ex-${idx}`} 
-                 exercise={ex} 
-                 index={idx} 
-                 isChecked={!!checkedState[`ex-${idx}`]}
-                 onToggle={() => handleToggle(idx)}
-                 onPreview={() => handleOpenYouTube(ex.name)}
-                 onStartTimer={() => setIsTimerOpen(true)}
-               />
-             ))}
+             {filteredExercises.length > 0 ? (
+               filteredExercises.map((ex) => {
+                 // Find original index to maintain consistent state keys
+                 const originalIndex = currentWorkout.exercises.indexOf(ex);
+                 return (
+                   <ExerciseItem 
+                     key={`ex-${originalIndex}`} 
+                     exercise={ex} 
+                     index={originalIndex} 
+                     isChecked={!!checkedState[`ex-${originalIndex}`]}
+                     onToggle={() => handleToggle(originalIndex)}
+                     onPreview={() => handleOpenYouTube(ex.name)}
+                     onStartTimer={() => setIsTimerOpen(true)}
+                   />
+                 );
+               })
+             ) : (
+               <div className="text-center py-8 text-gray-500 flex flex-col items-center gap-2">
+                  <Layers className="w-8 h-8 opacity-50" />
+                  <p className="text-sm">Không có bài tập nào thuộc nhóm này.</p>
+               </div>
+             )}
            </div>
 
            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">

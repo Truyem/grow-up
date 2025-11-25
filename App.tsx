@@ -6,7 +6,6 @@ import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
 import { AnalysisView } from './components/AnalysisView';
 import { generateDailyPlan } from './services/geminiService';
-import { sendDiscordLog } from './services/discordService';
 import { Sparkles, History } from 'lucide-react';
 
 // Initial State
@@ -98,17 +97,6 @@ export default function App() {
                 setWorkoutHistory(newHistory);
                 localStorage.setItem('gym_history', JSON.stringify(newHistory));
                 
-                // DISCORD LOG: Auto-save
-                sendDiscordLog(
-                  "💾 Auto-Saved Workout (Stale Plan)", 
-                  `Saved plan from ${cachedPlan.date}`, 
-                  [
-                    { name: "Exercises", value: exSummary || "None", inline: false },
-                    { name: "Reason", value: "New day started, previous plan archived.", inline: true }
-                  ],
-                  0xf59e0b // Amber color
-                );
-
                 alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới.`);
                 autoSaved = true;
               }
@@ -152,19 +140,6 @@ export default function App() {
     
     setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // DISCORD LOG: New Plan
-    sendDiscordLog(
-      "📅 New Plan Generated",
-      `Plan for ${generatedPlan.date}`,
-      [
-        { name: "Intensity", value: generatedPlan.workout.detail.levelName, inline: true },
-        { name: "Focus", value: generatedPlan.workout.summary, inline: false },
-        { name: "Nutrition", value: `${generatedPlan.nutrition.totalCalories}kcal | ${generatedPlan.nutrition.totalProtein}g Pro`, inline: true },
-        { name: "Est. Cost", value: `${generatedPlan.nutrition.totalCost.toLocaleString()} VND`, inline: true }
-      ],
-      0x06b6d4 // Cyan color
-    );
   };
 
   const handleReset = () => {
@@ -202,23 +177,12 @@ export default function App() {
 
     let updatedHistory: WorkoutHistoryItem[] = [];
     // Check if we already have an entry for today (by date string)
+    // Note: The original logic checked exactly, but for history list, prepending is usually safer.
+    // Let's just prepend. If user completes multiple times a day, they get multiple entries.
     updatedHistory = [newItem, ...workoutHistory];
 
     setWorkoutHistory(updatedHistory);
     localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
-
-    // DISCORD LOG: Complete
-    sendDiscordLog(
-      "✅ Workout Completed",
-      `Finished session on ${todayDateStr}`,
-      [
-        { name: "Level", value: levelSelected, inline: true },
-        { name: "Exercises Done", value: exercisesSummary, inline: false },
-        { name: "User Notes", value: userNotes || "No notes", inline: false },
-        { name: "Nutrition Cost", value: `${nutrition.totalCost.toLocaleString()} VND`, inline: true }
-      ],
-      0x10b981 // Emerald color
-    );
   };
 
   const handleDeleteHistoryItem = async (timestamp: number) => {
