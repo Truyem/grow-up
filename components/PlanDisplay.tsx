@@ -214,31 +214,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     const isMobile = /android|ipad|iphone|ipod/i.test(userAgent);
 
     if (isMobile) {
-      const isIOS = /ipad|iphone|ipod/i.test(userAgent);
-      const isAndroid = /android/i.test(userAgent);
-      
-      const webUrl = `https://www.youtube.com/results?search_query=${query}`;
-
-      // Attempt Deep Linking to App
-      if (isIOS) {
-         window.location.href = `youtube://results?search_query=${query}`;
-      } else if (isAndroid) {
-         window.location.href = `vnd.youtube://results?search_query=${query}`;
-      } else {
-         window.open(webUrl, '_blank');
-         return;
-      }
-
-      // Fallback to Web URL if App doesn't open (and page is still visible)
-      // Using setTimeout to verify if user left the page
-      setTimeout(() => {
-        if (!document.hidden) {
-           window.location.href = webUrl;
-        }
-      }, 2500);
-
+      // Mobile: Open m.youtube.com in new tab
+      window.open(`https://m.youtube.com/results?search_query=${query}`, '_blank');
     } else {
-      // Desktop: Open in new tab
+      // Desktop: Open www.youtube.com in new tab
       window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
     }
   };
