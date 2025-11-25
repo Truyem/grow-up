@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
+import { YouTubePopup } from './YouTubePopup';
 import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers } from 'lucide-react';
 
 interface PlanDisplayProps {
@@ -164,6 +165,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [isTimerOpen, setIsTimerOpen] = useState(false);
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+  const [youtubePopup, setYoutubePopup] = useState({
+    isOpen: false,
+    searchQuery: ''
+  });
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
   const totalExercises = currentWorkout.exercises.length;
@@ -214,29 +219,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     const isMobile = /android|ipad|iphone|ipod/i.test(userAgent);
 
     if (isMobile) {
-      const isIOS = /ipad|iphone|ipod/i.test(userAgent);
-      const isAndroid = /android/i.test(userAgent);
-      
-      const webUrl = `https://www.youtube.com/results?search_query=${query}`;
-
-      // Attempt Deep Linking to App
-      if (isIOS) {
-         window.location.href = `youtube://results?search_query=${query}`;
-      } else if (isAndroid) {
-         window.location.href = `vnd.youtube://results?search_query=${query}`;
-      } else {
-         window.open(webUrl, '_blank');
-         return;
-      }
-
-      // Fallback to Web URL if App doesn't open (and page is still visible)
-      // Using setTimeout to verify if user left the page
-      setTimeout(() => {
-        if (!document.hidden) {
-           window.location.href = webUrl;
-        }
-      }, 2500);
-
+      // Open popup instead of deep linking
+      setYoutubePopup({
+        isOpen: true,
+        searchQuery: query
+      });
     } else {
       // Desktop: Open in new tab
       window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
@@ -464,6 +451,12 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           Tạo Kế Hoạch Mới
         </button>
       </div>
+
+      <YouTubePopup 
+        isOpen={youtubePopup.isOpen}
+        onClose={() => setYoutubePopup({ isOpen: false, searchQuery: '' })}
+        searchQuery={youtubePopup.searchQuery}
+      />
     </div>
   );
 };
