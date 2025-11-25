@@ -14,14 +14,6 @@ const getCurrentDate = () => {
 
 // Fallback plans tailored by intensity
 const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
-  [Intensity.Easy]: {
-    levelName: "Nghỉ ngơi & Đi bộ (Rest & Walk)",
-    description: "Cơ thể bạn cần nghỉ ngơi. Chỉ đi bộ nhẹ nhàng để thư giãn, không tập nặng, không Yoga phức tạp.",
-    exercises: [
-      { name: "Đi bộ nhẹ nhàng (Walking)", sets: 1, reps: "15-20 min", notes: "Đi dạo hít thở không khí, thả lỏng cơ thể." },
-      { name: "Nghỉ ngơi hoàn toàn", sets: 1, reps: "N/A", notes: "Ngủ đủ giấc, uống nhiều nước." }
-    ]
-  },
   [Intensity.Medium]: {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp, độ khó tiêu chuẩn.",
@@ -146,41 +138,31 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
         }).join('\n')
       : "Chưa có lịch sử tập trong tuần này.";
 
-    // Logic detection for recovery
-    const isRecoveryNeeded = user.fatigue === FatigueLevel.Tired || user.soreMuscles.filter(m => m !== MuscleGroup.None).length >= 2;
-    const effectiveIntensity = isRecoveryNeeded ? Intensity.Easy : user.selectedIntensity;
-
     const intensityPrompt = {
-      [Intensity.Easy]: "Tạo kế hoạch PHỤC HỒI (RECOVERY). Chỉ cho phép: 1. Đi bộ nhẹ (Walking) hoặc 2. Nghỉ ngơi hoàn toàn. TUYỆT ĐỐI KHÔNG YOGA, không Cardio nặng. Mục tiêu là để cơ bắp nghỉ ngơi.",
       [Intensity.Medium]: "Tạo bài tập Vừa sức (Hypertrophy). Tập trung vào kích thích cơ bắp chuẩn, số reps vừa phải.",
       [Intensity.Hard]: "Tạo bài tập Thử thách (Overload). Cường độ cao, sử dụng dropset hoặc tập đến ngưỡng thất bại nếu an toàn."
     };
 
-    const nutritionPrompt = isRecoveryNeeded
-      ? "Người dùng đang MỆT/ĐAU CƠ. Ưu tiên thực phẩm dễ tiêu, hồi phục."
-      : "Sáng tạo các món ăn ngon, healthy trong tầm giá.";
-
     const prompt = `
-      Bạn là PT Online và Chuyên gia dinh dưỡng tiết kiệm cho sinh viên. Hãy thiết kế **DUY NHẤT 1 LỊCH TẬP** cho mức độ: **"${effectiveIntensity.toUpperCase()}"**.
+      Bạn là PT Online và Chuyên gia dinh dưỡng tiết kiệm cho sinh viên. Hãy thiết kế **DUY NHẤT 1 LỊCH TẬP** cho mức độ: **"${user.selectedIntensity.toUpperCase()}"**.
       
       MỤC TIÊU: Body Recomposition (Tăng cơ giảm mỡ).
       THÔNG TIN KHÁCH HÀNG: 61kg, 1m60.
       TRẠNG THÁI HÔM NAY: ${todayStr}. Mệt mỏi: "${user.fatigue}", Đau cơ: "${user.soreMuscles.join(', ')}".
-      
-      ${isRecoveryNeeded ? "**CẢNH BÁO: KHÁCH HÀNG ĐANG MỆT HOẶC ĐAU NHIỀU. CHUYỂN SANG CHẾ ĐỘ NGHỈ NGƠI/ĐI BỘ.**" : ""}
 
       LỊCH SỬ GẦN ĐÂY:
       ${historyText}
 
-      YÊU CẦU BÀI TẬP (${intensityPrompt[effectiveIntensity]}):
+      YÊU CẦU BÀI TẬP (${intensityPrompt[user.selectedIntensity]}):
       1. TRÁNH TUYỆT ĐỐI nhóm cơ đang đau: ${user.soreMuscles.join(', ')}.
       2. Dụng cụ có sẵn: Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau), BFR Bands, Tạ đơn (4,8,10kg), Dây kháng lực 15kg.
+      3. STAY HARD: Kể cả khi mệt, vẫn phải tập, nhưng hãy chọn bài tập phù hợp để không chấn thương vùng đau (Vd: Đau ngực thì tập chân, đau chân thì tập tay). TUYỆT ĐỐI KHÔNG CHO NGHỈ NGƠI HOẶC ĐI BỘ.
       
       YÊU CẦU DINH DƯỠNG SIÊU TIẾT KIỆM (SINH VIÊN):
       - **TỔNG CHI PHÍ 1 NGÀY: < 80.000 VNĐ (Bắt buộc)**. Tính giá dựa trên giá thị trường Winmart/Chợ dân sinh Việt Nam.
       - NGUYÊN LIỆU CHO PHÉP (Chỉ dùng những thứ này): Cơm, Trứng gà/vịt, Đậu phụ (Đậu hũ), Thịt Bò (ít), Gà (ưu tiên ức gà công nghiệp cho rẻ), Thịt Lợn (nạc), Cá Basa.
       - Calo ~1650, Protein ~110g.
-      - ${nutritionPrompt}
+      - Sáng tạo các món ăn ngon, healthy trong tầm giá.
       - Ưu tiên chế biến bằng NỒI CHIÊN KHÔNG DẦU (Air Fryer) cho tiện.
       - Hãy tính toán ước lượng giá tiền ("estimatedPrice") cho từng bữa và tổng cộng ("totalCost").
 

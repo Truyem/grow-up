@@ -15,7 +15,6 @@ export enum MuscleGroup {
 }
 
 export enum Intensity {
-  Easy = 'easy',
   Medium = 'medium',
   Hard = 'hard',
 }
@@ -47,7 +46,7 @@ export interface Meal {
 }
 
 export interface WorkoutLevel {
-  levelName: string; // "Nhẹ nhàng", "Vừa sức", "Thử thách"
+  levelName: string; // "Vừa sức", "Thử thách"
   description: string;
   exercises: Exercise[];
 }

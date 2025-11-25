@@ -156,7 +156,7 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
   </div>
 );
 
-type FilterType = 'All' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Dumbbell' | 'Band';
+type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green';
 
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete }) => {
   const [isCompleted, setIsCompleted] = useState(false);
@@ -214,7 +214,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     const isMobile = /android|ipad|iphone|ipod/i.test(userAgent);
 
     if (isMobile) {
-      // Mobile: Open m.youtube.com in new tab
+      // Mobile: Open m.youtube.com
       window.open(`https://m.youtube.com/results?search_query=${query}`, '_blank');
     } else {
       // Desktop: Open www.youtube.com in new tab
@@ -248,6 +248,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     if (['Red', 'Blue', 'Yellow', 'Green'].includes(activeFilter)) {
       return ex.colorCode === activeFilter;
     }
+
+    // Board (General)
+    if (activeFilter === 'Board') {
+      return !!ex.colorCode || ex.equipment?.toLowerCase().includes('board');
+    }
     
     // Equipment Filtering
     if (activeFilter === 'Dumbbell') {
@@ -258,17 +263,24 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
     }
 
+    if (activeFilter === 'Bodyweight') {
+       const eq = ex.equipment?.toLowerCase();
+       return !eq || eq.includes('không') || eq.includes('bodyweight') || eq === 'none';
+    }
+
     return true;
   });
 
   const filterOptions: { id: FilterType; label: string; color: string }[] = [
     { id: 'All', label: 'Tất cả', color: 'bg-white/10 text-white' },
+    { id: 'Board', label: 'Board (Chống đẩy)', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
+    { id: 'Dumbbell', label: 'Tạ đơn', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    { id: 'Band', label: 'Dây/BFR', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+    { id: 'Bodyweight', label: 'Bodyweight', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
     { id: 'Red', label: 'Vai (Red)', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
     { id: 'Blue', label: 'Ngực (Blue)', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
     { id: 'Yellow', label: 'Lưng (Yellow)', color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
     { id: 'Green', label: 'Tay sau (Green)', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
-    { id: 'Dumbbell', label: 'Tạ đơn', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-    { id: 'Band', label: 'Dây/BFR', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
   ];
 
   return (
