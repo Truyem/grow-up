@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -13,6 +13,7 @@ interface UserFormProps {
 
 export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSubmit, isLoading }) => {
   const [currentDate, setCurrentDate] = useState('');
+  const [newEquipment, setNewEquipment] = useState('');
 
   useEffect(() => {
     const now = new Date();
@@ -41,6 +42,23 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
 
       return { ...prev, soreMuscles: newSore };
     });
+  };
+
+  const handleAddEquipment = () => {
+    if (newEquipment.trim()) {
+      setUserData(prev => ({
+        ...prev,
+        equipment: [...prev.equipment, newEquipment.trim()]
+      }));
+      setNewEquipment('');
+    }
+  };
+
+  const handleRemoveEquipment = (indexToRemove: number) => {
+    setUserData(prev => ({
+      ...prev,
+      equipment: prev.equipment.filter((_, index) => index !== indexToRemove)
+    }));
   };
 
   const getIntensityLabel = (intensity: Intensity) => {
@@ -85,6 +103,49 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
               />
             </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Equipment Management Section */}
+      <GlassCard title="Dụng cụ tập luyện" icon={<Dumbbell className="w-6 h-6" />}>
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newEquipment}
+              onChange={(e) => setNewEquipment(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddEquipment()}
+              placeholder="Nhập tên dụng cụ (VD: Dây kháng lực 20kg)..."
+              className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            />
+            <button
+              onClick={handleAddEquipment}
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {userData.equipment.length > 0 ? (
+              userData.equipment.map((item, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 group hover:border-white/20 transition-all"
+                >
+                  <span>{item}</span>
+                  <button
+                    onClick={() => handleRemoveEquipment(index)}
+                    className="text-gray-500 hover:text-red-400 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-sm italic w-full text-center py-2">Chưa có dụng cụ nào. Hãy thêm vào!</p>
+            )}
           </div>
         </div>
       </GlassCard>

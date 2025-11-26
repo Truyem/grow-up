@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup } from "../types";
 
@@ -161,7 +160,13 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
 
       QUY TẮC BÀI TẬP:
       1. TRÁNH NHÓM CƠ ĐAU: ${user.soreMuscles.join(', ')}.
-      2. DỤNG CỤ: Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau), BFR Bands, Tạ đơn (4,8,10kg), Dây 15kg.
+      2. DỤNG CỤ CÓ SẴN (Chỉ dùng danh sách này):
+         ${user.equipment.map(e => {
+            if (e.trim() === "Board chống đẩy") {
+              return "- Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau)";
+            }
+            return `- ${e}`;
+         }).join('\n         ')}
       3. CHIA 2 BUỔI (SÁNG & TỐI): Sắp xếp thứ tự bài tập tối ưu nhất. Sáng tập nhóm cơ lớn/nặng. Tối tập phụ trợ hoặc nhóm cơ nhỏ để tối ưu Volume.
       4. STYLE GOGGINS (TIẾNG VIỆT): Phần "notes" của mỗi bài tập PHẢI là những câu nói, lời quát tháo mang phong cách David Goggins được dịch sang Tiếng Việt một cách đanh thép.
          (Ví dụ: "Ai sẽ vác những chiếc thuyền này?", "Bọn nó tuổi gì!", "STAY HARD! Cứng rắn lên!", "Chiếm lấy linh hồn chúng!", "Đừng làm thằng hèn!").

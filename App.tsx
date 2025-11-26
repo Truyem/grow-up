@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal } from './types';
 import { UserForm } from './components/UserForm';
@@ -8,6 +7,16 @@ import { AnalysisView } from './components/AnalysisView';
 import { generateDailyPlan } from './services/geminiService';
 import { Sparkles, History } from 'lucide-react';
 
+// Default equipment list
+const DEFAULT_EQUIPMENT = [
+  "Board chống đẩy",
+  "BFR Bands",
+  "Tạ đơn 4kg",
+  "Tạ đơn 8kg",
+  "Tạ đơn 10kg",
+  "Dây kháng lực 15kg"
+];
+
 // Initial State
 const INITIAL_USER_DATA: UserInput = {
   weight: 61,
@@ -15,6 +24,7 @@ const INITIAL_USER_DATA: UserInput = {
   fatigue: FatigueLevel.Normal,
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium, // Default to Medium
+  equipment: DEFAULT_EQUIPMENT,
 };
 
 type ViewMode = 'input' | 'plan' | 'history' | 'analysis';

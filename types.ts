@@ -25,6 +25,7 @@ export interface UserInput {
   fatigue: FatigueLevel;
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
+  equipment: string[]; // List of available equipment
 }
 
 export interface Exercise {
