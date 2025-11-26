@@ -71,10 +71,19 @@ export default function App() {
               
               if (checkedKeys.length > 0) {
                 // Determine completed exercises strings
-                const exercises = cachedPlan.workout.detail.exercises;
-                const completedList = exercises
-                  .filter((_, idx) => progress.checkedState[`ex-${idx}`])
-                  .map(ex => ex.name);
+                const morningEx = cachedPlan.workout.detail.morning || [];
+                const eveningEx = cachedPlan.workout.detail.evening || [];
+                
+                // Helper to map back from "mor-X" or "eve-X"
+                const completedList: string[] = [];
+                
+                morningEx.forEach((ex, idx) => {
+                   if (progress.checkedState[`mor-${idx}`]) completedList.push(ex.name);
+                });
+                
+                eveningEx.forEach((ex, idx) => {
+                   if (progress.checkedState[`eve-${idx}`]) completedList.push(ex.name);
+                });
                 
                 // Construct summary
                 const exSummary = completedList.join(', ');
@@ -176,9 +185,6 @@ export default function App() {
     };
 
     let updatedHistory: WorkoutHistoryItem[] = [];
-    // Check if we already have an entry for today (by date string)
-    // Note: The original logic checked exactly, but for history list, prepending is usually safer.
-    // Let's just prepend. If user completes multiple times a day, they get multiple entries.
     updatedHistory = [newItem, ...workoutHistory];
 
     setWorkoutHistory(updatedHistory);

@@ -16,20 +16,26 @@ const getCurrentDate = () => {
 const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
   [Intensity.Medium]: {
     levelName: "Vừa sức (Normal)",
-    description: "Duy trì cơ bắp, độ khó tiêu chuẩn.",
-    exercises: [
-      { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board" },
-      { name: "Dumbbell Goblet Squat", sets: 4, reps: "12", equipment: "Tạ 10kg" },
-      { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg" }
+    description: "Duy trì cơ bắp, độ khó tiêu chuẩn. Chia 2 buổi.",
+    morning: [
+      { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!" },
+      { name: "Dumbbell Goblet Squat", sets: 4, reps: "12", equipment: "Tạ 10kg", notes: "Chúng nó không biết tao là ai đâu con trai!" }
+    ],
+    evening: [
+       { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
+       { name: "Plank", sets: 3, reps: "45s", equipment: "None", notes: "STAY HARD! Cứng rắn lên!" }
     ]
   },
   [Intensity.Hard]: {
     levelName: "Cháy hết mình (Hard)",
-    description: "Tăng cơ tối đa, cường độ cao.",
-    exercises: [
-      { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao" },
-      { name: "BFR Bicep Curls", sets: 4, reps: "20", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Nghỉ 30s, tập chậm cảm nhận cơ" },
-      { name: "Goblet Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg" }
+    description: "Tăng cơ tối đa, cường độ cao. Chia 2 buổi.",
+    morning: [
+      { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?" },
+      { name: "Goblet Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
+    ],
+    evening: [
+      { name: "BFR Bicep Curls", sets: 4, reps: "20", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
+      { name: "Diamond Push-up (Green)", sets: 3, reps: "Failure", colorCode: "Green", equipment: "Board", notes: "Rõ rồi. Chiến thôi!" }
     ]
   }
 };
@@ -53,6 +59,20 @@ const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
   }
 });
 
+const exerciseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    name: { type: Type.STRING },
+    sets: { type: Type.NUMBER },
+    reps: { type: Type.STRING },
+    notes: { type: Type.STRING },
+    equipment: { type: Type.STRING },
+    colorCode: { type: Type.STRING, enum: ["Red", "Blue", "Yellow", "Green"] },
+    isBFR: { type: Type.BOOLEAN }
+  },
+  required: ["name", "sets", "reps", "notes"]
+};
+
 const responseSchema: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -66,24 +86,10 @@ const responseSchema: Schema = {
           properties: {
             levelName: { type: Type.STRING },
             description: { type: Type.STRING },
-            exercises: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  sets: { type: Type.NUMBER },
-                  reps: { type: Type.STRING },
-                  notes: { type: Type.STRING },
-                  equipment: { type: Type.STRING },
-                  colorCode: { type: Type.STRING, enum: ["Red", "Blue", "Yellow", "Green"] },
-                  isBFR: { type: Type.BOOLEAN }
-                },
-                required: ["name", "sets", "reps"]
-              }
-            }
+            morning: { type: Type.ARRAY, items: exerciseSchema },
+            evening: { type: Type.ARRAY, items: exerciseSchema }
           },
-          required: ["levelName", "description", "exercises"]
+          required: ["levelName", "description", "morning", "evening"]
         }
       },
       required: ["summary", "detail"]
@@ -139,34 +145,33 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       : "Chưa có lịch sử tập trong tuần này.";
 
     const intensityPrompt = {
-      [Intensity.Medium]: "Tạo bài tập Vừa sức (Hypertrophy). Tập trung vào kích thích cơ bắp chuẩn, số reps vừa phải.",
-      [Intensity.Hard]: "Tạo bài tập Thử thách (Overload). Cường độ cao, sử dụng dropset hoặc tập đến ngưỡng thất bại nếu an toàn."
+      [Intensity.Medium]: "Tạo bài tập Vừa sức (Hypertrophy).",
+      [Intensity.Hard]: "Tạo bài tập Thử thách (Overload). Max effort."
     };
 
     const prompt = `
-      Bạn là PT Online và Chuyên gia dinh dưỡng tiết kiệm cho sinh viên. Hãy thiết kế **DUY NHẤT 1 LỊCH TẬP** cho mức độ: **"${user.selectedIntensity.toUpperCase()}"**.
+      Bạn là David Goggins (Motivational Speaker/Navy SEAL).
+      
+      NHIỆM VỤ: Thiết kế lịch tập "STAY HARD" chia làm 2 buổi: SÁNG (Morning) và TỐI (Evening).
+      Mức độ: **"${user.selectedIntensity.toUpperCase()}"**.
       
       MỤC TIÊU: Body Recomposition (Tăng cơ giảm mỡ).
-      THÔNG TIN KHÁCH HÀNG: 61kg, 1m60.
-      TRẠNG THÁI HÔM NAY: ${todayStr}. Mệt mỏi: "${user.fatigue}", Đau cơ: "${user.soreMuscles.join(', ')}".
+      THÔNG TIN: 61kg, 1m60.
+      HÔM NAY: ${todayStr}. Mệt: "${user.fatigue}", Đau: "${user.soreMuscles.join(', ')}".
 
-      LỊCH SỬ GẦN ĐÂY:
-      ${historyText}
+      QUY TẮC BÀI TẬP:
+      1. TRÁNH NHÓM CƠ ĐAU: ${user.soreMuscles.join(', ')}.
+      2. DỤNG CỤ: Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau), BFR Bands, Tạ đơn (4,8,10kg), Dây 15kg.
+      3. CHIA 2 BUỔI (SÁNG & TỐI): Sắp xếp thứ tự bài tập tối ưu nhất. Sáng tập nhóm cơ lớn/nặng. Tối tập phụ trợ hoặc nhóm cơ nhỏ để tối ưu Volume.
+      4. STYLE GOGGINS (TIẾNG VIỆT): Phần "notes" của mỗi bài tập PHẢI là những câu nói, lời quát tháo mang phong cách David Goggins được dịch sang Tiếng Việt một cách đanh thép.
+         (Ví dụ: "Ai sẽ vác những chiếc thuyền này?", "Bọn nó tuổi gì!", "STAY HARD! Cứng rắn lên!", "Chiếm lấy linh hồn chúng!", "Đừng làm thằng hèn!").
 
-      YÊU CẦU BÀI TẬP (${intensityPrompt[user.selectedIntensity]}):
-      1. TRÁNH TUYỆT ĐỐI nhóm cơ đang đau: ${user.soreMuscles.join(', ')}.
-      2. Dụng cụ có sẵn: Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau), BFR Bands, Tạ đơn (4,8,10kg), Dây kháng lực 15kg.
-      3. STAY HARD: Kể cả khi mệt, vẫn phải tập, nhưng hãy chọn bài tập phù hợp để không chấn thương vùng đau (Vd: Đau ngực thì tập chân, đau chân thì tập tay). TUYỆT ĐỐI KHÔNG CHO NGHỈ NGƠI HOẶC ĐI BỘ.
-      
-      YÊU CẦU DINH DƯỠNG SIÊU TIẾT KIỆM (SINH VIÊN):
-      - **TỔNG CHI PHÍ 1 NGÀY: < 80.000 VNĐ (Bắt buộc)**. Tính giá dựa trên giá thị trường Winmart/Chợ dân sinh Việt Nam.
-      - NGUYÊN LIỆU CHO PHÉP (Chỉ dùng những thứ này): Cơm, Trứng gà/vịt, Đậu phụ (Đậu hũ), Thịt Bò (ít), Gà (ưu tiên ức gà công nghiệp cho rẻ), Thịt Lợn (nạc), Cá Basa.
-      - Calo ~1650, Protein ~110g.
-      - Sáng tạo các món ăn ngon, healthy trong tầm giá.
-      - Ưu tiên chế biến bằng NỒI CHIÊN KHÔNG DẦU (Air Fryer) cho tiện.
-      - Hãy tính toán ước lượng giá tiền ("estimatedPrice") cho từng bữa và tổng cộng ("totalCost").
+      DINH DƯỠNG (SINH VIÊN < 80k VND):
+      - Nguyên liệu: Cơm, Trứng, Đậu phụ, Gà, Lợn, Cá Basa.
+      - Chế biến: Air Fryer.
+      - Tính giá tiền chi tiết.
 
-      Trả về JSON duy nhất cho mức độ đã chọn.
+      Trả về JSON.
     `;
 
     const response = await ai.models.generateContent({

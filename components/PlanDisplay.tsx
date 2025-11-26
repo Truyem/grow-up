@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers } from 'lucide-react';
+import { MusicPlayer } from './ui/MusicPlayer';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -39,17 +40,16 @@ const ColorBadge: React.FC<{ color?: string }> = ({ color }) => {
 
 interface ExerciseItemProps {
   exercise: Exercise;
-  index: number;
   isChecked: boolean;
   onToggle: () => void;
   onPreview: () => void;
   onStartTimer: () => void;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked, onToggle, onPreview, onStartTimer }) => (
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer }) => (
   <div 
     className={`
-      group relative pl-4 py-3 border-l-2 transition-all duration-300
+      group relative pl-4 py-3 border-l-2 transition-all duration-300 mb-2 rounded-r-lg
       ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-white/10 hover:bg-white/5'}
     `}
   >
@@ -116,9 +116,9 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, index, isChecked,
         {exercise.notes && (
           <p 
             onClick={onToggle}
-            className={`text-xs italic bg-black/20 p-2 rounded-lg border border-white/5 mt-2 cursor-pointer ${isChecked ? 'text-emerald-200/50' : 'text-gray-400'}`}
+            className={`text-xs italic bg-red-900/20 p-2 rounded-lg border border-red-500/20 mt-2 cursor-pointer font-bold ${isChecked ? 'text-emerald-200/50' : 'text-red-300/80'}`}
           >
-            💡 {exercise.notes}
+            🔥 "{exercise.notes}"
           </p>
         )}
       </div>
@@ -166,9 +166,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
-  const totalExercises = currentWorkout.exercises.length;
   
-  const checkedCount = currentWorkout.exercises.filter((_, idx) => checkedState[`ex-${idx}`]).length;
+  // Combine all exercises to calculate progress
+  const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+  const totalExercises = allExercises.length;
+  
+  // Calculate checked based on composite keys "mor-X" and "eve-X"
+  const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = Math.round((checkedCount / totalExercises) * 100);
 
   // Restore progress from local storage on mount
@@ -201,8 +205,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     }
   }, [checkedState, userNote, plan.date, isCompleted]);
 
-  const handleToggle = (index: number) => {
-    const key = `ex-${index}`;
+  const handleToggle = (key: string) => {
     setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -224,9 +227,16 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   const handleComplete = () => {
     setIsCompleted(true);
-    const completedExercisesList = currentWorkout.exercises
-      .filter((_, idx) => checkedState[`ex-${idx}`])
+    
+    const completedMorning = currentWorkout.morning
+      .filter((_, idx) => checkedState[`mor-${idx}`])
       .map(ex => ex.name);
+      
+    const completedEvening = currentWorkout.evening
+      .filter((_, idx) => checkedState[`eve-${idx}`])
+      .map(ex => ex.name);
+
+    const completedExercisesList = [...completedMorning, ...completedEvening];
 
     // Clear the progress cache since we are finishing it
     localStorage.removeItem('workout_progress');
@@ -240,36 +250,22 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     );
   };
 
-  // Filter Logic
-  const filteredExercises = currentWorkout.exercises.filter(ex => {
+  // Filter Logic Helper
+  const filterExercise = (ex: Exercise) => {
     if (activeFilter === 'All') return true;
-    
-    // Color/Muscle Filtering
-    if (['Red', 'Blue', 'Yellow', 'Green'].includes(activeFilter)) {
-      return ex.colorCode === activeFilter;
-    }
-
-    // Board (General)
-    if (activeFilter === 'Board') {
-      return !!ex.colorCode || ex.equipment?.toLowerCase().includes('board');
-    }
-    
-    // Equipment Filtering
-    if (activeFilter === 'Dumbbell') {
-      return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
-    }
-    
-    if (activeFilter === 'Band') {
-      return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
-    }
-
+    if (['Red', 'Blue', 'Yellow', 'Green'].includes(activeFilter)) return ex.colorCode === activeFilter;
+    if (activeFilter === 'Board') return !!ex.colorCode || ex.equipment?.toLowerCase().includes('board');
+    if (activeFilter === 'Dumbbell') return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
+    if (activeFilter === 'Band') return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
     if (activeFilter === 'Bodyweight') {
        const eq = ex.equipment?.toLowerCase();
        return !eq || eq.includes('không') || eq.includes('bodyweight') || eq === 'none';
     }
-
     return true;
-  });
+  };
+
+  const filteredMorning = currentWorkout.morning.filter(filterExercise);
+  const filteredEvening = currentWorkout.evening.filter(filterExercise);
 
   const filterOptions: { id: FilterType; label: string; color: string }[] = [
     { id: 'All', label: 'Tất cả', color: 'bg-white/10 text-white' },
@@ -283,8 +279,41 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     { id: 'Green', label: 'Tay sau (Green)', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
   ];
 
+  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, filtered: Exercise[]) => (
+    <div className="mb-6 last:mb-0">
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10 text-cyan-200">
+        {icon}
+        <h4 className="font-bold uppercase tracking-wider text-sm">{title}</h4>
+        <span className="text-xs text-gray-500 ml-auto">({filtered.length} bài)</span>
+      </div>
+      
+      <div className="space-y-1">
+        {filtered.length > 0 ? (
+           filtered.map((ex) => {
+             // Find original index in the unfiltered array to maintain state consistency
+             const originalIndex = exercises.indexOf(ex);
+             const key = `${prefix}-${originalIndex}`;
+             return (
+               <ExerciseItem 
+                 key={key} 
+                 exercise={ex} 
+                 isChecked={!!checkedState[key]}
+                 onToggle={() => handleToggle(key)}
+                 onPreview={() => handleOpenYouTube(ex.name)}
+                 onStartTimer={() => setIsTimerOpen(true)}
+               />
+             );
+           })
+        ) : (
+           <p className="text-sm text-gray-500 italic py-2">Không có bài tập nào phù hợp với bộ lọc.</p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 animate-fade-in relative">
+    // Added pt-28 (top padding) to accommodate the sticky top RestTimer
+    <div className="space-y-6 animate-fade-in relative pt-28">
       <RestTimer 
         isOpen={isTimerOpen} 
         onClose={() => setIsTimerOpen(false)} 
@@ -325,6 +354,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
              {currentWorkout.description}
            </p>
 
+           {/* Music Player Embedded Here */}
+           <MusicPlayer />
+
            {/* Filter Bar */}
            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
               <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -357,30 +389,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
               </div>
            </div>
 
-           <div className="space-y-2 mt-2">
-             {filteredExercises.length > 0 ? (
-               filteredExercises.map((ex) => {
-                 // Find original index to maintain consistent state keys
-                 const originalIndex = currentWorkout.exercises.indexOf(ex);
-                 return (
-                   <ExerciseItem 
-                     key={`ex-${originalIndex}`} 
-                     exercise={ex} 
-                     index={originalIndex} 
-                     isChecked={!!checkedState[`ex-${originalIndex}`]}
-                     onToggle={() => handleToggle(originalIndex)}
-                     onPreview={() => handleOpenYouTube(ex.name)}
-                     onStartTimer={() => setIsTimerOpen(true)}
-                   />
-                 );
-               })
-             ) : (
-               <div className="text-center py-8 text-gray-500 flex flex-col items-center gap-2">
-                  <Layers className="w-8 h-8 opacity-50" />
-                  <p className="text-sm">Không có bài tập nào thuộc nhóm này.</p>
-               </div>
-             )}
-           </div>
+           {/* Render Morning Session */}
+           {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning)}
+           
+           {/* Render Evening Session */}
+           {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening)}
 
            <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
              <div className="flex gap-2 items-center text-xs text-gray-500">
@@ -396,7 +409,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                   value={userNote}
                   onChange={(e) => setUserNote(e.target.value)}
                   disabled={isCompleted}
-                  placeholder="Ví dụ: Đẩy ngực hơi mỏi vai trái, tăng tạ 10kg ok..."
+                  placeholder="Who's gonna carry the boats? Ghi chú lại cảm giác..."
                   className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none h-20"
                 />
              </div>

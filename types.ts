@@ -48,7 +48,8 @@ export interface Meal {
 export interface WorkoutLevel {
   levelName: string; // "Vừa sức", "Thử thách"
   description: string;
-  exercises: Exercise[];
+  morning: Exercise[]; // Split session
+  evening: Exercise[]; // Split session
 }
 
 export interface DailyPlan {
