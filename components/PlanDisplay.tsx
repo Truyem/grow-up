@@ -3,7 +3,7 @@ import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { MusicPlayer } from './ui/MusicPlayer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -45,85 +45,92 @@ interface ExerciseItemProps {
   onStartTimer: () => void;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer }) => (
-  <div 
-    className={`
-      group relative pl-4 py-3 border-l-2 transition-all duration-300 mb-2 rounded-r-lg
-      ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-white/10 hover:bg-white/5'}
-    `}
-  >
-    <div className="flex items-start gap-4">
-      <div 
-        onClick={onToggle}
-        className={`mt-1 cursor-pointer transition-colors ${isChecked ? 'text-emerald-400' : 'text-gray-600 group-hover:text-cyan-400'}`}
-      >
-         {isChecked ? <CheckSquare className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
-      </div>
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer }) => {
+  const isWalking = exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking');
 
-      <div className="flex-1">
-        <div className="flex justify-between items-start mb-1">
-          <button 
-            onClick={onPreview}
-            className={`text-left font-bold text-lg transition-all flex items-center gap-2 hover:underline decoration-cyan-500/50 decoration-2 underline-offset-4
-              ${isChecked ? 'text-emerald-400 line-through decoration-emerald-500/50 opacity-70' : 'text-white group-hover:text-cyan-300'}
-            `}
-            title="Xem hướng dẫn trên YouTube"
-          >
-            {exercise.name}
-            <ExternalLink className={`w-3.5 h-3.5 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
-          </button>
-          
-          <div className="flex gap-2">
-            <ColorBadge color={exercise.colorCode} />
-            {exercise.isBFR && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-500 text-white shadow-lg shadow-pink-500/40">
-                BFR
-              </span>
-            )}
-          </div>
+  return (
+    <div 
+      className={`
+        group relative pl-4 py-3 border-l-2 transition-all duration-300 mb-2 rounded-r-lg
+        ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-white/10 hover:bg-white/5'}
+      `}
+    >
+      <div className="flex items-start gap-4">
+        <div 
+          onClick={onToggle}
+          className={`mt-1 cursor-pointer transition-colors ${isChecked ? 'text-emerald-400' : 'text-gray-600 group-hover:text-cyan-400'}`}
+        >
+           {isChecked ? <CheckSquare className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
         </div>
-        
-        <div className="flex items-center justify-between">
-          <div 
-            onClick={onToggle}
-            className="cursor-pointer"
-          >
-            <div className={`flex items-center gap-4 text-sm mb-2 ${isChecked ? 'opacity-50' : 'text-gray-300'}`}>
-              <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" /> {exercise.sets} Sets</span>
-              <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /> {exercise.reps} Reps</span>
-            </div>
+
+        <div className="flex-1">
+          <div className="flex justify-between items-start mb-1">
+            <button 
+              onClick={onPreview}
+              className={`text-left font-bold text-lg transition-all flex items-center gap-2 hover:underline decoration-cyan-500/50 decoration-2 underline-offset-4
+                ${isChecked ? 'text-emerald-400 line-through decoration-emerald-500/50 opacity-70' : 'text-white group-hover:text-cyan-300'}
+              `}
+              title="Xem hướng dẫn trên YouTube"
+            >
+              {exercise.name}
+              <ExternalLink className={`w-3.5 h-3.5 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
+            </button>
             
-            {exercise.equipment && (
-              <div className={`text-xs mb-1 flex items-center gap-1 ${isChecked ? 'opacity-50' : 'text-gray-400'}`}>
-                <Dumbbell className="w-3 h-3" /> {exercise.equipment}
-              </div>
-            )}
+            <div className="flex gap-2">
+              <ColorBadge color={exercise.colorCode} />
+              {exercise.isBFR && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-500 text-white shadow-lg shadow-pink-500/40">
+                  BFR
+                </span>
+              )}
+            </div>
           </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartTimer();
-            }}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-cyan-300 font-bold transition-all active:scale-95 hover:border-cyan-500/30"
-          >
-            <Timer className="w-3.5 h-3.5" />
-            {exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking') ? 'Đếm giờ' : 'Nghỉ'}
-          </button>
-        </div>
           
-        {exercise.notes && (
-          <p 
-            onClick={onToggle}
-            className={`text-xs italic bg-red-900/20 p-2 rounded-lg border border-red-500/20 mt-2 cursor-pointer font-bold ${isChecked ? 'text-emerald-200/50' : 'text-red-300/80'}`}
-          >
-            🔥 "{exercise.notes}"
-          </p>
-        )}
+          <div className="flex items-center justify-between">
+            <div 
+              onClick={onToggle}
+              className="cursor-pointer"
+            >
+              <div className={`flex items-center gap-4 text-sm mb-2 ${isChecked ? 'opacity-50' : 'text-gray-300'}`}>
+                <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" /> {exercise.sets} Sets</span>
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /> {exercise.reps}</span>
+              </div>
+              
+              {exercise.equipment && (
+                <div className={`text-xs mb-1 flex items-center gap-1 ${isChecked ? 'opacity-50' : 'text-gray-400'}`}>
+                  <Dumbbell className="w-3 h-3" /> {exercise.equipment}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartTimer();
+              }}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border transition-all active:scale-95 
+                ${isWalking 
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300' 
+                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-cyan-300 hover:border-cyan-500/30'}`}
+            >
+              {isWalking ? <Footprints className="w-3.5 h-3.5" /> : <Timer className="w-3.5 h-3.5" />}
+              <span className="text-xs font-bold">{isWalking ? 'Đi bộ (60p)' : 'Nghỉ'}</span>
+            </button>
+          </div>
+            
+          {exercise.notes && (
+            <p 
+              onClick={onToggle}
+              className={`text-xs italic bg-red-900/20 p-2 rounded-lg border border-red-500/20 mt-2 cursor-pointer font-bold ${isChecked ? 'text-emerald-200/50' : 'text-red-300/80'}`}
+            >
+              🔥 "{exercise.notes}"
+            </p>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
   <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1">
@@ -363,7 +370,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                 <AlarmClock className="w-5 h-5" />
              </div>
              <div>
-                <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu</h4>
+                <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu (Tránh 12-14h)</h4>
                 <div className="flex gap-4 mt-1">
                    <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
                       <Sun className="w-3.5 h-3.5 text-yellow-400" />
@@ -416,7 +423,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
            <div className="mb-4">
               <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-400">Tiến độ (Tổng thể)</span>
+                 <span className="text-gray-400">Tiến độ (XP)</span>
                  <span className={`font-bold ${progressPercent === 100 ? 'text-emerald-400' : 'text-cyan-400'}`}>{progressPercent}%</span>
               </div>
               <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
@@ -472,13 +479,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                    <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành (+150 XP)
                  </>
                ) : (
-                 <>Hoàn Thành Buổi Tập <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">+150 XP</span></>
+                 <>Hoàn Thành Buổi Tập <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full ml-2">+150 XP</span></>
                )}
              </button>
            </div>
         </GlassCard>
 
-        <GlassCard title="Thực Đơn Sinh Viên (<80k)" icon={<Utensils className="w-6 h-6" />}>
+        <GlassCard title="Thực Đơn (Cơm & Súp lơ)" icon={<Utensils className="w-6 h-6" />}>
           <div className="grid grid-cols-3 gap-2 mb-6">
             <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
@@ -492,6 +499,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
               <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền</p>
               <p className="text-sm font-bold text-yellow-300">{formatCurrency(plan.nutrition.totalCost)}</p>
             </div>
+          </div>
+          
+          <div className="text-xs text-gray-400 italic mb-4 text-center">
+             *Thực đơn sử dụng Cơm trắng kết hợp Súp lơ (Cauliflower) làm rau chính.
           </div>
 
           <div className="space-y-4">
