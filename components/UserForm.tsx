@@ -1,25 +1,32 @@
-
 import React, { useEffect, useState } from 'react';
-import { FatigueLevel, MuscleGroup, UserInput, Intensity } from '../types';
+import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, Award, Zap } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
   setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
+  userStats: UserStats;
   onSubmit: () => void;
   isLoading: boolean;
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSubmit, isLoading }) => {
+export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userStats, onSubmit, isLoading }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [newEquipment, setNewEquipment] = useState('');
+  const [newIngredient, setNewIngredient] = useState('');
+  const [newConsumedFood, setNewConsumedFood] = useState('');
 
   useEffect(() => {
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
+
+  // Calculate XP Progress
+  const xpForNextLevel = 500;
+  const currentLevelXp = userStats.xp % xpForNextLevel;
+  const xpProgress = (currentLevelXp / xpForNextLevel) * 100;
   
   const handleMuscleChange = (muscle: MuscleGroup) => {
     setUserData(prev => {
@@ -61,6 +68,40 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
     }));
   };
 
+  const handleAddIngredient = () => {
+    if (newIngredient.trim()) {
+      setUserData(prev => ({
+        ...prev,
+        availableIngredients: [...(prev.availableIngredients || []), newIngredient.trim()]
+      }));
+      setNewIngredient('');
+    }
+  };
+
+  const handleRemoveIngredient = (indexToRemove: number) => {
+    setUserData(prev => ({
+      ...prev,
+      availableIngredients: (prev.availableIngredients || []).filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  const handleAddConsumedFood = () => {
+    if (newConsumedFood.trim()) {
+      setUserData(prev => ({
+        ...prev,
+        consumedFood: [...(prev.consumedFood || []), newConsumedFood.trim()]
+      }));
+      setNewConsumedFood('');
+    }
+  };
+
+  const handleRemoveConsumedFood = (indexToRemove: number) => {
+    setUserData(prev => ({
+      ...prev,
+      consumedFood: (prev.consumedFood || []).filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
   const getIntensityLabel = (intensity: Intensity) => {
     switch (intensity) {
       case Intensity.Medium: return "Vừa sức (Hypertrophy)";
@@ -71,6 +112,51 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
 
   return (
     <div className="space-y-6 animate-fade-in">
+      
+      {/* --- GAMIFICATION PROFILE CARD --- */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/40 via-purple-900/40 to-black/40 border border-white/10 shadow-2xl p-5 group">
+        <div className="absolute top-0 right-0 p-3 opacity-20">
+           <Award className="w-24 h-24 text-yellow-500 rotate-12" />
+        </div>
+        
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-orange-500/20">
+              {userStats.level}
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg">Chiến Binh</h3>
+              <div className="text-xs text-gray-400">Level {userStats.level}</div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end">
+             <div className="flex items-center gap-1 text-orange-400 font-bold bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+                <Flame className="w-4 h-4 fill-orange-400 animate-pulse" />
+                {userStats.streak} Ngày
+             </div>
+             <span className="text-[10px] text-gray-500 mt-1 uppercase tracking-wide">Chuỗi đăng nhập</span>
+          </div>
+        </div>
+
+        <div className="relative z-10">
+           <div className="flex justify-between text-xs text-gray-300 mb-1 font-medium">
+             <span>Kinh nghiệm (XP)</span>
+             <span>{Math.floor(currentLevelXp)} / {xpForNextLevel}</span>
+           </div>
+           <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
+             <div 
+               className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all duration-1000 ease-out"
+               style={{ width: `${xpProgress}%` }}
+             />
+           </div>
+           <div className="text-[10px] text-gray-400 mt-2 text-center italic">
+             "Hoàn thành buổi tập để nhận +150 XP"
+           </div>
+        </div>
+      </div>
+      
+      {/* Standard Form Below */}
       <GlassCard title="Thông tin hôm nay" icon={<Calendar className="w-6 h-6" />}>
         <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
           <p className="text-sm text-gray-400 uppercase tracking-widest mb-1">Hôm nay là</p>
@@ -110,13 +196,14 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
       {/* Equipment Management Section */}
       <GlassCard title="Dụng cụ tập luyện" icon={<Dumbbell className="w-6 h-6" />}>
         <div className="space-y-4">
+          <p className="text-xs text-gray-400 -mt-2">Hệ thống sẽ mặc định bạn chỉ có 1 quả tạ (1 tay) trừ khi bạn ghi rõ "2x" hoặc "đôi".</p>
           <div className="flex gap-2">
             <input
               type="text"
               value={newEquipment}
               onChange={(e) => setNewEquipment(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddEquipment()}
-              placeholder="Nhập tên dụng cụ (VD: Dây kháng lực 20kg)..."
+              placeholder="Nhập tên dụng cụ (VD: Tạ đơn 10kg)..."
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
             <button
@@ -188,6 +275,94 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, onSub
                 {muscle}
               </button>
             ))}
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Available Ingredients */}
+      <GlassCard title="Nguyên liệu có sẵn (Tủ lạnh)" icon={<Refrigerator className="w-6 h-6" />}>
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400 -mt-2">Nhập những món bạn đang có để AI gợi ý thực đơn tiết kiệm.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newIngredient}
+              onChange={(e) => setNewIngredient(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddIngredient()}
+              placeholder="VD: 500g Ức gà, 10 quả trứng..."
+              className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            />
+            <button
+              onClick={handleAddIngredient}
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(userData.availableIngredients || []).length > 0 ? (
+              (userData.availableIngredients || []).map((item, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-200 group hover:border-emerald-500/40 transition-all"
+                >
+                  <span>{item}</span>
+                  <button
+                    onClick={() => handleRemoveIngredient(index)}
+                    className="text-emerald-500/50 hover:text-red-400 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-sm italic w-full text-center py-2">Tủ lạnh đang trống...</p>
+            )}
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Consumed Food */}
+      <GlassCard title="Đã ăn hôm nay (Tính Calories)" icon={<Utensils className="w-6 h-6" />}>
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400 -mt-2">Nhập những gì bạn ĐÃ ăn để AI trừ đi và tính khẩu phần còn lại.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newConsumedFood}
+              onChange={(e) => setNewConsumedFood(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddConsumedFood()}
+              placeholder="VD: 1 bát phở bò, 1 ly cà phê sữa..."
+              className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            />
+            <button
+              onClick={handleAddConsumedFood}
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(userData.consumedFood || []).length > 0 ? (
+              (userData.consumedFood || []).map((item, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-sm text-orange-200 group hover:border-orange-500/40 transition-all"
+                >
+                  <span>{item}</span>
+                  <button
+                    onClick={() => handleRemoveConsumedFood(index)}
+                    className="text-orange-500/50 hover:text-red-400 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-sm italic w-full text-center py-2">Chưa ăn gì hôm nay...</p>
+            )}
           </div>
         </div>
       </GlassCard>

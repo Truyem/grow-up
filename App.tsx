@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
@@ -20,11 +20,21 @@ const DEFAULT_EQUIPMENT = [
 // Initial State
 const INITIAL_USER_DATA: UserInput = {
   weight: 61,
-  height: 160,
+  height: 165,
   fatigue: FatigueLevel.Normal,
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium, // Default to Medium
   equipment: DEFAULT_EQUIPMENT,
+  availableIngredients: [],
+  consumedFood: []
+};
+
+// Initial Stats
+const INITIAL_STATS: UserStats = {
+  xp: 0,
+  level: 1,
+  streak: 0,
+  lastLoginDate: ''
 };
 
 type ViewMode = 'input' | 'plan' | 'history' | 'analysis';
@@ -38,12 +48,13 @@ const getTodayString = () => {
 
 export default function App() {
   const [userData, setUserData] = useState<UserInput>(INITIAL_USER_DATA);
+  const [userStats, setUserStats] = useState<UserStats>(INITIAL_STATS);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('input');
 
-  // Load local history, cached plan, and auto-complete logic
+  // Load local history, cached plan, stats and auto-complete logic
   useEffect(() => {
     // 1. Load History
     let currentHistory: WorkoutHistoryItem[] = [];
@@ -57,7 +68,40 @@ export default function App() {
       }
     }
 
-    // 2. Check for Cached Plan and Progress
+    // 2. Load Stats & Handle Streak Logic
+    const savedStatsStr = localStorage.getItem('user_stats');
+    let currentStats = INITIAL_STATS;
+    
+    if (savedStatsStr) {
+      try {
+        currentStats = JSON.parse(savedStatsStr);
+      } catch(e) { console.error("Failed stats load", e); }
+    }
+
+    const todayDate = new Date().toDateString(); // "Mon Sep 28 2025" format for streak logic
+    if (currentStats.lastLoginDate !== todayDate) {
+      // Check if last login was yesterday to increment streak
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (currentStats.lastLoginDate === yesterday.toDateString()) {
+        currentStats.streak += 1;
+      } else if (currentStats.lastLoginDate && currentStats.lastLoginDate !== todayDate) {
+        // Break streak if gap > 1 day
+        currentStats.streak = 1;
+      } else if (!currentStats.lastLoginDate) {
+        currentStats.streak = 1;
+      }
+      
+      currentStats.lastLoginDate = todayDate;
+      setUserStats(currentStats);
+      localStorage.setItem('user_stats', JSON.stringify(currentStats));
+    } else {
+      setUserStats(currentStats);
+    }
+
+
+    // 3. Check for Cached Plan and Progress
     const cachedPlanStr = localStorage.getItem('daily_plan_cache');
     const savedProgressStr = localStorage.getItem('workout_progress');
 
@@ -69,6 +113,9 @@ export default function App() {
         // AUTO-SAVE LOGIC: If the plan is from a DIFFERENT day
         if (cachedPlan.date !== todayStr) {
           console.log("Found stale plan from:", cachedPlan.date);
+          
+          // Clear consumed food for the new day
+          setUserData(prev => ({ ...prev, consumedFood: [] }));
           
           let autoSaved = false;
           // Check if there was progress for this stale plan
@@ -116,7 +163,7 @@ export default function App() {
                 setWorkoutHistory(newHistory);
                 localStorage.setItem('gym_history', JSON.stringify(newHistory));
                 
-                alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới.`);
+                alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới. Dữ liệu đồ ăn đã được reset.`);
                 autoSaved = true;
               }
             }
@@ -169,6 +216,24 @@ export default function App() {
     setViewMode('input');
   };
 
+  const addExperience = (amount: number) => {
+    const newXP = userStats.xp + amount;
+    const newLevel = 1 + Math.floor(newXP / 500); // 500XP per level
+    
+    const updatedStats = {
+      ...userStats,
+      xp: newXP,
+      level: newLevel
+    };
+    
+    setUserStats(updatedStats);
+    localStorage.setItem('user_stats', JSON.stringify(updatedStats));
+    
+    if (newLevel > userStats.level) {
+      alert(`🎉 CHÚC MỪNG! BẠN ĐÃ LÊN LEVEL ${newLevel}! 🔥\n"Keep grinding, stay hard!"`);
+    }
+  };
+
   const handleCompleteWorkout = async (
     levelSelected: string, 
     summary: string, 
@@ -179,6 +244,10 @@ export default function App() {
     const now = new Date();
     const todayDateStr = getTodayString(); // Use the standardized date string helper
     
+    // Gain XP
+    const xpGained = 150;
+    addExperience(xpGained);
+
     const exercisesSummary = completedExercises.length > 0 
       ? completedExercises.join(', ') 
       : "Không có bài tập";
@@ -191,7 +260,8 @@ export default function App() {
       completedExercises,
       userNotes: userNotes || "",
       exercisesSummary,
-      nutrition // Save nutrition to history
+      nutrition, // Save nutrition to history
+      xpGained
     };
 
     let updatedHistory: WorkoutHistoryItem[] = [];
@@ -263,9 +333,11 @@ export default function App() {
             />
           ) : (
             <div className="max-w-2xl mx-auto space-y-4">
+               {/* Pass userStats to UserForm */}
                <UserForm 
                  userData={userData} 
                  setUserData={setUserData} 
+                 userStats={userStats}
                  onSubmit={handleGenerate}
                  isLoading={loading}
                />

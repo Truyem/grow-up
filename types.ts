@@ -1,4 +1,5 @@
 
+
 export enum FatigueLevel {
   Fresh = 'Khỏe',
   Normal = 'Bình thường',
@@ -26,6 +27,15 @@ export interface UserInput {
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
   equipment: string[]; // List of available equipment
+  availableIngredients: string[]; // Ingredients currently in fridge
+  consumedFood: string[]; // Food already consumed today
+}
+
+export interface UserStats {
+  xp: number;
+  level: number;
+  streak: number;
+  lastLoginDate: string;
 }
 
 export interface Exercise {
@@ -53,8 +63,15 @@ export interface WorkoutLevel {
   evening: Exercise[]; // Split session
 }
 
+export interface Schedule {
+  suggestedWorkoutTime: string;
+  suggestedSleepTime: string;
+  reasoning: string;
+}
+
 export interface DailyPlan {
   date: string;
+  schedule: Schedule; // New field for time optimization
   workout: {
     summary: string;
     detail: WorkoutLevel; // Changed from 'levels' object to single 'detail'
@@ -82,4 +99,5 @@ export interface WorkoutHistoryItem {
     totalCost?: number;
     meals: Meal[];
   };
+  xpGained?: number; // New field for gamification history
 }

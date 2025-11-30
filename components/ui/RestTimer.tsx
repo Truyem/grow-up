@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, Pause, Plus, Minus, RotateCcw } from 'lucide-react';
+import { X, Play, Pause, Plus, Minus, RotateCcw, Footprints } from 'lucide-react';
 
 interface RestTimerProps {
   isOpen: boolean;
@@ -19,12 +18,12 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
   // --- TIMER LOGIC ---
   useEffect(() => {
     if (isOpen) {
-      if (!isActive && timeLeft === 0) {
-        setTimeLeft(defaultDuration);
-        setDuration(defaultDuration);
-        setIsActive(true);
-      } else if (!isActive && timeLeft === defaultDuration) {
-        setIsActive(true);
+      // If the timer was closed and re-opened with a different default duration (e.g. 60 min walk), update it
+      // Only update if not currently active to prevent overwriting running timer
+      if (!isActive) {
+         setTimeLeft(defaultDuration);
+         setDuration(defaultDuration);
+         setIsActive(true);
       }
     }
   }, [isOpen, defaultDuration]);
@@ -77,8 +76,13 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -86,18 +90,18 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[60] animate-fade-in">
-      <div className="bg-[#0f172a]/90 backdrop-blur-xl border-b border-white/10 shadow-[0_5px_30px_rgba(0,0,0,0.6)] px-4 py-3 pt-safe">
+      <div className="bg-[#0f172a]/95 backdrop-blur-xl border-b border-white/10 shadow-[0_5px_30px_rgba(0,0,0,0.6)] px-4 py-3 pt-safe">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           
           {/* Top Row: Timer & Status */}
           <div className="flex items-center justify-between w-full sm:w-auto gap-6">
             <div className="flex items-center gap-4">
-              <div className={`text-4xl font-mono font-bold tracking-widest ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
+              <div className={`text-4xl font-mono font-bold tracking-widest ${timeLeft < 10 && timeLeft > 0 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
                 {formatTime(timeLeft)}
               </div>
               <div className="text-xs text-gray-400 font-medium uppercase tracking-wider flex flex-col">
-                 <span>{isActive ? 'Đang nghỉ' : 'Tạm dừng'}</span>
-                 <span className="text-[10px] text-gray-600">Rest Timer</span>
+                 <span>{isActive ? 'Đang chạy' : 'Tạm dừng'}</span>
+                 <span className="text-[10px] text-gray-600">Rest / Cardio Timer</span>
               </div>
             </div>
             
@@ -108,7 +112,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
           </div>
 
           {/* Middle Row: Controls */}
-          <div className="flex items-center gap-4 w-full sm:w-auto justify-center">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-center overflow-x-auto">
              {/* Timer Controls */}
              <div className="flex items-center gap-2 bg-white/5 rounded-full p-1 border border-white/5">
                <button 
@@ -135,13 +139,22 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
                </button>
 
                <button 
-                 onClick={() => { setTimeLeft(60); setDuration(60); setIsActive(true); }}
+                 onClick={() => { setTimeLeft(defaultDuration); setDuration(defaultDuration); setIsActive(true); }}
                  className="p-2 rounded-full hover:bg-white/10 text-gray-300 active:scale-95 transition-all"
-                 title="Reset 60s"
+                 title="Reset"
                >
                  <RotateCcw className="w-4 h-4" />
                </button>
              </div>
+
+             {/* Quick Preset for Walking */}
+             <button 
+                onClick={() => { setTimeLeft(3600); setDuration(3600); setIsActive(true); }}
+                className="flex items-center gap-1 px-3 py-2 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs font-bold whitespace-nowrap"
+                title="Set timer to 60 minutes for walking"
+             >
+                <Footprints className="w-3 h-3" /> 60m
+             </button>
           </div>
 
           {/* Right: Close (Desktop) */}

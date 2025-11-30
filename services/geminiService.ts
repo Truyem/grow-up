@@ -18,7 +18,7 @@ const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
     description: "Duy trì cơ bắp, độ khó tiêu chuẩn. Chia 2 buổi.",
     morning: [
       { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!" },
-      { name: "Dumbbell Goblet Squat", sets: 4, reps: "12", equipment: "Tạ 10kg", notes: "Chúng nó không biết tao là ai đâu con trai!" }
+      { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
     ],
     evening: [
        { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
@@ -30,10 +30,10 @@ const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
     description: "Tăng cơ tối đa, cường độ cao. Chia 2 buổi.",
     morning: [
       { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?" },
-      { name: "Goblet Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
+      { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
     ],
     evening: [
-      { name: "BFR Bicep Curls", sets: 4, reps: "20", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
+      { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
       { name: "Diamond Push-up (Green)", sets: 3, reps: "Failure", colorCode: "Green", equipment: "Board", notes: "Rõ rồi. Chiến thôi!" }
     ]
   }
@@ -41,6 +41,11 @@ const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
 
 const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
   date: getCurrentDate(),
+  schedule: {
+    suggestedWorkoutTime: "17:30",
+    suggestedSleepTime: "23:00",
+    reasoning: "Offline mode: Default schedule."
+  },
   workout: {
     summary: "Kế hoạch dự phòng (Offline). Vui lòng kiểm tra biến môi trường 'API_KEY' hoặc kết nối mạng.",
     detail: FALLBACK_PLANS_BY_INTENSITY[intensity]
@@ -76,6 +81,15 @@ const responseSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     date: { type: Type.STRING },
+    schedule: {
+      type: Type.OBJECT,
+      properties: {
+        suggestedWorkoutTime: { type: Type.STRING },
+        suggestedSleepTime: { type: Type.STRING },
+        reasoning: { type: Type.STRING }
+      },
+      required: ["suggestedWorkoutTime", "suggestedSleepTime", "reasoning"]
+    },
     workout: {
       type: Type.OBJECT,
       properties: {
@@ -118,7 +132,7 @@ const responseSchema: Schema = {
       required: ["totalCalories", "totalProtein", "meals", "totalCost"]
     }
   },
-  required: ["workout", "nutrition", "date"]
+  required: ["workout", "nutrition", "date", "schedule"]
 };
 
 export const generateDailyPlan = async (user: UserInput, history: WorkoutHistoryItem[]): Promise<DailyPlan> => {
@@ -143,40 +157,50 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
         }).join('\n')
       : "Chưa có lịch sử tập trong tuần này.";
 
-    const intensityPrompt = {
-      [Intensity.Medium]: "Tạo bài tập Vừa sức (Hypertrophy).",
-      [Intensity.Hard]: "Tạo bài tập Thử thách (Overload). Max effort."
-    };
-
     const prompt = `
       Bạn là David Goggins (Motivational Speaker/Navy SEAL).
       
-      NHIỆM VỤ: Thiết kế lịch tập "STAY HARD" chia làm 2 buổi: SÁNG (Morning) và TỐI (Evening).
-      Mức độ: **"${user.selectedIntensity.toUpperCase()}"**.
+      NHIỆM VỤ: Thiết kế lịch tập dựa trên LỊCH CỐ ĐỊNH 7 NGÀY.
       
-      MỤC TIÊU: Body Recomposition (Tăng cơ giảm mỡ).
-      THÔNG TIN: 61kg, 1m60.
-      HÔM NAY: ${todayStr}. Mệt: "${user.fatigue}", Đau: "${user.soreMuscles.join(', ')}".
+      LỊCH TẬP CỐ ĐỊNH (Strict Split):
+      - Thứ 2 (Day 1): Push (Ngực, Vai, Tay sau).
+      - Thứ 3 (Day 2): Pull (Lưng, Tay trước).
+      - Thứ 4 (Day 3): Legs & Abs (Đùi trước, Đùi sau, Bắp chân, Mông, Bụng).
+      - Thứ 5 (Day 4): Rest (Nghỉ ngơi hoàn toàn).
+      - Thứ 6 (Day 5): Chest & Back (Ngực, Lưng - Upper Body 1).
+      - Thứ 7 (Day 6): Shoulders & Arms (Vai, Tay trước, Tay sau - Upper Body 2).
+      - Chủ Nhật (Day 7): Rest (Active Recovery).
 
-      QUY TẮC BÀI TẬP:
-      1. TRÁNH NHÓM CƠ ĐAU: ${user.soreMuscles.join(', ')}.
-      2. DỤNG CỤ CÓ SẴN (Chỉ dùng danh sách này):
-         ${user.equipment.map(e => {
-            if (e.trim() === "Board chống đẩy") {
-              return "- Board chống đẩy (Red=Vai, Blue=Ngực, Yellow=Lưng, Green=Tay sau)";
-            }
-            return `- ${e}`;
-         }).join('\n         ')}
-      3. CHIA 2 BUỔI (SÁNG & TỐI): Sắp xếp thứ tự bài tập tối ưu nhất. Sáng tập nhóm cơ lớn/nặng. Tối tập phụ trợ hoặc nhóm cơ nhỏ để tối ưu Volume.
-      4. STYLE GOGGINS (TIẾNG VIỆT): Phần "notes" của mỗi bài tập PHẢI là những câu nói, lời quát tháo mang phong cách David Goggins được dịch sang Tiếng Việt một cách đanh thép.
-         (Ví dụ: "Ai sẽ vác những chiếc thuyền này?", "Bọn nó tuổi gì!", "STAY HARD! Cứng rắn lên!", "Chiếm lấy linh hồn chúng!", "Đừng làm thằng hèn!").
+      QUY TẮC NGÀY NGHỈ (REST):
+      - Nếu là Rest Day: Bài tập là "Đi bộ" (Walking). Chủ nhật PHẢI là "Đi bộ 60 phút" (Reps: "60 phút").
+      - Không thêm bài nặng vào ngày Rest.
 
-      DINH DƯỠNG (SINH VIÊN < 80k VND):
-      - Nguyên liệu: Cơm, Trứng, Đậu phụ, Gà, Lợn, Cá Basa.
-      - Chế biến: Air Fryer.
-      - Tính giá tiền chi tiết.
+      QUY TẮC DỤNG CỤ QUAN TRỌNG (ONE DUMBBELL LOGIC):
+      - Dụng cụ người dùng: ${user.equipment.join(', ')}.
+      - Nếu người dùng KHÔNG ghi rõ "2x", "đôi", hoặc "pair" trong danh sách tạ, HÃY MẶC ĐỊNH HỌ CHỈ CÓ 1 QUẢ TẠ (SINGLE DUMBBELL).
+      - Vì vậy, ƯU TIÊN TUYỆT ĐỐI các bài tập 1 TAY (Unilateral Exercises). 
+        Ví dụ: Thay vì "Dumbbell Press", hãy dùng "One Arm Dumbbell Press" hoặc "Floor Press (1 Arm)". Thay vì "Squat", dùng "Goblet Squat (1 tạ)" hoặc "Lunges".
+      - Chỉ dùng bài 2 tay nếu là Bodyweight hoặc dùng dây (Band).
 
-      Trả về JSON.
+      QUY TẮC THỜI GIAN (TIME OPTIMIZATION):
+      - Người dùng BẬN HỌC lúc 12:00 - 14:00.
+      - Hãy đề xuất giờ tập (suggestedWorkoutTime) và giờ ngủ (suggestedSleepTime).
+      - Giờ tập nên vào sáng sớm hoặc chiều tối (trừ khung giờ học).
+      - Giờ ngủ nên đảm bảo phục hồi (thường là 22:30 - 23:00).
+
+      THÔNG TIN KHÁC:
+      - Cân nặng: ${user.weight}kg, Chiều cao: ${user.height}cm.
+      - Hôm nay: ${todayStr}.
+      - Mức độ: ${user.selectedIntensity}.
+      - Style Goggins: Notes cực gắt, tiếng Việt, thúc đẩy tinh thần.
+
+      DINH DƯỠNG:
+      - Nguyên liệu: ${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Không có"}.
+      - Đã ăn: ${user.consumedFood.length > 0 ? user.consumedFood.join(', ') : "Chưa ăn"}.
+      - Target: Body Recomposition.
+      - Budget: <80k VND/ngày.
+
+      Trả về JSON theo schema.
     `;
 
     const response = await ai.models.generateContent({

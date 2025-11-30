@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { MusicPlayer } from './ui/MusicPlayer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -109,7 +108,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-cyan-300 font-bold transition-all active:scale-95 hover:border-cyan-500/30"
           >
             <Timer className="w-3.5 h-3.5" />
-            Nghỉ
+            {exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking') ? 'Đếm giờ' : 'Nghỉ'}
           </button>
         </div>
           
@@ -162,6 +161,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
+  const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
 
@@ -173,7 +173,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   
   // Calculate checked based on composite keys "mor-X" and "eve-X"
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
-  const progressPercent = Math.round((checkedCount / totalExercises) * 100);
+  const progressPercent = totalExercises > 0 ? Math.round((checkedCount / totalExercises) * 100) : 0;
 
   // Restore progress from local storage on mount
   useEffect(() => {
@@ -223,6 +223,17 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       // Desktop: Open www.youtube.com in new tab
       window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
     }
+  };
+
+  const handleStartTimer = (exerciseName: string) => {
+    // Determine duration based on exercise type
+    const lowerName = exerciseName.toLowerCase();
+    if (lowerName.includes('đi bộ') || lowerName.includes('walking')) {
+      setTimerDuration(3600); // 60 minutes for walking
+    } else {
+      setTimerDuration(120); // Standard 2 mins rest for weights
+    }
+    setIsTimerOpen(true);
   };
 
   const handleComplete = () => {
@@ -300,7 +311,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                  isChecked={!!checkedState[key]}
                  onToggle={() => handleToggle(key)}
                  onPreview={() => handleOpenYouTube(ex.name)}
-                 onStartTimer={() => setIsTimerOpen(true)}
+                 onStartTimer={() => handleStartTimer(ex.name)}
                />
              );
            })
@@ -317,7 +328,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       <RestTimer 
         isOpen={isTimerOpen} 
         onClose={() => setIsTimerOpen(false)} 
-        defaultDuration={60}
+        defaultDuration={timerDuration}
       />
       
       {/* Top Header with Back Button */}
@@ -343,6 +354,33 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           {plan.workout.summary}
         </p>
       </div>
+      
+      {/* TIME OPTIMIZATION CARD */}
+      {plan.schedule && (
+        <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg mb-6">
+          <div className="flex items-center gap-3">
+             <div className="p-3 bg-blue-500/20 rounded-full text-blue-300">
+                <AlarmClock className="w-5 h-5" />
+             </div>
+             <div>
+                <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu</h4>
+                <div className="flex gap-4 mt-1">
+                   <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
+                      <Sun className="w-3.5 h-3.5 text-yellow-400" />
+                      <span className="text-white text-sm font-mono">{plan.schedule.suggestedWorkoutTime}</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
+                      <MoonStar className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-white text-sm font-mono">{plan.schedule.suggestedSleepTime}</span>
+                   </div>
+                </div>
+             </div>
+          </div>
+          <div className="text-xs text-gray-400 italic text-center sm:text-right max-w-xs">
+             "{plan.schedule.reasoning}"
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <GlassCard 
@@ -418,18 +456,23 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                onClick={handleComplete}
                disabled={isCompleted}
                className={`
-                 w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2
+                 w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 relative overflow-hidden group
                  ${isCompleted 
                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default' 
                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98]'}
                `}
              >
+                {/* XP Animation Effect on Button Hover (If not completed) */}
+               {!isCompleted && (
+                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
+               )}
+
                {isCompleted ? (
                  <>
-                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành
+                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành (+150 XP)
                  </>
                ) : (
-                 "Hoàn Thành Buổi Tập"
+                 <>Hoàn Thành Buổi Tập <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">+150 XP</span></>
                )}
              </button>
            </div>
