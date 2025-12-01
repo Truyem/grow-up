@@ -15,26 +15,28 @@ const getCurrentDate = () => {
 const FALLBACK_PLANS_BY_INTENSITY: Record<Intensity, WorkoutLevel> = {
   [Intensity.Medium]: {
     levelName: "Vừa sức (Normal)",
-    description: "Duy trì cơ bắp, độ khó tiêu chuẩn. Chia 2 buổi.",
+    description: "Duy trì cơ bắp + Daily Abs & Cardio.",
     morning: [
       { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!" },
       { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
     ],
     evening: [
        { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
-       { name: "Plank", sets: 3, reps: "45s", equipment: "None", notes: "STAY HARD! Cứng rắn lên!" }
+       { name: "Plank (Abs)", sets: 3, reps: "60s", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
+       { name: "Jumping Jacks (Cardio)", sets: 3, reps: "50", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
     ]
   },
   [Intensity.Hard]: {
     levelName: "Cháy hết mình (Hard)",
-    description: "Tăng cơ tối đa, cường độ cao. Chia 2 buổi.",
+    description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
     morning: [
       { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?" },
       { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
     ],
     evening: [
       { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
-      { name: "Diamond Push-up (Green)", sets: 3, reps: "Failure", colorCode: "Green", equipment: "Board", notes: "Rõ rồi. Chiến thôi!" }
+      { name: "Hanging Leg Raise (Abs)", sets: 4, reps: "15", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)" },
+      { name: "Burpees (Cardio)", sets: 3, reps: "15", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)" }
     ]
   }
 };
@@ -56,9 +58,9 @@ const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
     totalCost: 95000,
     advice: "Chế độ BULKING: Ăn dư thừa Calories và nạp >2g Protein/kg để tối đa hóa tăng cơ.",
     meals: [
-      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "Cơm trắng + 3 Trứng ốp la + Súp lơ luộc.", estimatedPrice: 20000 },
-      { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát cơm + 200g Ức gà xào Súp lơ.", estimatedPrice: 45000 },
-      { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát cơm + 200g Thịt bò xào Súp lơ.", estimatedPrice: 30000 },
+      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "Cơm trắng + 3 Trứng ốp la + Rau xanh.", estimatedPrice: 20000 },
+      { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát cơm + 200g Ức gà xào rau trong tủ lạnh.", estimatedPrice: 45000 },
+      { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát cơm + 200g Thịt bò xào rau xanh.", estimatedPrice: 30000 },
       { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua hoặc trái cây.", estimatedPrice: 5000 }
     ]
   }
@@ -174,12 +176,14 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       - Thứ 7 (Day 6): Shoulders & Arms (Vai, Tay trước, Tay sau).
       - Chủ Nhật (Day 7): Rest (Active Recovery - Đi bộ).
 
-      QUY TẮC NGÀY NGHỈ (REST DAYS - Day 4 & Day 7):
-      - Nếu hôm nay là ngày nghỉ, bài tập DUY NHẤT là "Đi bộ" (Walking).
-      - Reps phải ghi rõ: "60 phút".
-      - Không thêm bài tạ vào ngày này.
+      === 2. YÊU CẦU BẮT BUỘC MỖI NGÀY (DAILY MANDATORY: ABS & CARDIO) ===
+      - QUY TẮC BẤT DI BẤT DỊCH: "Ngày nào cũng phải có bài tập Bụng (Abs) và Cardio".
+      - Hãy chèn thêm ít nhất 1 bài Abs (ví dụ: Crunch, Plank, Leg Raise) VÀ 1 bài Cardio (ví dụ: Jumping Jacks, Burpees, High Knees) vào cuối buổi tập của TẤT CẢ CÁC NGÀY.
+      - NGÀY NGHỈ (Day 4, Day 7):
+        + Bài chính: "Đi bộ" (Walking) - 60 phút (Đây là Cardio chính).
+        + Bắt buộc thêm: 1 bài Bụng nhẹ nhàng (vd: Plank 3 sets).
 
-      === 2. QUY TẮC DỤNG CỤ (ONE DUMBBELL RULE) ===
+      === 3. QUY TẮC DỤNG CỤ (ONE DUMBBELL RULE) ===
       - Dụng cụ hiện có: ${user.equipment.join(', ')}.
       - QUAN TRỌNG: Trừ khi tên dụng cụ có chữ "2x", "đôi", hoặc "pair", HÃY MẶC ĐỊNH NGƯỜI DÙNG CHỈ CÓ 1 QUẢ TẠ (SINGLE DUMBBELL).
       - ƯU TIÊN TUYỆT ĐỐI các bài tập 1 TAY (Unilateral):
@@ -187,22 +191,24 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
         + Thay vì "Squat" (khó cân bằng) -> Dùng "Goblet Squat (1 tạ)" hoặc "Single Arm Lunges".
         + Chỉ dùng bài 2 tay nếu là Bodyweight (Hít đất, Plank) hoặc dùng Dây kháng lực (Band).
 
-      === 3. TỐI ƯU THỜI GIAN (SCHEDULE) ===
+      === 4. TỐI ƯU THỜI GIAN (SCHEDULE) ===
       - Người dùng BẬN HỌC lúc: 12:00 - 14:00 (Tránh giờ này).
       - Đề xuất giờ tập (suggestedWorkoutTime): Sáng sớm hoặc Chiều tối.
       - Đề xuất giờ ngủ (suggestedSleepTime): Để đảm bảo phục hồi (vd: 22:30).
 
-      === 4. DINH DƯỠNG: TĂNG CÂN & TĂNG CƠ (BULKING) ===
+      === 5. DINH DƯỠNG: TĂNG CÂN & TĂNG CƠ (BULKING) ===
       - MỤC TIÊU: Thiết kế thực đơn để TĂNG CÂN và TĂNG CƠ tối đa (Hypertrophy).
       - PROTEIN: Bắt buộc tính toán ở mức CAO: 2.0g - 2.2g Protein / kg trọng lượng cơ thể.
         (Ví dụ: User ${user.weight}kg -> Target khoảng ${(user.weight * 2.1).toFixed(0)}g Protein).
       - CALORIES: Phải đảm bảo Surplus (Dư thừa năng lượng).
       - Tinh bột: Cơm trắng (White Rice) - Ăn nhiều để nạp năng lượng.
-      - Rau: Súp lơ (Cauliflower) là bắt buộc trong các bữa chính.
+      - Rau: KIỂM TRA TỦ LẠNH CỦA USER (${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Trống"}). 
+        + Nếu có rau trong tủ lạnh, hãy ưu tiên dùng chúng.
+        + Nếu không có, hãy gợi ý các loại rau xanh rẻ, phổ biến (Súp lơ, Rau muống, Cải thìa...). Không bắt buộc chỉ dùng súp lơ.
       - QUAN TRỌNG: Trong tên bữa ăn (field "name"), BẮT BUỘC ghi rõ GIỜ ĂN cụ thể.
         (Ví dụ: "Bữa Sáng (07:00)", "Bữa Trưa (11:30)", "Bữa Tối (19:00)").
-      - Nguyên liệu có sẵn: ${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Không có"}.
-      - Budget: <80k VND/ngày. Hãy tối ưu chi phí nhưng vẫn đủ đạm (Ưu tiên Ức gà, Trứng, Đậu phụ nếu cần rẻ).
+      - Nguyên liệu có sẵn: ${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Không có"}. Hãy kết hợp chúng vào thực đơn.
+      - Budget: <80k VND/ngày. Hãy tối ưu chi phí.
 
       === THÔNG TIN USER ===
       - Cân nặng: ${user.weight}kg, Chiều cao: ${user.height}cm.

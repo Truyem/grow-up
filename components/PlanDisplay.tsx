@@ -485,7 +485,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
            </div>
         </GlassCard>
 
-        <GlassCard title="Thực Đơn (Cơm & Súp lơ)" icon={<Utensils className="w-6 h-6" />}>
+        <GlassCard title="Thực Đơn Tăng Cân (Bulking)" icon={<Utensils className="w-6 h-6" />}>
           <div className="grid grid-cols-3 gap-2 mb-6">
             <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
@@ -502,7 +502,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           </div>
           
           <div className="text-xs text-gray-400 italic mb-4 text-center">
-             *Thực đơn sử dụng Cơm trắng kết hợp Súp lơ (Cauliflower) làm rau chính.
+             *Thực đơn ưu tiên sử dụng nguyên liệu có sẵn trong tủ lạnh của bạn.
           </div>
 
           <div className="space-y-4">
