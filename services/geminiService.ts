@@ -49,19 +49,19 @@ const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
     reasoning: "Offline mode: Default schedule."
   },
   workout: {
-    summary: "Kế hoạch dự phòng (Offline). Vui lòng kiểm tra biến môi trường 'API_KEY' hoặc kết nối mạng.",
+    summary: "Kế hoạch dự phòng (Offline).",
     detail: FALLBACK_PLANS_BY_INTENSITY[intensity]
   },
   nutrition: {
     totalCalories: 2600,
     totalProtein: 155,
     totalCost: 95000,
-    advice: "Chế độ BULKING: Ăn dư thừa Calories và nạp >2g Protein/kg để tối đa hóa tăng cơ.",
+    advice: "BULKING: Ăn dư thừa Calo. Bữa sáng không cơm.",
     meals: [
-      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "3 bát Cơm trắng (300g) + 3 Trứng ốp la + 100g Rau luộc.", estimatedPrice: 20000 },
+      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "300g Khoai lang luộc + 3 Trứng ốp la + 1 quả Chuối.", estimatedPrice: 20000 },
       { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Ức gà xào + 200g Rau trong tủ lạnh.", estimatedPrice: 45000 },
       { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Thịt bò xào + 200g Rau xanh.", estimatedPrice: 30000 },
-      { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua Vinamilk (100g) + 1 quả Chuối.", estimatedPrice: 5000 }
+      { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua Vinamilk (100g) + 1 quả táo.", estimatedPrice: 5000 }
     ]
   }
 });
@@ -115,18 +115,18 @@ const responseSchema: Schema = {
       properties: {
         totalCalories: { type: Type.NUMBER },
         totalProtein: { type: Type.NUMBER },
-        totalCost: { type: Type.NUMBER, description: "Total cost in VND" },
+        totalCost: { type: Type.NUMBER },
         advice: { type: Type.STRING },
         meals: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              name: { type: Type.STRING, description: "Name of the meal including time, e.g., 'Bữa Sáng (07:00)'" },
+              name: { type: Type.STRING },
               calories: { type: Type.NUMBER },
               protein: { type: Type.NUMBER },
-              estimatedPrice: { type: Type.NUMBER, description: "Estimated price in VND based on Winmart" },
-              description: { type: Type.STRING, description: "Detailed ingredients with exact grams (e.g. 200g Chicken)" }
+              estimatedPrice: { type: Type.NUMBER },
+              description: { type: Type.STRING }
             },
             required: ["name", "calories", "protein", "description", "estimatedPrice"]
           }
@@ -142,9 +142,8 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
   console.log("Checking API Key...", API_KEY ? "Present" : "Missing");
 
   if (!API_KEY) {
-    console.warn("API Key missing. Returning fallback plan.");
     alert("Không tìm thấy biến môi trường 'API_KEY'! Đang sử dụng lịch mẫu.");
-    await new Promise(resolve => setTimeout(resolve, 800)); // Slight fake delay
+    await new Promise(resolve => setTimeout(resolve, 800));
     return getFallbackPlan(user.selectedIntensity);
   }
 
@@ -152,80 +151,55 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     const todayStr = getCurrentDate();
     
+    // Condensed history to save tokens
     const recentHistory = history.slice(0, 7);
     const historyText = recentHistory.length > 0 
-      ? recentHistory.map(h => {
-          const exercisesDone = h.completedExercises?.join(', ') || "Không có dữ liệu bài tập";
-          return `- ${h.date}: ${h.levelSelected}. Bài đã tập: [${exercisesDone}].`;
-        }).join('\n')
-      : "Chưa có lịch sử tập trong tuần này.";
+      ? recentHistory.map(h => `- ${h.date}: ${h.levelSelected}.`).join('\n')
+      : "Chưa có lịch sử.";
 
-    const availableIngredientsStr = user.availableIngredients && user.availableIngredients.length > 0 
-      ? user.availableIngredients.join(', ') 
-      : "Trống";
+    const ingredients = user.availableIngredients?.length ? user.availableIngredients.join(', ') : "Trống";
 
     const prompt = `
-      Bạn là David Goggins (Motivational Speaker/Navy SEAL).
+      Bạn là David Goggins.
+      NHIỆM VỤ: Lịch tập hôm nay: ${todayStr}.
       
-      NHIỆM VỤ: Thiết kế lịch tập cá nhân hóa cho ngày hôm nay: ${todayStr}.
-      
-      === 1. LỊCH TẬP CỐ ĐỊNH 7 NGÀY (STRICT SPLIT) ===
-      Dựa vào thứ ngày hôm nay (${todayStr}), hãy chọn bài tập theo đúng lịch sau:
-      
-      - Thứ 2 (Day 1): Push (Ngực, Vai, Tay sau).
-      - Thứ 3 (Day 2): Back & Biceps (Lưng, Tay trước).
-      - Thứ 4 (Day 3): Legs & Abs (Đùi trước, Đùi sau, Bắp chân, Mông, Bụng).
-      - Thứ 5 (Day 4): Rest (Nghỉ ngơi - Đi bộ).
-      - Thứ 6 (Day 5): Chest & Back (Ngực, Lưng).
-      - Thứ 7 (Day 6): Shoulders & Arms (Vai, Tay trước, Tay sau).
-      - Chủ Nhật (Day 7): Rest (Active Recovery - Đi bộ).
+      === 1. LỊCH TẬP 7 NGÀY (STRICT) ===
+      Dựa vào thứ hôm nay, chọn đúng:
+      - T2: Push (Ngực, Vai, Tay sau).
+      - T3: Back & Biceps.
+      - T4: Legs & Abs.
+      - T5: Rest (Đi bộ).
+      - T6: Chest & Back.
+      - T7: Shoulder & Arms.
+      - CN: Rest (Đi bộ).
 
-      === 2. YÊU CẦU BẮT BUỘC MỖI NGÀY (DAILY MANDATORY: ABS & CARDIO) ===
-      - QUY TẮC BẤT DI BẤT DỊCH: "Ngày nào cũng phải có bài tập Bụng (Abs) và Cardio".
-      - Hãy chèn thêm ít nhất 1 bài Abs (ví dụ: Crunch, Plank, Leg Raise) VÀ 1 bài Cardio (ví dụ: Jumping Jacks, Burpees, High Knees) vào cuối buổi tập của TẤT CẢ CÁC NGÀY.
-      - NGÀY NGHỈ (Day 4, Day 7):
-        + Bài chính: "Đi bộ" (Walking) - 60 phút (Đây là Cardio chính).
-        + Bắt buộc thêm: 1 bài Bụng nhẹ nhàng (vd: Plank 3 sets).
+      === 2. DAILY MANDATORY (BẮT BUỘC) ===
+      - MỖI NGÀY đều phải có: 1 bài ABS + 1 bài CARDIO.
+      - NGÀY NGHỈ (T5, CN): Bài chính là "Đi bộ" (60p) + 1 bài Abs nhẹ.
 
-      === 3. QUY TẮC DỤNG CỤ (ONE DUMBBELL RULE) ===
-      - Dụng cụ hiện có: ${user.equipment.join(', ')}.
-      - QUAN TRỌNG: Trừ khi tên dụng cụ có chữ "2x", "đôi", hoặc "pair", HÃY MẶC ĐỊNH NGƯỜI DÙNG CHỈ CÓ 1 QUẢ TẠ (SINGLE DUMBBELL).
-      - ƯU TIÊN TUYỆT ĐỐI các bài tập 1 TAY (Unilateral):
-        + Thay vì "Dumbbell Press" (cần 2 tạ) -> Dùng "One Arm Floor Press" hoặc "One Arm Dumbbell Press".
-        + Thay vì "Squat" (khó cân bằng) -> Dùng "Goblet Squat (1 tạ)" hoặc "Single Arm Lunges".
-        + Chỉ dùng bài 2 tay nếu là Bodyweight (Hít đất, Plank) hoặc dùng Dây kháng lực (Band).
+      === 3. QUY TẮC DỤNG CỤ ===
+      - Đồ có: ${user.equipment.join(', ')}.
+      - QUAN TRỌNG: Chỉ có 1 TẠ ĐƠN (Single DB) trừ khi ghi "2x"/"đôi". Dùng bài 1 tay (Unilateral).
 
-      === 4. TỐI ƯU THỜI GIAN (SCHEDULE) ===
-      - Người dùng BẬN HỌC lúc: 12:00 - 14:00 (Tránh giờ này).
-      - Đề xuất giờ tập (suggestedWorkoutTime): Sáng sớm hoặc Chiều tối.
-      - Đề xuất giờ ngủ (suggestedSleepTime): Để đảm bảo phục hồi (vd: 22:30).
+      === 4. THỜI GIAN ===
+      - Tránh giờ học: 12:00 - 14:00.
+      - Đề xuất giờ tập & giờ ngủ (22:30).
 
-      === 5. DINH DƯỠNG: TĂNG CÂN & TĂNG CƠ (BULKING) ===
-      - MỤC TIÊU: Thiết kế thực đơn để TĂNG CÂN và TĂNG CƠ tối đa (Hypertrophy).
-      - PROTEIN: Bắt buộc tính toán ở mức CAO: 2.0g - 2.2g Protein / kg trọng lượng cơ thể.
-        (Ví dụ: User ${user.weight}kg -> Target khoảng ${(user.weight * 2.1).toFixed(0)}g Protein).
-      - CALORIES: Phải đảm bảo Surplus (Dư thừa năng lượng).
-      - TINH BỘT: Cơm trắng (White Rice) - Ăn nhiều để nạp năng lượng.
-      - RAU: KIỂM TRA TỦ LẠNH (${availableIngredientsStr}). Ưu tiên dùng rau có sẵn, nếu không thì gợi ý súp lơ, cải, rau muống.
-      
-      - CHI TIẾT ĐỊNH LƯỢNG (QUAN TRỌNG):
-        + KỂ CẢ NGÀY NGHỈ (REST DAYS), trong phần 'description' của MỖI bữa ăn, BẮT BUỘC phải ghi rõ định lượng CỤ THỂ (Gram/Bát/Quả) của TỪNG loại thức ăn.
-        + Ví dụ SAI: "Cơm trắng ăn với ức gà và rau."
-        + Ví dụ ĐÚNG: "3 bát cơm đầy (400g) + 200g Ức gà áp chảo + 150g Súp lơ luộc."
-        + Phải ghi chính xác số gram để người dùng cân đo được.
+      === 5. DINH DƯỠNG (BULKING) ===
+      - PROTEIN: CAO (2-2.2g/kg -> ~${(user.weight * 2.1).toFixed(0)}g).
+      - CALO: Surplus.
+      - TINH BỘT:
+        + BỮA SÁNG: KHÔNG ĂN CƠM. Thay bằng Khoai lang/Yến mạch/Bánh mì.
+        + CÁC BỮA KHÁC: Cơm trắng ăn thoải mái.
+      - RAU: Ưu tiên tủ lạnh (${ingredients}).
+      - ĐỊNH LƯỢNG: Phải ghi rõ gram/bát (Kể cả ngày nghỉ). VD: "400g Cơm + 200g Gà".
+      - FORMAT TÊN BỮA: Ghi rõ giờ (VD: "Bữa Sáng (07:00)").
+      - Budget < 80k.
 
-      - QUAN TRỌNG: Trong tên bữa ăn (field "name"), BẮT BUỘC ghi rõ GIỜ ĂN cụ thể.
-        (Ví dụ: "Bữa Sáng (07:00)", "Bữa Trưa (11:30)", "Bữa Tối (19:00)").
-      - Budget: <80k VND/ngày. Hãy tối ưu chi phí.
-
-      === THÔNG TIN USER ===
-      - Cân nặng: ${user.weight}kg, Chiều cao: ${user.height}cm.
-      - Mức độ mệt mỏi: ${user.fatigue}.
-      - Nhóm cơ đau: ${user.soreMuscles.join(', ')}.
-      - Cường độ: ${user.selectedIntensity}.
-      - Style Goggins: Notes cực gắt, tiếng Việt, thúc đẩy tinh thần "Who's gonna carry the boats?".
-
-      Trả về JSON hợp lệ theo schema.
+      === USER ===
+      - ${user.weight}kg, ${user.height}cm.
+      - Mệt: ${user.fatigue}. Đau: ${user.soreMuscles.join(', ')}.
+      - Style: Goggins, Tiếng Việt, gắt.
     `;
 
     const response = await ai.models.generateContent({
@@ -244,11 +218,11 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       return result;
     }
     
-    throw new Error("Empty response from AI");
+    throw new Error("Empty response");
 
   } catch (error) {
-    console.error("Gemini API Error Detail:", error);
-    alert(`Lỗi kết nối AI: ${(error as any).message || "Unknown error"}. Đang hiển thị lịch mẫu.`);
+    console.error("Gemini Error:", error);
+    alert("Lỗi AI. Dùng lịch mẫu.");
     return getFallbackPlan(user.selectedIntensity);
   }
 };
