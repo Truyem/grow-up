@@ -58,10 +58,10 @@ const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
     totalCost: 95000,
     advice: "Chế độ BULKING: Ăn dư thừa Calories và nạp >2g Protein/kg để tối đa hóa tăng cơ.",
     meals: [
-      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "Cơm trắng + 3 Trứng ốp la + Rau xanh.", estimatedPrice: 20000 },
-      { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát cơm + 200g Ức gà xào rau trong tủ lạnh.", estimatedPrice: 45000 },
-      { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát cơm + 200g Thịt bò xào rau xanh.", estimatedPrice: 30000 },
-      { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua hoặc trái cây.", estimatedPrice: 5000 }
+      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "3 bát Cơm trắng (300g) + 3 Trứng ốp la + 100g Rau luộc.", estimatedPrice: 20000 },
+      { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Ức gà xào + 200g Rau trong tủ lạnh.", estimatedPrice: 45000 },
+      { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Thịt bò xào + 200g Rau xanh.", estimatedPrice: 30000 },
+      { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua Vinamilk (100g) + 1 quả Chuối.", estimatedPrice: 5000 }
     ]
   }
 });
@@ -126,7 +126,7 @@ const responseSchema: Schema = {
               calories: { type: Type.NUMBER },
               protein: { type: Type.NUMBER },
               estimatedPrice: { type: Type.NUMBER, description: "Estimated price in VND based on Winmart" },
-              description: { type: Type.STRING }
+              description: { type: Type.STRING, description: "Detailed ingredients with exact grams (e.g. 200g Chicken)" }
             },
             required: ["name", "calories", "protein", "description", "estimatedPrice"]
           }
@@ -159,6 +159,10 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
           return `- ${h.date}: ${h.levelSelected}. Bài đã tập: [${exercisesDone}].`;
         }).join('\n')
       : "Chưa có lịch sử tập trong tuần này.";
+
+    const availableIngredientsStr = user.availableIngredients && user.availableIngredients.length > 0 
+      ? user.availableIngredients.join(', ') 
+      : "Trống";
 
     const prompt = `
       Bạn là David Goggins (Motivational Speaker/Navy SEAL).
@@ -201,13 +205,17 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       - PROTEIN: Bắt buộc tính toán ở mức CAO: 2.0g - 2.2g Protein / kg trọng lượng cơ thể.
         (Ví dụ: User ${user.weight}kg -> Target khoảng ${(user.weight * 2.1).toFixed(0)}g Protein).
       - CALORIES: Phải đảm bảo Surplus (Dư thừa năng lượng).
-      - Tinh bột: Cơm trắng (White Rice) - Ăn nhiều để nạp năng lượng.
-      - Rau: KIỂM TRA TỦ LẠNH CỦA USER (${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Trống"}). 
-        + Nếu có rau trong tủ lạnh, hãy ưu tiên dùng chúng.
-        + Nếu không có, hãy gợi ý các loại rau xanh rẻ, phổ biến (Súp lơ, Rau muống, Cải thìa...). Không bắt buộc chỉ dùng súp lơ.
+      - TINH BỘT: Cơm trắng (White Rice) - Ăn nhiều để nạp năng lượng.
+      - RAU: KIỂM TRA TỦ LẠNH (${availableIngredientsStr}). Ưu tiên dùng rau có sẵn, nếu không thì gợi ý súp lơ, cải, rau muống.
+      
+      - CHI TIẾT ĐỊNH LƯỢNG (QUAN TRỌNG):
+        + KỂ CẢ NGÀY NGHỈ (REST DAYS), trong phần 'description' của MỖI bữa ăn, BẮT BUỘC phải ghi rõ định lượng CỤ THỂ (Gram/Bát/Quả) của TỪNG loại thức ăn.
+        + Ví dụ SAI: "Cơm trắng ăn với ức gà và rau."
+        + Ví dụ ĐÚNG: "3 bát cơm đầy (400g) + 200g Ức gà áp chảo + 150g Súp lơ luộc."
+        + Phải ghi chính xác số gram để người dùng cân đo được.
+
       - QUAN TRỌNG: Trong tên bữa ăn (field "name"), BẮT BUỘC ghi rõ GIỜ ĂN cụ thể.
         (Ví dụ: "Bữa Sáng (07:00)", "Bữa Trưa (11:30)", "Bữa Tối (19:00)").
-      - Nguyên liệu có sẵn: ${user.availableIngredients.length > 0 ? user.availableIngredients.join(', ') : "Không có"}. Hãy kết hợp chúng vào thực đơn.
       - Budget: <80k VND/ngày. Hãy tối ưu chi phí.
 
       === THÔNG TIN USER ===
