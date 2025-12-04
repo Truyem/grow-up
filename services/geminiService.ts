@@ -271,11 +271,13 @@ export const generateDailyPlan = async (
 
     ### 2. WORKOUT RULES (CRITICAL)
     - **INTENSITY**: ${userData.selectedIntensity} (Medium=Hypertrophy, Hard=Failure/Overload).
-    - **EQUIPMENT**: ${userData.equipment.join(', ')}.
+    - **EQUIPMENT AVAILABLE**: ${userData.equipment.join(', ')}.
+    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool (e.g., Bench, Pull-up Bar, Machine), you MUST substitute with a **BODYWEIGHT** equivalent (e.g., Floor Press instead of Bench Press, Australian Pull-up under table instead of Pull-up).
     - **ONE DUMBBELL RULE**: Unless equipment list says "2x" or "đôi", user only has ONE dumbbell. use UNILATERAL exercises (One Arm Row, Single Arm Press, Split Squat, etc.).
     - **DAILY ABS & CARDIO**: EVERY SINGLE DAY (Day 1-7) MUST include 1 Abs exercise + 1 Cardio exercise in the Evening session.
+    - **CARDIO NAMING**: If the exercise is Walking (Đi bộ) or Running (Chạy), you MUST append "(Cardio)" to the name.
     - **REST DAY (Day 4 & 7)**: 
-      - Main Activity: "Đi bộ (Walking)" - 60 Minutes.
+      - Main Activity: "Đi bộ (Walking) (Cardio)" - 60 Minutes.
       - Plus Light Abs exercise.
     - **TIME OPTIMIZATION**: Avoid scheduling workout between 12:00 - 14:00 (Study time). Suggest optimal time.
 
@@ -284,7 +286,6 @@ export const generateDailyPlan = async (
     - **PROTEIN TARGET**: ${proteinTarget}g (${proteinMultiplier}g/kg).
     - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING (Deficit < 2300 logic removed, adhere to calculated target)'}.
     - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef) to hit ${proteinTarget}g within ${Math.round(target)} kcal.
-    - **EGG LIMIT**: Max 3 WHOLE eggs/day. If more needed, use EGG WHITES (Lòng trắng) only.
     - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}. If empty, use generic economical veggies.
     - **CARBS**: 
        - Breakfast: NO RICE (Bread/Sweet Potato/Oats only).
