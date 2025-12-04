@@ -1,5 +1,4 @@
 
-
 export enum FatigueLevel {
   Fresh = 'Khỏe',
   Normal = 'Bình thường',
@@ -20,12 +19,15 @@ export enum Intensity {
   Hard = 'hard',
 }
 
+export type NutritionGoal = 'bulking' | 'cutting';
+
 export interface UserInput {
   weight: number;
   height: number;
   fatigue: FatigueLevel;
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
+  nutritionGoal: NutritionGoal; // New field
   equipment: string[]; // List of available equipment
   availableIngredients: string[]; // Ingredients currently in fridge
   consumedFood: string[]; // Food already consumed today

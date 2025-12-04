@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats } from './types';
 import { UserForm } from './components/UserForm';
@@ -24,6 +25,7 @@ const INITIAL_USER_DATA: UserInput = {
   fatigue: FatigueLevel.Normal,
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium, // Default to Medium
+  nutritionGoal: 'cutting', // Default to cutting
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
   consumedFood: []

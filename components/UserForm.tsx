@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, Award, Zap } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, Award, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -237,6 +238,42 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
         </div>
       </GlassCard>
 
+      {/* Nutrition Goal Selection */}
+      <GlassCard title="Mục tiêu dinh dưỡng" icon={<Utensils className="w-6 h-6" />}>
+        <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                userData.nutritionGoal === 'bulking'
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <TrendingUp className="w-8 h-8 flex-shrink-0" />
+              <div className="text-center">
+                <div className="font-bold text-sm">Tăng Cân (Bulking)</div>
+                <div className="text-[10px] opacity-70">Calo dư thừa, Cơm trắng</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setUserData({ ...userData, nutritionGoal: 'cutting' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                userData.nutritionGoal === 'cutting'
+                  ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <TrendingDown className="w-8 h-8 flex-shrink-0" />
+              <div className="text-center">
+                <div className="font-bold text-sm">Giảm Cân (Cutting)</div>
+                <div className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</div>
+              </div>
+            </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2 text-center italic">*Tối đa 3 quả trứng/ngày (thêm phải bỏ lòng đỏ).</p>
+      </GlassCard>
+
       <GlassCard title="Tình trạng sức khỏe" icon={<Activity className="w-6 h-6" />}>
         <div className="mb-6">
           <label className="block text-sm text-gray-300 mb-2">Mức độ mệt mỏi</label>
@@ -368,9 +405,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       </GlassCard>
 
       {/* Intensity Selection */}
-      <GlassCard title="Mục tiêu hôm nay" icon={<BatteryCharging className="w-6 h-6" />}>
+      <GlassCard title="Cường độ tập luyện" icon={<BatteryCharging className="w-6 h-6" />}>
         <div className="space-y-3">
-          <label className="block text-sm text-gray-300">Chọn cường độ tập luyện:</label>
           <div className="grid grid-cols-1 gap-3">
             
             <button
