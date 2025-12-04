@@ -27,15 +27,13 @@ export interface UserInput {
   fatigue: FatigueLevel;
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
-  nutritionGoal: NutritionGoal; // New field
+  nutritionGoal: NutritionGoal;
   equipment: string[]; // List of available equipment
   availableIngredients: string[]; // Ingredients currently in fridge
   consumedFood: string[]; // Food already consumed today
 }
 
 export interface UserStats {
-  xp: number;
-  level: number;
   streak: number;
   lastLoginDate: string;
 }
@@ -73,10 +71,10 @@ export interface Schedule {
 
 export interface DailyPlan {
   date: string;
-  schedule: Schedule; // New field for time optimization
+  schedule: Schedule;
   workout: {
     summary: string;
-    detail: WorkoutLevel; // Changed from 'levels' object to single 'detail'
+    detail: WorkoutLevel;
   };
   nutrition: {
     totalCalories: number;
@@ -95,11 +93,10 @@ export interface WorkoutHistoryItem {
   completedExercises: string[];
   userNotes?: string;
   exercisesSummary?: string;
-  nutrition?: { // Added nutrition to history
+  nutrition?: {
     totalCalories: number;
     totalProtein: number;
     totalCost?: number;
     meals: Meal[];
   };
-  xpGained?: number; // New field for gamification history
 }

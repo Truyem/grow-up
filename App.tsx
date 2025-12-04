@@ -31,10 +31,8 @@ const INITIAL_USER_DATA: UserInput = {
   consumedFood: []
 };
 
-// Initial Stats
+// Initial Stats (Only Streak)
 const INITIAL_STATS: UserStats = {
-  xp: 0,
-  level: 1,
   streak: 0,
   lastLoginDate: ''
 };
@@ -119,7 +117,6 @@ export default function App() {
           // Clear consumed food for the new day
           setUserData(prev => ({ ...prev, consumedFood: [] }));
           
-          let autoSaved = false;
           // Check if there was progress for this stale plan
           if (savedProgressStr) {
             const progress = JSON.parse(savedProgressStr);
@@ -166,7 +163,6 @@ export default function App() {
                 localStorage.setItem('gym_history', JSON.stringify(newHistory));
                 
                 alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới. Dữ liệu đồ ăn đã được reset.`);
-                autoSaved = true;
               }
             }
           }
@@ -218,24 +214,6 @@ export default function App() {
     setViewMode('input');
   };
 
-  const addExperience = (amount: number) => {
-    const newXP = userStats.xp + amount;
-    const newLevel = 1 + Math.floor(newXP / 500); // 500XP per level
-    
-    const updatedStats = {
-      ...userStats,
-      xp: newXP,
-      level: newLevel
-    };
-    
-    setUserStats(updatedStats);
-    localStorage.setItem('user_stats', JSON.stringify(updatedStats));
-    
-    if (newLevel > userStats.level) {
-      alert(`🎉 CHÚC MỪNG! BẠN ĐÃ LÊN LEVEL ${newLevel}! 🔥\n"Keep grinding, stay hard!"`);
-    }
-  };
-
   const handleCompleteWorkout = async (
     levelSelected: string, 
     summary: string, 
@@ -246,10 +224,6 @@ export default function App() {
     const now = new Date();
     const todayDateStr = getTodayString(); // Use the standardized date string helper
     
-    // Gain XP
-    const xpGained = 150;
-    addExperience(xpGained);
-
     const exercisesSummary = completedExercises.length > 0 
       ? completedExercises.join(', ') 
       : "Không có bài tập";
@@ -262,8 +236,7 @@ export default function App() {
       completedExercises,
       userNotes: userNotes || "",
       exercisesSummary,
-      nutrition, // Save nutrition to history
-      xpGained
+      nutrition // Save nutrition to history
     };
 
     let updatedHistory: WorkoutHistoryItem[] = [];

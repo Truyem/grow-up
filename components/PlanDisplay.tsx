@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
@@ -423,7 +424,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
            <div className="mb-4">
               <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-400">Tiến độ (XP)</span>
+                 <span className="text-gray-400">Tiến độ hoàn thành</span>
                  <span className={`font-bold ${progressPercent === 100 ? 'text-emerald-400' : 'text-cyan-400'}`}>{progressPercent}%</span>
               </div>
               <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
@@ -469,17 +470,17 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98]'}
                `}
              >
-                {/* XP Animation Effect on Button Hover (If not completed) */}
+                {/* Animation Effect on Button Hover (If not completed) */}
                {!isCompleted && (
                  <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
                )}
 
                {isCompleted ? (
                  <>
-                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành (+150 XP)
+                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành
                  </>
                ) : (
-                 <>Hoàn Thành Buổi Tập <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full ml-2">+150 XP</span></>
+                 <>Hoàn Thành Buổi Tập</>
                )}
              </button>
            </div>

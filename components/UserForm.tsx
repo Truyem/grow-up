@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, Award, Zap, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -24,10 +24,6 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
 
-  // Calculate XP Progress
-  const xpForNextLevel = 500;
-  const currentLevelXp = userStats.xp % xpForNextLevel;
-  const xpProgress = (currentLevelXp / xpForNextLevel) * 100;
   
   const handleMuscleChange = (muscle: MuscleGroup) => {
     setUserData(prev => {
@@ -114,47 +110,27 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
   return (
     <div className="space-y-6 animate-fade-in">
       
-      {/* --- GAMIFICATION PROFILE CARD --- */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/40 via-purple-900/40 to-black/40 border border-white/10 shadow-2xl p-5 group">
-        <div className="absolute top-0 right-0 p-3 opacity-20">
-           <Award className="w-24 h-24 text-yellow-500 rotate-12" />
-        </div>
-        
-        <div className="flex items-center justify-between mb-4 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-500 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-orange-500/20">
-              {userStats.level}
+      {/* --- STREAK CARD ONLY --- */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4 flex items-center justify-between group">
+         <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
+               <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
             </div>
             <div>
-              <h3 className="text-white font-bold text-lg">Chiến Binh</h3>
-              <div className="text-xs text-gray-400">Level {userStats.level}</div>
+               <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
+               <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
             </div>
-          </div>
-          
-          <div className="flex flex-col items-end">
-             <div className="flex items-center gap-1 text-orange-400 font-bold bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
-                <Flame className="w-4 h-4 fill-orange-400 animate-pulse" />
-                {userStats.streak} Ngày
-             </div>
-             <span className="text-[10px] text-gray-500 mt-1 uppercase tracking-wide">Chuỗi đăng nhập</span>
-          </div>
-        </div>
-
-        <div className="relative z-10">
-           <div className="flex justify-between text-xs text-gray-300 mb-1 font-medium">
-             <span>Kinh nghiệm (XP)</span>
-             <span>{Math.floor(currentLevelXp)} / {xpForNextLevel}</span>
-           </div>
-           <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
-             <div 
-               className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all duration-1000 ease-out"
-               style={{ width: `${xpProgress}%` }}
-             />
-           </div>
-           <div className="text-[10px] text-gray-400 mt-2 text-center italic">
-             "Hoàn thành buổi tập để nhận +150 XP"
-           </div>
-        </div>
+         </div>
+         <div className="text-right relative z-10">
+            <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+               {userStats.streak}
+            </span>
+            <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
+         </div>
+         {/* Decorative BG */}
+         <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
+            <Flame className="w-32 h-32" />
+         </div>
       </div>
       
       {/* Standard Form Below */}
@@ -271,7 +247,6 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               </div>
             </button>
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center italic">*Tối đa 3 quả trứng/ngày (thêm phải bỏ lòng đỏ).</p>
       </GlassCard>
 
       <GlassCard title="Tình trạng sức khỏe" icon={<Activity className="w-6 h-6" />}>
