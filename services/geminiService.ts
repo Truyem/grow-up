@@ -53,15 +53,15 @@ const getFallbackPlan = (intensity: Intensity): DailyPlan => ({
     detail: FALLBACK_PLANS_BY_INTENSITY[intensity]
   },
   nutrition: {
-    totalCalories: 2600,
-    totalProtein: 155,
+    totalCalories: 2100,
+    totalProtein: 160,
     totalCost: 95000,
-    advice: "BULKING: Ăn dư thừa Calo. Bữa sáng không cơm.",
+    advice: "CUTTING: Thâm hụt Calo (< 2300). Giữ Protein cao để giữ cơ.",
     meals: [
-      { name: "Bữa Sáng (07:00)", calories: 600, protein: 35, description: "300g Khoai lang luộc + 3 Trứng ốp la + 1 quả Chuối.", estimatedPrice: 20000 },
-      { name: "Bữa Trưa (12:00)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Ức gà xào + 200g Rau trong tủ lạnh.", estimatedPrice: 45000 },
-      { name: "Bữa Tối (18:30)", calories: 950, protein: 60, description: "3 bát Cơm đầy (400g) + 200g Thịt bò xào + 200g Rau xanh.", estimatedPrice: 30000 },
-      { name: "Bữa Phụ (21:00)", calories: 100, protein: 0, description: "1 hộp sữa chua Vinamilk (100g) + 1 quả táo.", estimatedPrice: 5000 }
+      { name: "Bữa Sáng (07:00)", calories: 450, protein: 30, description: "2 củ Khoai lang luộc + 3 Trứng luộc (bỏ 1 lòng đỏ).", estimatedPrice: 15000 },
+      { name: "Bữa Trưa (12:00)", calories: 750, protein: 60, description: "1.5 bát Cơm (200g) + 250g Ức gà luộc/áp chảo + 300g Rau xanh.", estimatedPrice: 40000 },
+      { name: "Bữa Tối (18:30)", calories: 700, protein: 60, description: "1 bát Cơm (150g) + 250g Cá/Thịt nạc + 300g Súp lơ/Rau.", estimatedPrice: 35000 },
+      { name: "Bữa Phụ (21:00)", calories: 200, protein: 10, description: "1 hộp sữa chua không đường + Hạt.", estimatedPrice: 5000 }
     ]
   }
 });
@@ -185,14 +185,15 @@ export const generateDailyPlan = async (user: UserInput, history: WorkoutHistory
       - Tránh giờ học: 12:00 - 14:00.
       - Đề xuất giờ tập & giờ ngủ (22:30).
 
-      === 5. DINH DƯỠNG (BULKING) ===
-      - PROTEIN: CAO (2-2.2g/kg -> ~${(user.weight * 2.1).toFixed(0)}g).
-      - CALO: Surplus.
+      === 5. DINH DƯỠNG (CUTTING/GIẢM CÂN) ===
+      - MỤC TIÊU: THÂM HỤT CALO (DEFICIT).
+      - TỔNG CALO: BẮT BUỘC < 2300 kcal/ngày.
+      - PROTEIN: RẤT CAO (2.2g/kg -> ~${(user.weight * 2.2).toFixed(0)}g) để giữ cơ khi giảm mỡ.
       - TINH BỘT:
-        + BỮA SÁNG: KHÔNG ĂN CƠM. Thay bằng Khoai lang/Yến mạch/Bánh mì.
-        + CÁC BỮA KHÁC: Cơm trắng ăn thoải mái.
-      - RAU: Ưu tiên tủ lạnh (${ingredients}).
-      - ĐỊNH LƯỢNG: Phải ghi rõ gram/bát (Kể cả ngày nghỉ). VD: "400g Cơm + 200g Gà".
+        + BỮA SÁNG: KHÔNG ĂN CƠM. Ăn Khoai/Yến mạch.
+        + TRƯA/TỐI: Cơm trắng (Ăn ít, khoảng 1-1.5 bát/bữa).
+      - RAU: Ăn thật nhiều để no (Ưu tiên tủ lạnh: ${ingredients}).
+      - ĐỊNH LƯỢNG: Ghi rõ gram/bát. VD: "150g Cơm + 300g Gà".
       - FORMAT TÊN BỮA: Ghi rõ giờ (VD: "Bữa Sáng (07:00)").
       - Budget < 80k.
 
