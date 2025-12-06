@@ -21,6 +21,8 @@ export enum Intensity {
 
 export type NutritionGoal = 'bulking' | 'cutting';
 
+export type TrainingMode = 'standard' | 'saitama';
+
 export interface UserInput {
   weight: number;
   height: number;
@@ -28,6 +30,7 @@ export interface UserInput {
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
   nutritionGoal: NutritionGoal;
+  trainingMode: TrainingMode; // New field
   equipment: string[]; // List of available equipment
   availableIngredients: string[]; // Ingredients currently in fridge
   consumedFood: string[]; // Food already consumed today

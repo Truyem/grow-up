@@ -26,6 +26,7 @@ const INITIAL_USER_DATA: UserInput = {
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium, // Default to Medium
   nutritionGoal: 'cutting', // Default to cutting
+  trainingMode: 'standard', // Default to standard AI split
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
   consumedFood: []

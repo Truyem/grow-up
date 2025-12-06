@@ -157,14 +157,7 @@ export const generateDailyPlan = async (
   const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0; // High protein
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
-  const mathExplanation = `
-    - User Stats: ${userData.weight}kg, ${userData.height}cm.
-    - Estimated Maintenance (TDEE): ~${tdee} kcal.
-    - Estimated Workout Burn: +${burn} kcal (approx).
-    - Goal Adjustment (${goalText}): ${userData.nutritionGoal === 'bulking' ? '+400' : '-400'} kcal.
-    - FINAL DAILY TARGET: ~${target} kcal.
-  `;
-
+  
   // Determine Day Number (1-7)
   const today = new Date();
   const dayIndex = today.getDay(); // 0 is Sunday, 1 is Monday...
@@ -254,12 +247,25 @@ export const generateDailyPlan = async (
     }
   };
 
-  const prompt = `
-    ACT AS A WORLD-CLASS PERSONAL TRAINER & NUTRITIONIST.
-    GENERATE A 1-DAY PLAN FOR: ${getCurrentDate()}.
-    USER GOAL: ${goalText}.
+  // --- CONDITIONAL PROMPT LOGIC ---
+  let workoutInstructionBlock = "";
+
+  if (userData.trainingMode === 'saitama') {
+    workoutInstructionBlock = `
+    ### WORKOUT MODE: SAITAMA CHALLENGE (ONE PUNCH MAN)
+    IGNORE THE DATE AND SPLIT. TODAY IS SAITAMA DAY.
+    YOU MUST GENERATE THE FOLLOWING EXERCISES:
+    1. **Push-ups**: Total 100 reps target. (Break into manageable sets based on intensity, e.g., 5 sets of 20 or 10 sets of 10).
+    2. **Sit-ups**: Total 100 reps target.
+    3. **Squats**: Total 100 reps target (Bodyweight or Dumbbell if user wants extra hard).
+    4. **Running**: 10km Run (Cardio). *IMPORTANT*: If user Intensity is 'Medium' or 'Fresh', scale this down to "60 Minutes Run/Walk (Cardio)" to be realistic. If 'Hard', keep it 10km.
     
-    ### 1. WORKOUT SCHEDULE (STRICT 7-DAY SPLIT)
+    Structure this into Morning (Upper Body focus) and Evening (Lower Body/Run focus) or however fits best, but ALL 4 components must be present.
+    `;
+  } else {
+    // Standard AI Mode
+    workoutInstructionBlock = `
+    ### WORKOUT SCHEDULE (STRICT 7-DAY SPLIT)
     TODAY IS: ${currentSplitName}. FOLLOW THIS SPLIT STRICTLY:
     - Day 1 (Mon): Push (Chest, Shoulder, Triceps)
     - Day 2 (Tue): Pull (Back, Biceps)
@@ -269,30 +275,39 @@ export const generateDailyPlan = async (
     - Day 6 (Sat): Shoulder & Arms (Biceps, Triceps)
     - Day 7 (Sun): REST DAY (Active Recovery)
 
-    ### 2. WORKOUT RULES (CRITICAL)
+    **DAILY ABS & CARDIO (FOR STANDARD MODE)**: EVERY SINGLE DAY (Day 1-7) MUST include 1 Abs exercise + 1 Cardio exercise in the Evening session.
+    **REST DAY RULES**: Main Activity: "Đi bộ (Walking) (Cardio)" - 60 Minutes + Light Abs.
+    `;
+  }
+
+  const prompt = `
+    ACT AS A WORLD-CLASS PERSONAL TRAINER & NUTRITIONIST.
+    GENERATE A 1-DAY PLAN FOR: ${getCurrentDate()}.
+    USER GOAL: ${goalText}.
+    TRAINING MODE: ${userData.trainingMode === 'saitama' ? 'SAITAMA CHALLENGE' : 'STANDARD AI COACH'}.
+    
+    ${workoutInstructionBlock}
+
+    ### GENERAL WORKOUT RULES (APPLY TO ALL MODES)
     - **INTENSITY**: ${userData.selectedIntensity} (Medium=Hypertrophy, Hard=Failure/Overload).
     - **EQUIPMENT AVAILABLE**: ${userData.equipment.join(', ')}.
-    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool (e.g., Bench, Pull-up Bar, Machine), you MUST substitute with a **BODYWEIGHT** equivalent (e.g., Floor Press instead of Bench Press, Australian Pull-up under table instead of Pull-up).
-    - **ONE DUMBBELL RULE**: Unless equipment list says "2x" or "đôi", user only has ONE dumbbell. use UNILATERAL exercises (One Arm Row, Single Arm Press, Split Squat, etc.).
-    - **DAILY ABS & CARDIO**: EVERY SINGLE DAY (Day 1-7) MUST include 1 Abs exercise + 1 Cardio exercise in the Evening session.
+    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool (e.g., Bench, Pull-up Bar, Machine), you MUST substitute with a **BODYWEIGHT** equivalent.
+    - **ONE DUMBBELL RULE**: Unless equipment list says "2x" or "đôi", user only has ONE dumbbell. use UNILATERAL exercises.
     - **CARDIO NAMING**: If the exercise is Walking (Đi bộ) or Running (Chạy), you MUST append "(Cardio)" to the name.
-    - **REST DAY (Day 4 & 7)**: 
-      - Main Activity: "Đi bộ (Walking) (Cardio)" - 60 Minutes.
-      - Plus Light Abs exercise.
     - **TIME OPTIMIZATION**: Avoid scheduling workout between 12:00 - 14:00 (Study time). Suggest optimal time.
 
-    ### 3. NUTRITION RULES (DYNAMIC MATH)
+    ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
     - **PROTEIN TARGET**: ${proteinTarget}g (${proteinMultiplier}g/kg).
-    - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING (Deficit < 2300 logic removed, adhere to calculated target)'}.
-    - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef) to hit ${proteinTarget}g within ${Math.round(target)} kcal.
+    - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING'}.
+    - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef).
     - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}. If empty, use generic economical veggies.
     - **CARBS**: 
        - Breakfast: NO RICE (Bread/Sweet Potato/Oats only).
        - Lunch/Dinner: White Rice is allowed (High amount for Bulk, Controlled amount for Cut).
     - **FORMAT**: Meal names MUST have time (e.g., "Bữa Sáng (07:00)"). Description MUST be specific (e.g., "300g Rice + 200g Chicken").
 
-    ### 4. DATA INPUTS
+    ### DATA INPUTS
     - Weight: ${userData.weight}kg, Height: ${userData.height}cm.
     - Sore Muscles: ${userData.soreMuscles.join(', ')} (Avoid heavy load on these).
     - Fatigue: ${userData.fatigue}.

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -167,6 +167,44 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               />
             </div>
           </div>
+        </div>
+      </GlassCard>
+
+      {/* TRAINING MODE SELECTION */}
+      <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6" />}>
+        <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setUserData({ ...userData, trainingMode: 'standard' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all relative overflow-hidden ${
+                userData.trainingMode === 'standard'
+                  ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <BrainCircuit className="w-8 h-8 flex-shrink-0" />
+              <div className="text-center relative z-10">
+                <div className="font-bold text-sm">AI Coach (7 Days)</div>
+                <div className="text-[10px] opacity-70">Lịch tập chia nhóm cơ chuẩn</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setUserData({ ...userData, trainingMode: 'saitama' })}
+              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all relative overflow-hidden group ${
+                userData.trainingMode === 'saitama'
+                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <div className="w-8 h-8 flex items-center justify-center text-2xl">👊</div>
+              <div className="text-center relative z-10">
+                <div className="font-bold text-sm">Saitama Challenge</div>
+                <div className="text-[10px] opacity-70">100 Push/Sit/Squat + 10km Run</div>
+              </div>
+              {userData.trainingMode === 'saitama' && (
+                <div className="absolute inset-0 bg-yellow-500/10 animate-pulse" />
+              )}
+            </button>
         </div>
       </GlassCard>
 
