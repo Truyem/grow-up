@@ -1,4 +1,5 @@
 
+
 export enum FatigueLevel {
   Fresh = 'Khỏe',
   Normal = 'Bình thường',
@@ -30,10 +31,11 @@ export interface UserInput {
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
   nutritionGoal: NutritionGoal;
-  trainingMode: TrainingMode; // New field
-  equipment: string[]; // List of available equipment
-  availableIngredients: string[]; // Ingredients currently in fridge
-  consumedFood: string[]; // Food already consumed today
+  trainingMode: TrainingMode;
+  useCreatine: boolean; // New field
+  equipment: string[];
+  availableIngredients: string[];
+  consumedFood: string[];
 }
 
 export interface UserStats {
@@ -41,13 +43,15 @@ export interface UserStats {
   lastLoginDate: string;
 }
 
+export type ExerciseColor = 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
+
 export interface Exercise {
   name: string;
   sets: number;
   reps: string; 
   notes?: string;
   equipment?: string;
-  colorCode?: 'Red' | 'Blue' | 'Yellow' | 'Green';
+  colorCode?: ExerciseColor;
   isBFR?: boolean;
 }
 
@@ -56,14 +60,14 @@ export interface Meal {
   calories: number;
   protein: number;
   description: string;
-  estimatedPrice: number; // Price in VND
+  estimatedPrice: number;
 }
 
 export interface WorkoutLevel {
-  levelName: string; // "Vừa sức", "Thử thách"
+  levelName: string;
   description: string;
-  morning: Exercise[]; // Split session
-  evening: Exercise[]; // Split session
+  morning: Exercise[];
+  evening: Exercise[];
 }
 
 export interface Schedule {
@@ -82,7 +86,8 @@ export interface DailyPlan {
   nutrition: {
     totalCalories: number;
     totalProtein: number;
-    totalCost: number; // Total daily cost in VND
+    waterIntake: number; // Liters
+    totalCost: number;
     meals: Meal[];
     advice: string;
   };
@@ -99,6 +104,7 @@ export interface WorkoutHistoryItem {
   nutrition?: {
     totalCalories: number;
     totalProtein: number;
+    waterIntake?: number;
     totalCost?: number;
     meals: Meal[];
   };

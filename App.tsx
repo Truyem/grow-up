@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats } from './types';
 import { UserForm } from './components/UserForm';
@@ -24,9 +25,10 @@ const INITIAL_USER_DATA: UserInput = {
   height: 165,
   fatigue: FatigueLevel.Normal,
   soreMuscles: [MuscleGroup.None],
-  selectedIntensity: Intensity.Medium, // Default to Medium
-  nutritionGoal: 'cutting', // Default to cutting
-  trainingMode: 'standard', // Default to standard AI split
+  selectedIntensity: Intensity.Medium, 
+  nutritionGoal: 'cutting', 
+  trainingMode: 'standard', 
+  useCreatine: false, // Default false
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
   consumedFood: []
@@ -220,7 +222,7 @@ export default function App() {
     summary: string, 
     completedExercises: string[], 
     userNotes: string,
-    nutrition: { totalCalories: number; totalProtein: number; totalCost: number; meals: Meal[] }
+    nutrition: DailyPlan['nutrition']
   ) => {
     const now = new Date();
     const todayDateStr = getTodayString(); // Use the standardized date string helper

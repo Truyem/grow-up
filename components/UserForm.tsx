@@ -1,8 +1,9 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -254,7 +255,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
 
       {/* Nutrition Goal Selection */}
       <GlassCard title="Mục tiêu dinh dưỡng" icon={<Utensils className="w-6 h-6" />}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-4">
             <button
               onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
               className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
@@ -284,6 +285,41 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
                 <div className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</div>
               </div>
             </button>
+        </div>
+
+        {/* Creatine Toggle */}
+        <div 
+          onClick={() => setUserData({ ...userData, useCreatine: !userData.useCreatine })}
+          className={`
+            relative p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all
+            ${userData.useCreatine 
+              ? 'bg-blue-600/20 border-blue-500/50 shadow-lg shadow-blue-500/10' 
+              : 'bg-black/20 border-white/10 hover:bg-white/5'}
+          `}
+        >
+          <div className="flex items-center gap-3">
+             <div className={`p-2 rounded-lg ${userData.useCreatine ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-400'}`}>
+                <Zap className="w-5 h-5" />
+             </div>
+             <div>
+                <div className={`font-bold text-sm ${userData.useCreatine ? 'text-blue-300' : 'text-gray-300'}`}>
+                   Sử dụng Creatine Monohydrate
+                </div>
+                <div className="text-[10px] text-gray-400">
+                   Tự động tính thêm nước vào thực đơn (+1.5L)
+                </div>
+             </div>
+          </div>
+          
+          <div className={`
+             w-12 h-6 rounded-full p-1 transition-colors relative
+             ${userData.useCreatine ? 'bg-blue-500' : 'bg-gray-600'}
+          `}>
+             <div className={`
+                w-4 h-4 bg-white rounded-full shadow-md transition-transform
+                ${userData.useCreatine ? 'translate-x-6' : 'translate-x-0'}
+             `} />
+          </div>
         </div>
       </GlassCard>
 

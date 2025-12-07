@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { MusicPlayer } from './ui/MusicPlayer';
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -22,18 +23,24 @@ const ColorBadge: React.FC<{ color?: string }> = ({ color }) => {
     Red: 'bg-red-500 shadow-red-500/50',
     Blue: 'bg-blue-500 shadow-blue-500/50',
     Yellow: 'bg-yellow-400 shadow-yellow-400/50',
-    Green: 'bg-green-500 shadow-green-500/50',
+    Green: 'bg-emerald-500 shadow-emerald-500/50',
+    Pink: 'bg-pink-500 shadow-pink-500/50',
+    Purple: 'bg-purple-500 shadow-purple-500/50',
+    Orange: 'bg-orange-500 shadow-orange-500/50',
   };
   const translations: Record<string, string> = {
     Red: 'Vai',
     Blue: 'Ngực',
     Yellow: 'Lưng',
-    Green: 'Tay sau'
+    Green: 'Tay sau',
+    Pink: 'Tay trước',
+    Purple: 'Chân',
+    Orange: 'Abs/Cardio'
   };
 
   return (
-    <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-black uppercase tracking-wider shadow-lg ${colors[color] || 'bg-gray-500'}`}>
-      {color} ({translations[color]})
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider shadow-lg ${colors[color] || 'bg-gray-500'}`}>
+      {translations[color] || color}
     </span>
   );
 };
@@ -163,7 +170,7 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
   </div>
 );
 
-type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green';
+type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
 
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete }) => {
   const [isCompleted, setIsCompleted] = useState(false);
@@ -272,7 +279,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   // Filter Logic Helper
   const filterExercise = (ex: Exercise) => {
     if (activeFilter === 'All') return true;
-    if (['Red', 'Blue', 'Yellow', 'Green'].includes(activeFilter)) return ex.colorCode === activeFilter;
+    if (['Red', 'Blue', 'Yellow', 'Green', 'Pink', 'Purple', 'Orange'].includes(activeFilter)) return ex.colorCode === activeFilter;
     if (activeFilter === 'Board') return !!ex.colorCode || ex.equipment?.toLowerCase().includes('board');
     if (activeFilter === 'Dumbbell') return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
     if (activeFilter === 'Band') return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
@@ -292,10 +299,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     { id: 'Dumbbell', label: 'Tạ đơn', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
     { id: 'Band', label: 'Dây/BFR', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
     { id: 'Bodyweight', label: 'Bodyweight', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
-    { id: 'Red', label: 'Vai (Red)', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
-    { id: 'Blue', label: 'Ngực (Blue)', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-    { id: 'Yellow', label: 'Lưng (Yellow)', color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
-    { id: 'Green', label: 'Tay sau (Green)', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
+    { id: 'Red', label: 'Vai', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
+    { id: 'Blue', label: 'Ngực', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    { id: 'Yellow', label: 'Lưng', color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
+    { id: 'Green', label: 'Tay sau', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+    { id: 'Pink', label: 'Tay trước', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+    { id: 'Purple', label: 'Chân', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    { id: 'Orange', label: 'Bụng/Tim mạch', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
   ];
 
   const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, filtered: Exercise[]) => (
@@ -487,7 +497,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         </GlassCard>
 
         <GlassCard title="Thực Đơn Tăng Cân (Bulking)" icon={<Utensils className="w-6 h-6" />}>
-          <div className="grid grid-cols-3 gap-2 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
             <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
               <p className="text-xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
@@ -495,6 +505,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
             <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Protein</p>
               <p className="text-xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
+            </div>
+            {/* New Water Intake Card */}
+            <div className="bg-blue-500/10 rounded-xl p-3 text-center border border-blue-500/20">
+              <p className="text-blue-200/70 text-[10px] uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Droplets className="w-3 h-3" /> Nước</p>
+              <p className="text-xl font-bold text-blue-300">{plan.nutrition.waterIntake || 2}L</p>
             </div>
             <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
               <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền</p>

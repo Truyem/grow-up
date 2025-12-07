@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup } from "../types";
 
@@ -50,6 +51,17 @@ const calculateTargetCalories = (weight: number, height: number, goal: 'bulking'
   return { tdee, burn, target };
 };
 
+// 5. Calculate Water Intake
+const calculateWaterIntake = (weight: number, useCreatine: boolean): number => {
+  // Base: 40ml per kg (0.04L)
+  let baseWater = weight * 0.04; 
+  if (useCreatine) {
+    baseWater += 1.5; // Add 1.5L if taking Creatine
+  }
+  // Round to 1 decimal place
+  return Math.round(baseWater * 10) / 10;
+};
+
 
 // Fallback plans tailored by intensity and goal
 const getFallbackPlan = (userData: UserInput): DailyPlan => {
@@ -59,30 +71,31 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
   const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0)); // 2.2g or 2.0g per kg
 
   const intensity = userData.selectedIntensity;
+  const waterIntake = calculateWaterIntake(userData.weight, userData.useCreatine);
   
   const workout: WorkoutLevel = intensity === Intensity.Hard ? {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
     morning: [
       { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?" },
-      { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
+      { name: "Single Arm Walking Lunges (Purple - Legs)", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
     ],
     evening: [
-      { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
-      { name: "Hanging Leg Raise (Abs)", sets: 4, reps: "15", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)" },
-      { name: "Burpees (Cardio)", sets: 3, reps: "15", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)" }
+      { name: "One Arm Bicep Curls (Pink - Biceps)", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
+      { name: "Hanging Leg Raise (Orange - Abs)", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)" },
+      { name: "Burpees (Orange - Cardio)", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)" }
     ]
   } : {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp + Daily Abs & Cardio.",
     morning: [
       { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!" },
-      { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
+      { name: "One Arm Dumbbell Squat (Purple - Legs)", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
     ],
     evening: [
-       { name: "Band Pull Apart", sets: 3, reps: "15", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
-       { name: "Plank (Abs)", sets: 3, reps: "60s", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
-       { name: "Jumping Jacks (Cardio)", sets: 3, reps: "50", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
+       { name: "Band Pull Apart (Yellow - Back)", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
+       { name: "Plank (Orange - Abs)", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
+       { name: "Jumping Jacks (Orange - Cardio)", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
     ]
   };
 
@@ -104,8 +117,9 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     nutrition: {
       totalCalories: target,
       totalProtein: proteinTarget,
+      waterIntake: waterIntake,
       totalCost: 150000,
-      advice: `Mục tiêu: ${isBulking ? 'Bulking (+400kcal)' : 'Cutting (-400kcal)'}. TDEE: ${tdee}.`,
+      advice: `Mục tiêu: ${isBulking ? 'Bulking (+400kcal)' : 'Cutting (-400kcal)'}. TDEE: ${tdee}. Nước: ${waterIntake}L`,
       meals: [
         {
           name: "Bữa Sáng (07:00)",
@@ -156,6 +170,7 @@ export const generateDailyPlan = async (
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
   const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0; // High protein
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
+  const waterTarget = calculateWaterIntake(userData.weight, userData.useCreatine);
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
   
   // Determine Day Number (1-7)
@@ -227,6 +242,7 @@ export const generateDailyPlan = async (
         properties: {
           totalCalories: { type: Type.NUMBER },
           totalProtein: { type: Type.NUMBER },
+          waterIntake: { type: Type.NUMBER }, // New field in schema
           totalCost: { type: Type.NUMBER },
           advice: { type: Type.STRING },
           meals: {
@@ -296,9 +312,20 @@ export const generateDailyPlan = async (
     - **CARDIO NAMING**: If the exercise is Walking (Đi bộ) or Running (Chạy), you MUST append "(Cardio)" to the name.
     - **TIME OPTIMIZATION**: Avoid scheduling workout between 12:00 - 14:00 (Study time). Suggest optimal time.
 
+    ### COLOR CODING RULES (MANDATORY)
+    Assign a 'colorCode' to EVERY exercise based on the PRIMARY muscle group involved:
+    - **Blue**: Chest (Ngực)
+    - **Red**: Shoulders (Vai)
+    - **Yellow**: Back (Lưng)
+    - **Green**: Triceps (Tay sau)
+    - **Pink**: Biceps (Tay trước)
+    - **Purple**: Legs (Chân/Mông) & Lower Body
+    - **Orange**: Abs (Bụng) & Cardio
+
     ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
     - **PROTEIN TARGET**: ${proteinTarget}g (${proteinMultiplier}g/kg).
+    - **WATER INTAKE TARGET**: ${waterTarget} Liters (Calculated based on weight + Creatine usage).
     - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING'}.
     - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef).
     - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}. If empty, use generic economical veggies.
@@ -312,6 +339,7 @@ export const generateDailyPlan = async (
     - Sore Muscles: ${userData.soreMuscles.join(', ')} (Avoid heavy load on these).
     - Fatigue: ${userData.fatigue}.
     - Food Consumed Today: ${userData.consumedFood.join(', ')} (Subtract these from the plan).
+    - Creatine Supplement: ${userData.useCreatine ? "YES" : "NO"}.
 
     Generate JSON response.
   `;
