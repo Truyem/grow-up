@@ -10,11 +10,11 @@ interface AnalysisViewProps {
 }
 
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) => {
-  
+
   // Calculate Statistics
   const stats = useMemo(() => {
     const totalWorkouts = history.length;
-    
+
     const totalExercises = history.reduce((acc, item) => {
       return acc + (item.completedExercises ? item.completedExercises.length : 0);
     }, 0);
@@ -24,23 +24,23 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) =
     if (history.length > 0) {
       const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
       const today = new Date();
-      today.setHours(0,0,0,0);
-      
+      today.setHours(0, 0, 0, 0);
+
       // Check if last workout was today or yesterday to start counting
       const lastWorkoutDate = new Date(sortedHistory[0].timestamp);
-      lastWorkoutDate.setHours(0,0,0,0);
-      
+      lastWorkoutDate.setHours(0, 0, 0, 0);
+
       const diffTime = Math.abs(today.getTime() - lastWorkoutDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays <= 1) {
         streak = 1;
         for (let i = 0; i < sortedHistory.length - 1; i++) {
           const current = new Date(sortedHistory[i].timestamp);
-          const next = new Date(sortedHistory[i+1].timestamp);
-          current.setHours(0,0,0,0);
-          next.setHours(0,0,0,0);
-          
+          const next = new Date(sortedHistory[i + 1].timestamp);
+          current.setHours(0, 0, 0, 0);
+          next.setHours(0, 0, 0, 0);
+
           const d = (current.getTime() - next.getTime()) / (1000 * 3600 * 24);
           if (d === 1) {
             streak++;
@@ -58,19 +58,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) =
   const chartData = useMemo(() => {
     const days = [];
     const today = new Date();
-    
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const dateStr = d.toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
-      
+
       // Find workouts on this day
       // Note: Comparing by simplified date string for robustness
-      const dayStart = new Date(d.setHours(0,0,0,0)).getTime();
-      const dayEnd = new Date(d.setHours(23,59,59,999)).getTime();
+      const dayStart = new Date(d.setHours(0, 0, 0, 0)).getTime();
+      const dayEnd = new Date(d.setHours(23, 59, 59, 999)).getTime();
 
       const workoutOnDay = history.find(h => h.timestamp >= dayStart && h.timestamp <= dayEnd);
-      
+
       days.push({
         name: i === 0 ? 'Hôm nay' : dateStr,
         exercises: workoutOnDay?.completedExercises?.length || 0,
@@ -98,9 +98,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) =
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-4 mb-6">
-        <button 
+        <button
           onClick={onBack}
-          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white"
+          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-white cursor-pointer"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -145,30 +145,30 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) =
         <div className="h-[300px] w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
-              <XAxis 
-                dataKey="name" 
-                stroke="#94a3b8" 
-                fontSize={12} 
+              <XAxis
+                dataKey="name"
+                stroke="#94a3b8"
+                fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 dy={10}
               />
-              <YAxis 
-                hide 
+              <YAxis
+                hide
               />
-              <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
               <Bar dataKey="exercises" radius={[6, 6, 6, 6]} barSize={40}>
                 {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={entry.exercises > 0 ? 'url(#colorGradient)' : 'rgba(255,255,255,0.05)'} 
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.exercises > 0 ? 'url(#colorGradient)' : 'rgba(255,255,255,0.05)'}
                   />
                 ))}
               </Bar>
               <defs>
                 <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.8} />
                 </linearGradient>
               </defs>
             </BarChart>

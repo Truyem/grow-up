@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -25,17 +25,17 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
 
-  
+
   const handleMuscleChange = (muscle: MuscleGroup) => {
     setUserData(prev => {
       let newSore: MuscleGroup[] = [];
-      
+
       if (muscle === MuscleGroup.None) {
-        if (prev.soreMuscles.includes(MuscleGroup.None)) return prev; 
+        if (prev.soreMuscles.includes(MuscleGroup.None)) return prev;
         newSore = [MuscleGroup.None];
       } else {
         const cleanPrev = prev.soreMuscles.filter(m => m !== MuscleGroup.None);
-        
+
         if (cleanPrev.includes(muscle)) {
           newSore = cleanPrev.filter(m => m !== muscle);
         } else {
@@ -110,30 +110,30 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
 
   return (
     <div className="space-y-6 animate-fade-in">
-      
+
       {/* --- STREAK CARD ONLY --- */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4 flex items-center justify-between group">
-         <div className="flex items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
-               <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
-            </div>
-            <div>
-               <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
-               <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
-            </div>
-         </div>
-         <div className="text-right relative z-10">
-            <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-               {userStats.streak}
-            </span>
-            <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
-         </div>
-         {/* Decorative BG */}
-         <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
-            <Flame className="w-32 h-32" />
-         </div>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4 flex items-center justify-between group cursor-pointer hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all">
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
+            <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
+            <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
+          </div>
+        </div>
+        <div className="text-right relative z-10">
+          <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            {userStats.streak}
+          </span>
+          <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
+        </div>
+        {/* Decorative BG */}
+        <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
+          <Flame className="w-32 h-32" />
+        </div>
       </div>
-      
+
       {/* Standard Form Below */}
       <GlassCard title="Thông tin hôm nay" icon={<Calendar className="w-6 h-6" />}>
         <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
@@ -174,38 +174,36 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       {/* TRAINING MODE SELECTION */}
       <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6" />}>
         <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setUserData({ ...userData, trainingMode: 'standard' })}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all relative overflow-hidden ${
-                userData.trainingMode === 'standard'
-                  ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+          <button
+            onClick={() => setUserData({ ...userData, trainingMode: 'standard' })}
+            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'standard'
+                ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
-            >
-              <BrainCircuit className="w-8 h-8 flex-shrink-0" />
-              <div className="text-center relative z-10">
-                <div className="font-bold text-sm">AI Coach (7 Days)</div>
-                <div className="text-[10px] opacity-70">Lịch tập chia nhóm cơ chuẩn</div>
-              </div>
-            </button>
+          >
+            <BrainCircuit className="w-8 h-8 flex-shrink-0" />
+            <div className="text-center relative z-10">
+              <div className="font-bold text-sm">AI Coach (7 Days)</div>
+              <div className="text-[10px] opacity-70">Lịch tập chia nhóm cơ chuẩn</div>
+            </div>
+          </button>
 
-            <button
-              onClick={() => setUserData({ ...userData, trainingMode: 'saitama' })}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all relative overflow-hidden group ${
-                userData.trainingMode === 'saitama'
-                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+          <button
+            onClick={() => setUserData({ ...userData, trainingMode: 'saitama' })}
+            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'saitama'
+                ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
-            >
-              <div className="w-8 h-8 flex items-center justify-center text-2xl">👊</div>
-              <div className="text-center relative z-10">
-                <div className="font-bold text-sm">Saitama Challenge</div>
-                <div className="text-[10px] opacity-70">100 Push/Sit/Squat + 10km Run</div>
-              </div>
-              {userData.trainingMode === 'saitama' && (
-                <div className="absolute inset-0 bg-yellow-500/10 animate-pulse" />
-              )}
-            </button>
+          >
+            <Target className="w-8 h-8 flex-shrink-0" />
+            <div className="text-center relative z-10">
+              <div className="font-bold text-sm">Saitama Challenge</div>
+              <div className="text-[10px] opacity-70">100 Push/Sit/Squat + 10km Run</div>
+            </div>
+            {userData.trainingMode === 'saitama' && (
+              <div className="absolute inset-0 bg-yellow-500/10 animate-pulse" />
+            )}
+          </button>
         </div>
       </GlassCard>
 
@@ -224,7 +222,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             />
             <button
               onClick={handleAddEquipment}
-              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -233,14 +231,14 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <div className="flex flex-wrap gap-2">
             {userData.equipment.length > 0 ? (
               userData.equipment.map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 group hover:border-white/20 transition-all"
                 >
                   <span>{item}</span>
                   <button
                     onClick={() => handleRemoveEquipment(index)}
-                    className="text-gray-500 hover:text-red-400 transition-colors"
+                    className="text-gray-500 hover:text-red-400 transition-colors cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -256,66 +254,64 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       {/* Nutrition Goal Selection */}
       <GlassCard title="Mục tiêu dinh dưỡng" icon={<Utensils className="w-6 h-6" />}>
         <div className="grid grid-cols-2 gap-3 mb-4">
-            <button
-              onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                userData.nutritionGoal === 'bulking'
-                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+          <button
+            onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
+            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${userData.nutritionGoal === 'bulking'
+                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
-            >
-              <TrendingUp className="w-8 h-8 flex-shrink-0" />
-              <div className="text-center">
-                <div className="font-bold text-sm">Tăng Cân (Bulking)</div>
-                <div className="text-[10px] opacity-70">Calo dư thừa, Cơm trắng</div>
-              </div>
-            </button>
+          >
+            <TrendingUp className="w-8 h-8 flex-shrink-0" />
+            <div className="text-center">
+              <div className="font-bold text-sm">Tăng Cân (Bulking)</div>
+              <div className="text-[10px] opacity-70">Calo dư thừa, Cơm trắng</div>
+            </div>
+          </button>
 
-            <button
-              onClick={() => setUserData({ ...userData, nutritionGoal: 'cutting' })}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                userData.nutritionGoal === 'cutting'
-                  ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
+          <button
+            onClick={() => setUserData({ ...userData, nutritionGoal: 'cutting' })}
+            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${userData.nutritionGoal === 'cutting'
+                ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
-            >
-              <TrendingDown className="w-8 h-8 flex-shrink-0" />
-              <div className="text-center">
-                <div className="font-bold text-sm">Giảm Cân (Cutting)</div>
-                <div className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</div>
-              </div>
-            </button>
+          >
+            <TrendingDown className="w-8 h-8 flex-shrink-0" />
+            <div className="text-center">
+              <div className="font-bold text-sm">Giảm Cân (Cutting)</div>
+              <div className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</div>
+            </div>
+          </button>
         </div>
 
         {/* Creatine Toggle */}
-        <div 
+        <div
           onClick={() => setUserData({ ...userData, useCreatine: !userData.useCreatine })}
           className={`
             relative p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-all
-            ${userData.useCreatine 
-              ? 'bg-blue-600/20 border-blue-500/50 shadow-lg shadow-blue-500/10' 
-              : 'bg-black/20 border-white/10 hover:bg-white/5'}
+            ${userData.useCreatine
+              ? 'bg-blue-600/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
+              : 'bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20'}
           `}
         >
           <div className="flex items-center gap-3">
-             <div className={`p-2 rounded-lg ${userData.useCreatine ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-400'}`}>
-                <Zap className="w-5 h-5" />
-             </div>
-             <div>
-                <div className={`font-bold text-sm ${userData.useCreatine ? 'text-blue-300' : 'text-gray-300'}`}>
-                   Sử dụng Creatine Monohydrate
-                </div>
-                <div className="text-[10px] text-gray-400">
-                   Tự động tính thêm nước vào thực đơn (+1.5L)
-                </div>
-             </div>
+            <div className={`p-2 rounded-lg transition-colors ${userData.useCreatine ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-400'}`}>
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className={`font-bold text-sm ${userData.useCreatine ? 'text-blue-300' : 'text-gray-300'}`}>
+                Sử dụng Creatine Monohydrate
+              </div>
+              <div className="text-[10px] text-gray-400">
+                Tự động tính thêm nước vào thực đơn (+1.5L)
+              </div>
+            </div>
           </div>
-          
+
           <div className={`
              w-12 h-6 rounded-full p-1 transition-colors relative
              ${userData.useCreatine ? 'bg-blue-500' : 'bg-gray-600'}
           `}>
-             <div className={`
+            <div className={`
                 w-4 h-4 bg-white rounded-full shadow-md transition-transform
                 ${userData.useCreatine ? 'translate-x-6' : 'translate-x-0'}
              `} />
@@ -331,11 +327,10 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               <button
                 key={level}
                 onClick={() => setUserData({ ...userData, fatigue: level })}
-                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
-                  userData.fatigue === level
+                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${userData.fatigue === level
                     ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 border shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                    : 'bg-black/20 border-transparent text-gray-400 hover:bg-black/30'
-                }`}
+                    : 'bg-black/20 border-transparent text-gray-400 hover:bg-black/30 border'
+                  }`}
               >
                 {level}
               </button>
@@ -350,13 +345,12 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               <button
                 key={muscle}
                 onClick={() => handleMuscleChange(muscle)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
-                  userData.soreMuscles.includes(muscle)
-                    ? muscle === MuscleGroup.None 
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border cursor-pointer ${userData.soreMuscles.includes(muscle)
+                    ? muscle === MuscleGroup.None
                       ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                       : 'bg-pink-500/20 border-pink-500 text-pink-300'
                     : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20'
-                }`}
+                  }`}
               >
                 {muscle}
               </button>
@@ -380,7 +374,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             />
             <button
               onClick={handleAddIngredient}
-              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -389,14 +383,14 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <div className="flex flex-wrap gap-2">
             {(userData.availableIngredients || []).length > 0 ? (
               (userData.availableIngredients || []).map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-200 group hover:border-emerald-500/40 transition-all"
                 >
                   <span>{item}</span>
                   <button
                     onClick={() => handleRemoveIngredient(index)}
-                    className="text-emerald-500/50 hover:text-red-400 transition-colors"
+                    className="text-emerald-500/50 hover:text-red-400 transition-colors cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -424,7 +418,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             />
             <button
               onClick={handleAddConsumedFood}
-              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95"
+              className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -433,14 +427,14 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <div className="flex flex-wrap gap-2">
             {(userData.consumedFood || []).length > 0 ? (
               (userData.consumedFood || []).map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg text-sm text-orange-200 group hover:border-orange-500/40 transition-all"
                 >
                   <span>{item}</span>
                   <button
                     onClick={() => handleRemoveConsumedFood(index)}
-                    className="text-orange-500/50 hover:text-red-400 transition-colors"
+                    className="text-orange-500/50 hover:text-red-400 transition-colors cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -457,14 +451,13 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       <GlassCard title="Cường độ tập luyện" icon={<BatteryCharging className="w-6 h-6" />}>
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-3">
-            
+
             <button
               onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
-              className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
-                userData.selectedIntensity === Intensity.Medium
+              className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Medium
                   ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
-              }`}
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                }`}
             >
               <BatteryCharging className="w-6 h-6 flex-shrink-0" />
               <div className="text-left">
@@ -475,11 +468,10 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
 
             <button
               onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
-              className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
-                userData.selectedIntensity === Intensity.Hard
+              className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Hard
                   ? 'bg-red-500/20 border-red-500 text-red-300'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
-              }`}
+                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                }`}
             >
               <BatteryFull className="w-6 h-6 flex-shrink-0" />
               <div className="text-left">
@@ -495,10 +487,10 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
         onClick={onSubmit}
         disabled={isLoading}
         className={`
-          group relative w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300
-          bg-cyan-500/20 border border-cyan-500/40 text-cyan-100
-          hover:bg-cyan-500/30 hover:border-cyan-400 hover:text-white
-          hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(6,182,212,0.4)]
+          group relative w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 cursor-pointer
+          bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/40 text-cyan-100
+          hover:from-cyan-500/30 hover:to-blue-500/30 hover:border-cyan-400 hover:text-white
+          hover:shadow-[0_0_30px_rgba(6,182,212,0.4)]
           active:scale-[0.98]
           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
           overflow-hidden
@@ -515,11 +507,11 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           </span>
         ) : (
           <span className="relative z-10 flex items-center justify-center gap-2">
-             <Activity className="w-5 h-5" /> Tạo Lịch Tập Ngay
+            <Activity className="w-5 h-5" /> Tạo Lịch Tập Ngay
           </span>
         )}
       </button>
-      
+
       <style>{`
         @keyframes shimmer {
           100% { transform: translateX(100%); }

@@ -10,21 +10,30 @@ interface GlassCardProps {
 export const GlassCard: React.FC<GlassCardProps> = ({ children, className = "", title, icon }) => {
   return (
     <div className={`
-      relative overflow-hidden
-      bg-white/5 backdrop-blur-xl 
+      group/card relative overflow-hidden
+      bg-gradient-to-br from-white/8 via-white/5 to-white/3
+      backdrop-blur-xl 
       border border-white/10 
       shadow-[0_8px_32px_0_rgba(0,0,0,0.36)]
       rounded-3xl p-6
-      transition-all duration-300 hover:bg-white/10
+      transition-all duration-300 
+      hover:bg-gradient-to-br hover:from-white/12 hover:via-white/8 hover:to-white/5
+      hover:border-white/20
+      hover:shadow-[0_8px_40px_0_rgba(6,182,212,0.15)]
       ${className}
     `}>
+      {/* Subtle glow effect on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none">
+        <div className="absolute -inset-[1px] bg-gradient-to-r from-cyan-500/10 via-transparent to-blue-500/10 rounded-3xl" />
+      </div>
+
       {(title || icon) && (
-        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
-          {icon && <div className="text-cyan-400">{icon}</div>}
+        <div className="relative z-10 flex items-center gap-3 mb-4 pb-3 border-b border-white/10 group-hover/card:border-white/20 transition-colors">
+          {icon && <div className="text-cyan-400 group-hover/card:text-cyan-300 transition-colors">{icon}</div>}
           {title && <h3 className="text-xl font-semibold text-white/90 tracking-tight">{title}</h3>}
         </div>
       )}
-      {children}
+      <div className="relative z-10">{children}</div>
     </div>
   );
 };

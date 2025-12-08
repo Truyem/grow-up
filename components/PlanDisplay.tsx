@@ -57,23 +57,23 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   const isWalking = exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking');
 
   return (
-    <div 
+    <div
       className={`
         group relative pl-4 py-3 border-l-2 transition-all duration-300 mb-2 rounded-r-lg
         ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-white/10 hover:bg-white/5'}
       `}
     >
       <div className="flex items-start gap-4">
-        <div 
+        <div
           onClick={onToggle}
           className={`mt-1 cursor-pointer transition-colors ${isChecked ? 'text-emerald-400' : 'text-gray-600 group-hover:text-cyan-400'}`}
         >
-           {isChecked ? <CheckSquare className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
+          {isChecked ? <CheckSquare className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
         </div>
 
         <div className="flex-1">
           <div className="flex justify-between items-start mb-1">
-            <button 
+            <button
               onClick={onPreview}
               className={`text-left font-bold text-lg transition-all flex items-center gap-2 hover:underline decoration-cyan-500/50 decoration-2 underline-offset-4
                 ${isChecked ? 'text-emerald-400 line-through decoration-emerald-500/50 opacity-70' : 'text-white group-hover:text-cyan-300'}
@@ -83,7 +83,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
               {exercise.name}
               <ExternalLink className={`w-3.5 h-3.5 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
             </button>
-            
+
             <div className="flex gap-2">
               <ColorBadge color={exercise.colorCode} />
               {exercise.isBFR && (
@@ -93,9 +93,9 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center justify-between">
-            <div 
+            <div
               onClick={onToggle}
               className="cursor-pointer"
             >
@@ -103,7 +103,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
                 <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" /> {exercise.sets} Sets</span>
                 <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /> {exercise.reps}</span>
               </div>
-              
+
               {exercise.equipment && (
                 <div className={`text-xs mb-1 flex items-center gap-1 ${isChecked ? 'opacity-50' : 'text-gray-400'}`}>
                   <Dumbbell className="w-3 h-3" /> {exercise.equipment}
@@ -117,17 +117,17 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
                 onStartTimer();
               }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border transition-all active:scale-95 
-                ${isWalking 
-                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300' 
+                ${isWalking
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
                   : 'bg-white/5 hover:bg-white/10 border-white/10 text-cyan-300 hover:border-cyan-500/30'}`}
             >
               {isWalking ? <Footprints className="w-3.5 h-3.5" /> : <Timer className="w-3.5 h-3.5" />}
               <span className="text-xs font-bold">{isWalking ? 'Đi bộ (60p)' : 'Nghỉ'}</span>
             </button>
           </div>
-            
+
           {exercise.notes && (
-            <p 
+            <p
               onClick={onToggle}
               className={`text-xs italic bg-red-900/20 p-2 rounded-lg border border-red-500/20 mt-2 cursor-pointer font-bold ${isChecked ? 'text-emerald-200/50' : 'text-red-300/80'}`}
             >
@@ -141,27 +141,27 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
 };
 
 const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
-  <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1">
+  <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 cursor-pointer">
     <div className="absolute -bottom-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
-       <UtensilsCrossed className="w-24 h-24 text-white" />
+      <UtensilsCrossed className="w-24 h-24 text-white" />
     </div>
-    
+
     <div className="relative z-10 flex gap-4">
       <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-emerald-500/30 transition-colors">
-         <UtensilsCrossed className="w-6 h-6 text-emerald-300" />
+        <UtensilsCrossed className="w-6 h-6 text-emerald-300" />
       </div>
-      
+
       <div className="flex-1">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
           <h4 className="font-bold text-lg text-white group-hover:text-emerald-300 transition-colors">{meal.name}</h4>
-          
+
           <div className="flex flex-wrap gap-2 text-xs font-bold mt-1 sm:mt-0">
-             <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
-             <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
-             <span className="px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 border border-yellow-500/30">~{formatCurrency(meal.estimatedPrice)}</span>
+            <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
+            <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
+            <span className="px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 border border-yellow-500/30">~{formatCurrency(meal.estimatedPrice)}</span>
           </div>
         </div>
-        
+
         <p className="text-sm text-gray-400 leading-relaxed border-t border-white/5 pt-2">
           {meal.description}
         </p>
@@ -181,11 +181,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
-  
+
   // Combine all exercises to calculate progress
   const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
   const totalExercises = allExercises.length;
-  
+
   // Calculate checked based on composite keys "mor-X" and "eve-X"
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalExercises > 0 ? Math.round((checkedCount / totalExercises) * 100) : 0;
@@ -226,7 +226,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   const handleOpenYouTube = (exerciseName: string) => {
     const query = encodeURIComponent(`${exerciseName} exercise tutorial form`);
-    
+
     // Device Detection
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isMobile = /android|ipad|iphone|ipod/i.test(userAgent);
@@ -253,11 +253,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
   const handleComplete = () => {
     setIsCompleted(true);
-    
+
     const completedMorning = currentWorkout.morning
       .filter((_, idx) => checkedState[`mor-${idx}`])
       .map(ex => ex.name);
-      
+
     const completedEvening = currentWorkout.evening
       .filter((_, idx) => checkedState[`eve-${idx}`])
       .map(ex => ex.name);
@@ -268,9 +268,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     localStorage.removeItem('workout_progress');
 
     onComplete(
-      currentWorkout.levelName, 
-      plan.workout.summary, 
-      completedExercisesList, 
+      currentWorkout.levelName,
+      plan.workout.summary,
+      completedExercisesList,
       userNote,
       plan.nutrition
     );
@@ -284,8 +284,8 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     if (activeFilter === 'Dumbbell') return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
     if (activeFilter === 'Band') return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
     if (activeFilter === 'Bodyweight') {
-       const eq = ex.equipment?.toLowerCase();
-       return !eq || eq.includes('không') || eq.includes('bodyweight') || eq === 'none';
+      const eq = ex.equipment?.toLowerCase();
+      return !eq || eq.includes('không') || eq.includes('bodyweight') || eq === 'none';
     }
     return true;
   };
@@ -315,26 +315,26 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         <h4 className="font-bold uppercase tracking-wider text-sm">{title}</h4>
         <span className="text-xs text-gray-500 ml-auto">({filtered.length} bài)</span>
       </div>
-      
+
       <div className="space-y-1">
         {filtered.length > 0 ? (
-           filtered.map((ex) => {
-             // Find original index in the unfiltered array to maintain state consistency
-             const originalIndex = exercises.indexOf(ex);
-             const key = `${prefix}-${originalIndex}`;
-             return (
-               <ExerciseItem 
-                 key={key} 
-                 exercise={ex} 
-                 isChecked={!!checkedState[key]}
-                 onToggle={() => handleToggle(key)}
-                 onPreview={() => handleOpenYouTube(ex.name)}
-                 onStartTimer={() => handleStartTimer(ex.name)}
-               />
-             );
-           })
+          filtered.map((ex) => {
+            // Find original index in the unfiltered array to maintain state consistency
+            const originalIndex = exercises.indexOf(ex);
+            const key = `${prefix}-${originalIndex}`;
+            return (
+              <ExerciseItem
+                key={key}
+                exercise={ex}
+                isChecked={!!checkedState[key]}
+                onToggle={() => handleToggle(key)}
+                onPreview={() => handleOpenYouTube(ex.name)}
+                onStartTimer={() => handleStartTimer(ex.name)}
+              />
+            );
+          })
         ) : (
-           <p className="text-sm text-gray-500 italic py-2">Không có bài tập nào phù hợp với bộ lọc.</p>
+          <p className="text-sm text-gray-500 italic py-2">Không có bài tập nào phù hợp với bộ lọc.</p>
         )}
       </div>
     </div>
@@ -343,17 +343,17 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   return (
     // Added pt-28 (top padding) to accommodate the sticky top RestTimer
     <div className="space-y-6 animate-fade-in relative pt-28">
-      <RestTimer 
-        isOpen={isTimerOpen} 
-        onClose={() => setIsTimerOpen(false)} 
+      <RestTimer
+        isOpen={isTimerOpen}
+        onClose={() => setIsTimerOpen(false)}
         defaultDuration={timerDuration}
       />
-      
+
       {/* Top Header with Back Button */}
       <div className="flex items-center justify-between mb-2">
-        <button 
+        <button
           onClick={onReset}
-          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/70 hover:text-white"
+          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-white/70 hover:text-white cursor-pointer"
           title="Quay lại màn hình tạo lịch"
         >
           <ArrowLeft className="w-6 h-6" />
@@ -372,128 +372,128 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           {plan.workout.summary}
         </p>
       </div>
-      
+
       {/* TIME OPTIMIZATION CARD */}
       {plan.schedule && (
         <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg mb-6">
           <div className="flex items-center gap-3">
-             <div className="p-3 bg-blue-500/20 rounded-full text-blue-300">
-                <AlarmClock className="w-5 h-5" />
-             </div>
-             <div>
-                <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu (Tránh 12-14h)</h4>
-                <div className="flex gap-4 mt-1">
-                   <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
-                      <Sun className="w-3.5 h-3.5 text-yellow-400" />
-                      <span className="text-white text-sm font-mono">{plan.schedule.suggestedWorkoutTime}</span>
-                   </div>
-                   <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
-                      <MoonStar className="w-3.5 h-3.5 text-purple-400" />
-                      <span className="text-white text-sm font-mono">{plan.schedule.suggestedSleepTime}</span>
-                   </div>
+            <div className="p-3 bg-blue-500/20 rounded-full text-blue-300">
+              <AlarmClock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu (Tránh 12-14h)</h4>
+              <div className="flex gap-4 mt-1">
+                <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
+                  <Sun className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-white text-sm font-mono">{plan.schedule.suggestedWorkoutTime}</span>
                 </div>
-             </div>
+                <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
+                  <MoonStar className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-white text-sm font-mono">{plan.schedule.suggestedSleepTime}</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="text-xs text-gray-400 italic text-center sm:text-right max-w-xs">
-             "{plan.schedule.reasoning}"
+            "{plan.schedule.reasoning}"
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GlassCard 
-          title={`Bài Tập: ${currentWorkout.levelName}`} 
+        <GlassCard
+          title={`Bài Tập: ${currentWorkout.levelName}`}
           icon={<Flame className="w-6 h-6" />}
           className="transition-all duration-300"
         >
-           <p className="text-sm text-gray-400 mb-4 italic border-l-2 border-cyan-500 pl-3">
-             {currentWorkout.description}
-           </p>
+          <p className="text-sm text-gray-400 mb-4 italic border-l-2 border-cyan-500 pl-3">
+            {currentWorkout.description}
+          </p>
 
-           {/* Music Player Embedded Here */}
-           <MusicPlayer />
+          {/* Music Player Embedded Here */}
+          <MusicPlayer />
 
-           {/* Filter Bar */}
-           <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
-              <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              {filterOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setActiveFilter(opt.id)}
-                  className={`
-                    flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all
-                    ${activeFilter === opt.id 
-                      ? `${opt.color} border-current shadow-[0_0_10px_rgba(255,255,255,0.1)]` 
-                      : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'}
+          {/* Filter Bar */}
+          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
+            <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            {filterOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setActiveFilter(opt.id)}
+                className={`
+                    flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors duration-200 cursor-pointer
+                    ${activeFilter === opt.id
+                    ? `${opt.color} border-current shadow-[0_0_10px_rgba(255,255,255,0.1)]`
+                    : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-300'}
                   `}
-                >
-                  {opt.label}
-                </button>
-              ))}
-           </div>
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
-           <div className="mb-4">
-              <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-400">Tiến độ hoàn thành</span>
-                 <span className={`font-bold ${progressPercent === 100 ? 'text-emerald-400' : 'text-cyan-400'}`}>{progressPercent}%</span>
-              </div>
-              <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
-                 <div 
-                   className={`h-full transition-all duration-500 ${progressPercent === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-cyan-500 to-blue-500'}`} 
-                   style={{ width: `${progressPercent}%` }}
-                 />
-              </div>
-           </div>
+          <div className="mb-4">
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-gray-400">Tiến độ hoàn thành</span>
+              <span className={`font-bold ${progressPercent === 100 ? 'text-emerald-400' : 'text-cyan-400'}`}>{progressPercent}%</span>
+            </div>
+            <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ${progressPercent === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-cyan-500 to-blue-500'}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
 
-           {/* Render Morning Session */}
-           {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning)}
-           
-           {/* Render Evening Session */}
-           {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening)}
+          {/* Render Morning Session */}
+          {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning)}
 
-           <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
-             <div className="flex gap-2 items-center text-xs text-gray-500">
-                <ExternalLink className="w-4 h-4" />
-                <span>Bấm vào tên bài tập để tìm hướng dẫn trên YouTube.</span>
-             </div>
+          {/* Render Evening Session */}
+          {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening)}
 
-             <div>
-                <label className="flex items-center gap-2 text-sm text-gray-300 mb-2">
-                  <PenLine className="w-4 h-4" /> Ghi chú buổi tập
-                </label>
-                <textarea 
-                  value={userNote}
-                  onChange={(e) => setUserNote(e.target.value)}
-                  disabled={isCompleted}
-                  placeholder="Who's gonna carry the boats? Ghi chú lại cảm giác..."
-                  className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none h-20"
-                />
-             </div>
-             
-             <button 
-               onClick={handleComplete}
-               disabled={isCompleted}
-               className={`
+          <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
+            <div className="flex gap-2 items-center text-xs text-gray-500">
+              <ExternalLink className="w-4 h-4" />
+              <span>Bấm vào tên bài tập để tìm hướng dẫn trên YouTube.</span>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-sm text-gray-300 mb-2">
+                <PenLine className="w-4 h-4" /> Ghi chú buổi tập
+              </label>
+              <textarea
+                value={userNote}
+                onChange={(e) => setUserNote(e.target.value)}
+                disabled={isCompleted}
+                placeholder="Who's gonna carry the boats? Ghi chú lại cảm giác..."
+                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none h-20"
+              />
+            </div>
+
+            <button
+              onClick={handleComplete}
+              disabled={isCompleted}
+              className={`
                  w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 relative overflow-hidden group
-                 ${isCompleted 
-                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default' 
-                   : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98]'}
+                 ${isCompleted
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-default'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-[0.98]'}
                `}
-             >
-                {/* Animation Effect on Button Hover (If not completed) */}
-               {!isCompleted && (
-                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
-               )}
+            >
+              {/* Animation Effect on Button Hover (If not completed) */}
+              {!isCompleted && (
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
+              )}
 
-               {isCompleted ? (
-                 <>
-                   <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành
-                 </>
-               ) : (
-                 <>Hoàn Thành Buổi Tập</>
-               )}
-             </button>
-           </div>
+              {isCompleted ? (
+                <>
+                  <CheckCircle2 className="w-6 h-6" /> Đã Hoàn Thành
+                </>
+              ) : (
+                <>Hoàn Thành Buổi Tập</>
+              )}
+            </button>
+          </div>
         </GlassCard>
 
         <GlassCard title="Thực Đơn Tăng Cân (Bulking)" icon={<Utensils className="w-6 h-6" />}>
@@ -516,9 +516,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
               <p className="text-sm font-bold text-yellow-300">{formatCurrency(plan.nutrition.totalCost)}</p>
             </div>
           </div>
-          
+
           <div className="text-xs text-gray-400 italic mb-4 text-center">
-             *Thực đơn ưu tiên sử dụng nguyên liệu có sẵn trong tủ lạnh của bạn.
+            *Thực đơn ưu tiên sử dụng nguyên liệu có sẵn trong tủ lạnh của bạn.
           </div>
 
           <div className="space-y-4">
@@ -530,9 +530,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       </div>
 
       <div className="text-center pt-8 pb-4">
-        <button 
+        <button
           onClick={onReset}
-          className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 mx-auto"
+          className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
           Tạo Kế Hoạch Mới

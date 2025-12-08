@@ -21,19 +21,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
-            className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white"
+            className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-white cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h2 className="text-2xl font-bold text-white">Lịch sử tập luyện</h2>
         </div>
-        
+
         {onAnalyze && history.length > 0 && (
-          <button 
+          <button
             onClick={onAnalyze}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg transition-all hover:scale-105"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg transition-all hover:shadow-cyan-500/25 cursor-pointer"
           >
             <BarChart3 className="w-5 h-5" />
             <span className="hidden sm:inline">Thống kê</span>
@@ -52,15 +52,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
           {history.map((item) => (
             <GlassCard key={item.timestamp} className="relative group">
               <div className="flex flex-col md:flex-row md:items-start gap-4">
-                
+
                 {/* Date Badge & Delete Column */}
                 <div className="flex-shrink-0 flex flex-col items-center gap-3 z-10">
                   <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 text-center w-24 shadow-inner shadow-cyan-500/5">
                     <Calendar className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
                     <span className="text-xs text-cyan-200 font-bold block">{item.date}</span>
                   </div>
-                  
-                  <button 
+
+                  <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -78,14 +78,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                 <div className="flex-grow border-l border-white/5 md:pl-4 md:border-l-0 md:border-t-0 border-t pt-4 md:pt-0 opacity-90">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                       <h3 className="text-lg font-bold text-white">{item.summary}</h3>
-                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 uppercase tracking-wider
-                         ${item.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' : 
-                           item.levelSelected.includes('Medium') ? 'bg-blue-500/20 text-blue-300' : 
-                           'bg-green-500/20 text-green-300'}
+                      <h3 className="text-lg font-bold text-white">{item.summary}</h3>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 uppercase tracking-wider
+                         ${item.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' :
+                          item.levelSelected.includes('Medium') ? 'bg-blue-500/20 text-blue-300' :
+                            'bg-green-500/20 text-green-300'}
                        `}>
-                         {item.levelSelected}
-                       </span>
+                        {item.levelSelected}
+                      </span>
                     </div>
                   </div>
 
@@ -95,11 +95,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                       <div className="flex items-center gap-2 text-gray-400 text-xs mb-2 uppercase tracking-wide">
                         <Dumbbell className="w-3 h-3" /> Bài đã hoàn thành
                       </div>
-                      
+
                       {item.exercisesSummary && (
-                         <div className="mb-2 text-xs text-cyan-300/80 italic border-b border-white/5 pb-2">
-                           {item.exercisesSummary}
-                         </div>
+                        <div className="mb-2 text-xs text-cyan-300/80 italic border-b border-white/5 pb-2">
+                          {item.exercisesSummary}
+                        </div>
                       )}
 
                       {item.completedExercises && item.completedExercises.length > 0 ? (
