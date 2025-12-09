@@ -48,7 +48,7 @@ export type ExerciseColor = 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purp
 export interface Exercise {
   name: string;
   sets: number;
-  reps: string; 
+  reps: string;
   notes?: string;
   equipment?: string;
   colorCode?: ExerciseColor;
@@ -107,5 +107,20 @@ export interface WorkoutHistoryItem {
     waterIntake?: number;
     totalCost?: number;
     meals: Meal[];
+  };
+}
+
+// AI Overview - Insights from Gemini AI about workout progress
+export interface AIOverview {
+  summary: string;           // Tóm tắt tiến trình tổng quan
+  strengths: string[];       // Điểm mạnh của user
+  improvements: string[];    // Những gì cần cải thiện
+  recommendation: string;    // Đề xuất bước tiếp theo
+  motivationalQuote: string; // Quote động viên
+  weeklyStats: {
+    workoutsCompleted: number;
+    totalExercises: number;
+    estimatedCaloriesBurned: number;
+    consistency: number;     // 0-100 percentage
   };
 }

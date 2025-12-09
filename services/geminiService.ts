@@ -1,7 +1,7 @@
 
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview } from "../types";
 
 // The API key is injected via vite.config.ts define into process.env.API_KEY
 const API_KEY = process.env.API_KEY;
@@ -22,7 +22,7 @@ const calculateBMR = (weight: number, height: number, age: number = 22): number 
 
 // 2. Calculate TDEE (Moderate Activity assumed for gym goer)
 const calculateTDEE = (bmr: number): number => {
-  return Math.round(bmr * 1.55); 
+  return Math.round(bmr * 1.55);
 };
 
 // 3. Estimate Workout Burn (Rough avg for 60 mins)
@@ -35,11 +35,11 @@ const calculateTargetCalories = (weight: number, height: number, goal: 'bulking'
   const bmr = calculateBMR(weight, height);
   const tdee = calculateTDEE(bmr);
   const burn = estimateWorkoutBurn(intensity);
-  
+
   // Formula: (TDEE) + (Workout Burn) +/- Goal Adjustment
   // Note: TDEE usually includes activity, but user requested: "Add workout burn to avg consumption".
   // So we take a baseline maintenance and add specific burn, then adjust.
-  
+
   let adjustment = 0;
   if (goal === 'bulking') {
     adjustment = 400; // Minimum surplus
@@ -54,7 +54,7 @@ const calculateTargetCalories = (weight: number, height: number, goal: 'bulking'
 // 5. Calculate Water Intake
 const calculateWaterIntake = (weight: number, useCreatine: boolean): number => {
   // Base: 40ml per kg (0.04L)
-  let baseWater = weight * 0.04; 
+  let baseWater = weight * 0.04;
   if (useCreatine) {
     baseWater += 1.5; // Add 1.5L if taking Creatine
   }
@@ -66,13 +66,13 @@ const calculateWaterIntake = (weight: number, useCreatine: boolean): number => {
 // Fallback plans tailored by intensity and goal
 const getFallbackPlan = (userData: UserInput): DailyPlan => {
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
-  
+
   const isBulking = userData.nutritionGoal === 'bulking';
   const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0)); // 2.2g or 2.0g per kg
 
   const intensity = userData.selectedIntensity;
   const waterIntake = calculateWaterIntake(userData.weight, userData.useCreatine);
-  
+
   const workout: WorkoutLevel = intensity === Intensity.Hard ? {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
@@ -93,16 +93,16 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
       { name: "One Arm Dumbbell Squat (Purple - Legs)", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
     ],
     evening: [
-       { name: "Band Pull Apart (Yellow - Back)", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
-       { name: "Plank (Orange - Abs)", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
-       { name: "Jumping Jacks (Orange - Cardio)", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
+      { name: "Band Pull Apart (Yellow - Back)", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
+      { name: "Plank (Orange - Abs)", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
+      { name: "Jumping Jacks (Orange - Cardio)", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
     ]
   };
 
   // Fallback Nutrition Construction
   const carbSource = isBulking ? "400g Cơm trắng" : "150g Cơm trắng (Ít carb)";
   const vegSource = "300g Súp lơ xanh";
-  
+
   return {
     date: getCurrentDate(),
     schedule: {
@@ -155,7 +155,7 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
 };
 
 export const generateDailyPlan = async (
-  userData: UserInput, 
+  userData: UserInput,
   history: WorkoutHistoryItem[]
 ): Promise<DailyPlan> => {
   if (!API_KEY) {
@@ -172,13 +172,13 @@ export const generateDailyPlan = async (
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
   const waterTarget = calculateWaterIntake(userData.weight, userData.useCreatine);
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
-  
+
   // Determine Day Number (1-7)
   const today = new Date();
   const dayIndex = today.getDay(); // 0 is Sunday, 1 is Monday...
   // Map JS Day (0-6) to User Split Day (1-7) where Sunday is Day 7
-  const currentDayNumber = dayIndex === 0 ? 7 : dayIndex; 
-  
+  const currentDayNumber = dayIndex === 0 ? 7 : dayIndex;
+
   const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Rest)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
   const currentSplitName = dayNames[currentDayNumber];
 
@@ -356,10 +356,125 @@ export const generateDailyPlan = async (
 
     const jsonText = response.text;
     if (!jsonText) throw new Error("Empty response");
-    
+
     return JSON.parse(jsonText) as DailyPlan;
   } catch (error) {
     console.error("Gemini API Error:", error);
     return getFallbackPlan(userData);
+  }
+};
+
+// --- AI OVERVIEW GENERATION ---
+
+const getFallbackAIOverview = (history: WorkoutHistoryItem[]): AIOverview => {
+  const lastWeek = history.filter(h => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return h.timestamp >= weekAgo;
+  });
+
+  const workoutsCompleted = lastWeek.length;
+  const totalExercises = lastWeek.reduce((acc, h) => acc + (h.completedExercises?.length || 0), 0);
+  const consistency = Math.round((workoutsCompleted / 7) * 100);
+
+  return {
+    summary: history.length === 0
+      ? "Chưa có dữ liệu tập luyện. Hãy bắt đầu lịch trình đầu tiên của bạn!"
+      : `Bạn đã hoàn thành ${workoutsCompleted} buổi tập trong tuần này với ${totalExercises} bài tập.`,
+    strengths: history.length > 0 ? ["Đã bắt đầu hành trình tập luyện"] : [],
+    improvements: workoutsCompleted < 4 ? ["Tăng tần suất tập luyện lên 4-5 ngày/tuần"] : [],
+    recommendation: "Tiếp tục duy trì lịch tập đều đặn và tập trung vào progressive overload.",
+    motivationalQuote: "\"Điều duy nhất đáng sợ là sự sợ hãi chính nó.\" - David Goggins",
+    weeklyStats: {
+      workoutsCompleted,
+      totalExercises,
+      estimatedCaloriesBurned: workoutsCompleted * 350,
+      consistency
+    }
+  };
+};
+
+export const generateAIOverview = async (
+  history: WorkoutHistoryItem[],
+  userData?: UserInput
+): Promise<AIOverview> => {
+  if (!API_KEY || history.length === 0) {
+    return getFallbackAIOverview(history);
+  }
+
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const model = "gemini-2.5-flash";
+
+  // Prepare history summary for context
+  const lastWeekHistory = history.filter(h => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return h.timestamp >= weekAgo;
+  });
+
+  const historySummary = lastWeekHistory.map(h => ({
+    date: h.date,
+    level: h.levelSelected,
+    exercises: h.completedExercises?.length || 0,
+    exerciseNames: h.completedExercises?.slice(0, 5).join(', ') || 'N/A'
+  }));
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      summary: { type: Type.STRING },
+      strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+      improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+      recommendation: { type: Type.STRING },
+      motivationalQuote: { type: Type.STRING },
+      weeklyStats: {
+        type: Type.OBJECT,
+        properties: {
+          workoutsCompleted: { type: Type.NUMBER },
+          totalExercises: { type: Type.NUMBER },
+          estimatedCaloriesBurned: { type: Type.NUMBER },
+          consistency: { type: Type.NUMBER }
+        }
+      }
+    }
+  };
+
+  const prompt = `
+ROLE: Huấn luyện viên cá nhân chuyên nghiệp, phân tích tiến trình tập luyện.
+
+CONTEXT: Lịch sử tập (7 ngày gần nhất):
+${JSON.stringify(historySummary, null, 2)}
+
+Tổng buổi tập: ${history.length}
+${userData ? `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? 'Tăng cơ' : 'Giảm mỡ'}` : ''}
+
+TASK: Phân tích tiến trình, tạo AI Overview bằng tiếng Việt.
+
+RULES:
+- summary: 1-2 câu tóm tắt tiến trình tuần
+- strengths: 2-3 điểm mạnh (VD: "Tập đều đặn", "Focus compound movements")
+- improvements: 2-3 điểm cần cải thiện
+- recommendation: 1 gợi ý cụ thể cho tuần tới
+- motivationalQuote: Quote tiếng Việt từ David Goggins/bodybuilder nổi tiếng
+- weeklyStats: consistency = (workouts/7)*100
+
+OUTPUT: JSON format.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("Empty response");
+
+    return JSON.parse(jsonText) as AIOverview;
+  } catch (error) {
+    console.error("AI Overview Error:", error);
+    return getFallbackAIOverview(history);
   }
 };
