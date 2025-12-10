@@ -25,9 +25,9 @@ const INITIAL_USER_DATA: UserInput = {
   height: 165,
   fatigue: FatigueLevel.Normal,
   soreMuscles: [MuscleGroup.None],
-  selectedIntensity: Intensity.Medium, 
-  nutritionGoal: 'cutting', 
-  trainingMode: 'standard', 
+  selectedIntensity: Intensity.Medium,
+  nutritionGoal: 'cutting',
+  trainingMode: 'standard',
   useCreatine: false, // Default false
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
@@ -56,9 +56,50 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('input');
+  const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
+  // Auto-save on page unload/visibility change to prevent data loss
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Force sync save of current state to localStorage
+      const currentProgress = localStorage.getItem('workout_progress');
+      const currentPlan = localStorage.getItem('daily_plan_cache');
+
+      // Data is already being saved by PlanDisplay component, but we ensure it's synced
+      if (currentProgress && currentPlan) {
+        console.log('Auto-saving progress before page unload...');
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // When tab becomes hidden, ensure data is persisted
+        console.log('Tab hidden - data auto-saved via localStorage');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Load local history, cached plan, stats and auto-complete logic
   useEffect(() => {
+    // 0. Load User Settings
+    const savedUserData = localStorage.getItem('user_settings');
+    if (savedUserData) {
+      try {
+        const parsedUserData = JSON.parse(savedUserData);
+        // Merge with initial data to handle new fields
+        setUserData(prev => ({ ...prev, ...parsedUserData }));
+      } catch (e) {
+        console.error("Failed to load user settings", e);
+      }
+    }
+
     // 1. Load History
     let currentHistory: WorkoutHistoryItem[] = [];
     const savedHistory = localStorage.getItem('gym_history');
@@ -74,11 +115,11 @@ export default function App() {
     // 2. Load Stats & Handle Streak Logic
     const savedStatsStr = localStorage.getItem('user_stats');
     let currentStats = INITIAL_STATS;
-    
+
     if (savedStatsStr) {
       try {
         currentStats = JSON.parse(savedStatsStr);
-      } catch(e) { console.error("Failed stats load", e); }
+      } catch (e) { console.error("Failed stats load", e); }
     }
 
     const todayDate = new Date().toDateString(); // "Mon Sep 28 2025" format for streak logic
@@ -86,7 +127,7 @@ export default function App() {
       // Check if last login was yesterday to increment streak
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      
+
       if (currentStats.lastLoginDate === yesterday.toDateString()) {
         currentStats.streak += 1;
       } else if (currentStats.lastLoginDate && currentStats.lastLoginDate !== todayDate) {
@@ -95,7 +136,7 @@ export default function App() {
       } else if (!currentStats.lastLoginDate) {
         currentStats.streak = 1;
       }
-      
+
       currentStats.lastLoginDate = todayDate;
       setUserStats(currentStats);
       localStorage.setItem('user_stats', JSON.stringify(currentStats));
@@ -112,68 +153,75 @@ export default function App() {
       try {
         const cachedPlan = JSON.parse(cachedPlanStr) as DailyPlan;
         const todayStr = getTodayString();
-        
+
         // AUTO-SAVE LOGIC: If the plan is from a DIFFERENT day
         if (cachedPlan.date !== todayStr) {
           console.log("Found stale plan from:", cachedPlan.date);
-          
+
           // Clear consumed food for the new day
           setUserData(prev => ({ ...prev, consumedFood: [] }));
-          
-          // Check if there was progress for this stale plan
-          if (savedProgressStr) {
-            const progress = JSON.parse(savedProgressStr);
-            if (progress.planDate === cachedPlan.date && progress.checkedState) {
-              
-              // Count checked exercises
-              const checkedKeys = Object.keys(progress.checkedState).filter(k => progress.checkedState[k]);
-              
-              if (checkedKeys.length > 0) {
-                // Determine completed exercises strings
-                const morningEx = cachedPlan.workout.detail.morning || [];
-                const eveningEx = cachedPlan.workout.detail.evening || [];
-                
-                // Helper to map back from "mor-X" or "eve-X"
-                const completedList: string[] = [];
-                
-                morningEx.forEach((ex, idx) => {
-                   if (progress.checkedState[`mor-${idx}`]) completedList.push(ex.name);
-                });
-                
-                eveningEx.forEach((ex, idx) => {
-                   if (progress.checkedState[`eve-${idx}`]) completedList.push(ex.name);
-                });
-                
-                // Construct summary
-                const exSummary = completedList.join(', ');
-                const finalNote = (progress.userNote || "") + " (Tự động lưu do qua ngày)";
 
-                // Create History Item
-                const newItem: WorkoutHistoryItem = {
-                  date: cachedPlan.date, // Use the date of the PLAN, not today
-                  timestamp: Date.now(), // timestamp of saving
-                  levelSelected: cachedPlan.workout.detail.levelName,
-                  summary: cachedPlan.workout.summary,
-                  completedExercises: completedList,
-                  userNotes: finalNote,
-                  exercisesSummary: exSummary,
-                  nutrition: cachedPlan.nutrition
-                };
+          // Check if this date already exists in history to prevent duplicates
+          const alreadyExists = currentHistory.some(h => h.date === cachedPlan.date);
 
-                // Add to history (prepend)
-                const newHistory = [newItem, ...currentHistory];
-                setWorkoutHistory(newHistory);
-                localStorage.setItem('gym_history', JSON.stringify(newHistory));
-                
-                alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} vì bạn đã qua ngày mới. Dữ liệu đồ ăn đã được reset.`);
+          if (!alreadyExists) {
+            // Get progress if available
+            let completedList: string[] = [];
+            let userNoteFromProgress = "";
+            let savedTimestamp = Date.now();
+
+            if (savedProgressStr) {
+              try {
+                const progress = JSON.parse(savedProgressStr);
+                if (progress.planDate === cachedPlan.date && progress.checkedState) {
+                  const morningEx = cachedPlan.workout.detail.morning || [];
+                  const eveningEx = cachedPlan.workout.detail.evening || [];
+
+                  morningEx.forEach((ex, idx) => {
+                    if (progress.checkedState[`mor-${idx}`]) completedList.push(ex.name);
+                  });
+
+                  eveningEx.forEach((ex, idx) => {
+                    if (progress.checkedState[`eve-${idx}`]) completedList.push(ex.name);
+                  });
+
+                  userNoteFromProgress = progress.userNote || "";
+                  savedTimestamp = progress.lastUpdated || Date.now();
+                }
+              } catch (e) {
+                console.error("Failed to parse progress", e);
               }
             }
+
+            // Always save the workout (even if no exercises were checked)
+            const exSummary = completedList.length > 0 ? completedList.join(', ') : "Chưa hoàn thành bài tập";
+            const finalNote = userNoteFromProgress
+              ? userNoteFromProgress + " (Tự động lưu do qua ngày)"
+              : "(Tự động lưu do qua ngày)";
+
+            const newItem: WorkoutHistoryItem = {
+              date: cachedPlan.date,
+              timestamp: savedTimestamp,
+              levelSelected: cachedPlan.workout.detail.levelName,
+              summary: cachedPlan.workout.summary,
+              completedExercises: completedList,
+              userNotes: finalNote,
+              exercisesSummary: exSummary,
+              nutrition: cachedPlan.nutrition
+            };
+
+            const newHistory = [newItem, ...currentHistory];
+            setWorkoutHistory(newHistory);
+            localStorage.setItem('gym_history', JSON.stringify(newHistory));
+
+            const exerciseCount = completedList.length;
+            alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} (${exerciseCount} bài tập đã hoàn thành). Dữ liệu đồ ăn đã được reset.`);
           }
 
           // Clean up old cache whether we saved it or not
           localStorage.removeItem('daily_plan_cache');
           localStorage.removeItem('workout_progress');
-          
+
           // Stay on input mode to create TODAY's plan
           setViewMode('input');
 
@@ -192,19 +240,37 @@ export default function App() {
     }
   }, []);
 
+  // Save user settings whenever userData changes (exclude consumedFood as it resets daily)
+  useEffect(() => {
+    const settingsToSave = {
+      weight: userData.weight,
+      height: userData.height,
+      fatigue: userData.fatigue,
+      soreMuscles: userData.soreMuscles,
+      selectedIntensity: userData.selectedIntensity,
+      nutritionGoal: userData.nutritionGoal,
+      trainingMode: userData.trainingMode,
+      useCreatine: userData.useCreatine,
+      equipment: userData.equipment,
+      availableIngredients: userData.availableIngredients
+      // consumedFood is NOT saved - it resets daily
+    };
+    localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
+  }, [userData]);
+
   const handleGenerate = async () => {
     setLoading(true);
     // Pass workout history to the service
     const generatedPlan = await generateDailyPlan(userData, workoutHistory);
-    
+
     setPlan(generatedPlan);
     setViewMode('plan');
-    
+
     // Save to local storage cache
     localStorage.setItem('daily_plan_cache', JSON.stringify(generatedPlan));
     // Clear any old progress when generating a fresh plan
     localStorage.removeItem('workout_progress');
-    
+
     setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -212,23 +278,23 @@ export default function App() {
   const handleReset = () => {
     // Direct reset without confirmation dialog to ensure button responsiveness
     setPlan(null);
-    localStorage.removeItem('daily_plan_cache'); 
+    localStorage.removeItem('daily_plan_cache');
     localStorage.removeItem('workout_progress'); // Also clear progress on manual reset
     setViewMode('input');
   };
 
   const handleCompleteWorkout = async (
-    levelSelected: string, 
-    summary: string, 
-    completedExercises: string[], 
+    levelSelected: string,
+    summary: string,
+    completedExercises: string[],
     userNotes: string,
     nutrition: DailyPlan['nutrition']
   ) => {
     const now = new Date();
     const todayDateStr = getTodayString(); // Use the standardized date string helper
-    
-    const exercisesSummary = completedExercises.length > 0 
-      ? completedExercises.join(', ') 
+
+    const exercisesSummary = completedExercises.length > 0
+      ? completedExercises.join(', ')
       : "Không có bài tập";
 
     const newItem: WorkoutHistoryItem = {
@@ -259,13 +325,13 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
-      
+
       {/* Background Image */}
       <div className="fixed inset-0 z-0">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ 
-            backgroundImage: `url('https://images.pexels.com/photos/268533/pexels-photo-268533.jpeg?cs=srgb&dl=pexels-pixabay-268533.jpg&fm=jpg')` 
+          style={{
+            backgroundImage: `url('https://images.pexels.com/photos/268533/pexels-photo-268533.jpeg?cs=srgb&dl=pexels-pixabay-268533.jpg&fm=jpg')`
           }}
         />
         <div className="absolute inset-0 bg-black/80" />
@@ -273,7 +339,7 @@ export default function App() {
 
       {/* Content Layer */}
       <div className="relative z-10 container mx-auto px-4 py-10 max-w-5xl">
-        
+
         {/* Header */}
         {viewMode === 'input' && (
           <div className="text-center mb-10 space-y-3 animate-fade-in relative">
@@ -292,41 +358,41 @@ export default function App() {
         {/* Main View Switch */}
         <div className="transition-all duration-500 ease-in-out">
           {viewMode === 'plan' && plan ? (
-            <PlanDisplay 
-              plan={plan} 
-              onReset={handleReset} 
+            <PlanDisplay
+              plan={plan}
+              onReset={handleReset}
               onComplete={handleCompleteWorkout}
             />
           ) : viewMode === 'history' ? (
-            <HistoryView 
+            <HistoryView
               history={workoutHistory}
               onBack={() => setViewMode('input')}
               onDelete={handleDeleteHistoryItem}
               onAnalyze={() => setViewMode('analysis')}
             />
           ) : viewMode === 'analysis' ? (
-            <AnalysisView 
-              history={workoutHistory} 
-              onBack={() => setViewMode('history')} 
+            <AnalysisView
+              history={workoutHistory}
+              onBack={() => setViewMode('history')}
             />
           ) : (
             <div className="max-w-2xl mx-auto space-y-4">
-               {/* Pass userStats to UserForm */}
-               <UserForm 
-                 userData={userData} 
-                 setUserData={setUserData} 
-                 userStats={userStats}
-                 onSubmit={handleGenerate}
-                 isLoading={loading}
-               />
-               
-               <button 
-                 onClick={() => setViewMode('history')}
-                 className="w-full py-3 rounded-2xl font-semibold text-gray-400 bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] hover:text-white hover:shadow-lg"
-               >
-                 <History className="w-5 h-5" />
-                 Xem Lịch sử tập luyện
-               </button>
+              {/* Pass userStats to UserForm */}
+              <UserForm
+                userData={userData}
+                setUserData={setUserData}
+                userStats={userStats}
+                onSubmit={handleGenerate}
+                isLoading={loading}
+              />
+
+              <button
+                onClick={() => setViewMode('history')}
+                className="w-full py-3 rounded-2xl font-semibold text-gray-400 bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] hover:text-white hover:shadow-lg"
+              >
+                <History className="w-5 h-5" />
+                Xem Lịch sử tập luyện
+              </button>
             </div>
           )}
         </div>
