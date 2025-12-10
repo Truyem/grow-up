@@ -6,6 +6,7 @@ import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
 import { AnalysisView } from './components/AnalysisView';
+import { Toast } from './components/ui/Toast';
 import { generateDailyPlan } from './services/geminiService';
 import { Sparkles, History } from 'lucide-react';
 
@@ -57,6 +58,7 @@ export default function App() {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('input');
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   // Auto-save on page unload/visibility change to prevent data loss
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -215,7 +217,7 @@ export default function App() {
             localStorage.setItem('gym_history', JSON.stringify(newHistory));
 
             const exerciseCount = completedList.length;
-            alert(`Hệ thống đã tự động lưu buổi tập ngày ${cachedPlan.date} (${exerciseCount} bài tập đã hoàn thành). Dữ liệu đồ ăn đã được reset.`);
+            setToastMessage(`Đã tự động lưu buổi tập ngày ${cachedPlan.date} (${exerciseCount} bài tập). Dữ liệu đồ ăn đã được reset.`);
           }
 
           // Clean up old cache whether we saved it or not
@@ -401,6 +403,15 @@ export default function App() {
           <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage || ''}
+        isOpen={!!toastMessage}
+        onClose={() => setToastMessage(null)}
+        type="success"
+        duration={6000}
+      />
     </div>
   );
 }
