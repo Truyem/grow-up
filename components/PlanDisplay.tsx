@@ -386,7 +386,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         {/* API Status Badge */}
         {apiStatus.totalKeys > 0 && (
           <div className="flex justify-center pt-2">
-            <ApiStatusBadge status={apiStatus} />
+            <ApiStatusBadge
+              status={apiStatus}
+              onKeyChange={() => setApiStatus(getApiStatus())}
+            />
           </div>
         )}
       </div>

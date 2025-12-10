@@ -39,6 +39,17 @@ const getCurrentApiKey = (): string | null => {
   return API_KEYS[currentKeyIndex];
 };
 
+// Set current API key by index (for manual selection from UI)
+export const setCurrentApiKey = (index: number): boolean => {
+  if (index < 0 || index >= API_KEYS.length) {
+    console.error(`Invalid API key index: ${index}`);
+    return false;
+  }
+  currentKeyIndex = index;
+  console.log(`🔧 Manually switched to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+  return true;
+};
+
 // Mark current key as rate limited and rotate to next
 const markRateLimitedAndRotate = (): string | null => {
   if (API_KEYS.length === 0) return null;
