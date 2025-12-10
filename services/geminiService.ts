@@ -3,8 +3,40 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview } from "../types";
 
-// The API key is injected via vite.config.ts define into process.env.API_KEY
-const API_KEY = process.env.API_KEY;
+// Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
+const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
+
+// Track current API key index - persists across calls
+let currentKeyIndex = 0;
+
+// Get current API key
+const getCurrentApiKey = (): string | null => {
+  if (API_KEYS.length === 0) return null;
+  return API_KEYS[currentKeyIndex];
+};
+
+// Rotate to next API key
+const rotateApiKey = (): string | null => {
+  if (API_KEYS.length === 0) return null;
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  console.log(`🔄 Rotated to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+  return API_KEYS[currentKeyIndex];
+};
+
+// Check if error is rate limit related
+const isRateLimitError = (error: unknown): boolean => {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return message.includes('429') ||
+      message.includes('rate limit') ||
+      message.includes('quota') ||
+      message.includes('resource exhausted') ||
+      message.includes('too many requests') ||
+      message.includes('503') ||
+      message.includes('500');
+  }
+  return false;
+};
 
 // Helper to get current formatted date
 const getCurrentDate = () => {
@@ -158,12 +190,14 @@ export const generateDailyPlan = async (
   userData: UserInput,
   history: WorkoutHistoryItem[]
 ): Promise<DailyPlan> => {
-  if (!API_KEY) {
-    console.warn("API Key not found. Using fallback plan.");
+  const apiKey = getCurrentApiKey();
+  if (!apiKey) {
+    console.warn("No API Keys found. Using fallback plan.");
     return getFallbackPlan(userData);
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  let ai = new GoogleGenAI({ apiKey });
+  let retriesLeft = API_KEYS.length; // Try each key once
   const model = "gemini-2.5-flash";
 
   // --- PRE-CALCULATE MATH ---
@@ -344,24 +378,41 @@ export const generateDailyPlan = async (
     Generate JSON response.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+  while (retriesLeft > 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty response");
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("Empty response");
 
-    return JSON.parse(jsonText) as DailyPlan;
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return getFallbackPlan(userData);
+      return JSON.parse(jsonText) as DailyPlan;
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+
+      // Check if rate limited and we have more keys to try
+      if (isRateLimitError(error) && retriesLeft > 1) {
+        const newKey = rotateApiKey();
+        if (newKey) {
+          console.log(`⚡ Rate limit detected, switching to next API key...`);
+          ai = new GoogleGenAI({ apiKey: newKey });
+          retriesLeft--;
+          continue;
+        }
+      }
+
+      // No more retries or not a rate limit error
+      return getFallbackPlan(userData);
+    }
   }
+
+  return getFallbackPlan(userData);
 };
 
 // --- AI OVERVIEW GENERATION ---
@@ -397,11 +448,13 @@ export const generateAIOverview = async (
   history: WorkoutHistoryItem[],
   userData?: UserInput
 ): Promise<AIOverview> => {
-  if (!API_KEY || history.length === 0) {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey || history.length === 0) {
     return getFallbackAIOverview(history);
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  let ai = new GoogleGenAI({ apiKey });
+  let retriesLeft = API_KEYS.length;
   const model = "gemini-2.5-flash";
 
   // Prepare history summary for context
@@ -459,22 +512,39 @@ RULES:
 OUTPUT: JSON format.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
+  while (retriesLeft > 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty response");
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("Empty response");
 
-    return JSON.parse(jsonText) as AIOverview;
-  } catch (error) {
-    console.error("AI Overview Error:", error);
-    return getFallbackAIOverview(history);
+      return JSON.parse(jsonText) as AIOverview;
+    } catch (error) {
+      console.error("AI Overview Error:", error);
+
+      // Check if rate limited and we have more keys to try
+      if (isRateLimitError(error) && retriesLeft > 1) {
+        const newKey = rotateApiKey();
+        if (newKey) {
+          console.log(`⚡ Rate limit detected on AI Overview, switching to next API key...`);
+          ai = new GoogleGenAI({ apiKey: newKey });
+          retriesLeft--;
+          continue;
+        }
+      }
+
+      // No more retries or not a rate limit error
+      return getFallbackAIOverview(history);
+    }
   }
+
+  return getFallbackAIOverview(history);
 };
