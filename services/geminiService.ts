@@ -9,18 +9,66 @@ const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
 // Track current API key index - persists across calls
 let currentKeyIndex = 0;
 
+// Track rate-limited API keys (index -> timestamp when it was rate limited)
+const rateLimitedKeys: Map<number, number> = new Map();
+
+// API Status type for external consumption
+export interface ApiStatus {
+  totalKeys: number;
+  currentKeyIndex: number;
+  activeKeysCount: number;
+  rateLimitedKeysCount: number;
+  rateLimitedKeyIndexes: number[];
+}
+
+// Get API status for UI display
+export const getApiStatus = (): ApiStatus => {
+  const rateLimitedKeyIndexes = Array.from(rateLimitedKeys.keys());
+  return {
+    totalKeys: API_KEYS.length,
+    currentKeyIndex: currentKeyIndex,
+    activeKeysCount: API_KEYS.length - rateLimitedKeys.size,
+    rateLimitedKeysCount: rateLimitedKeys.size,
+    rateLimitedKeyIndexes
+  };
+};
+
 // Get current API key
 const getCurrentApiKey = (): string | null => {
   if (API_KEYS.length === 0) return null;
   return API_KEYS[currentKeyIndex];
 };
 
-// Rotate to next API key
-const rotateApiKey = (): string | null => {
+// Mark current key as rate limited and rotate to next
+const markRateLimitedAndRotate = (): string | null => {
   if (API_KEYS.length === 0) return null;
-  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
-  console.log(`🔄 Rotated to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
-  return API_KEYS[currentKeyIndex];
+
+  // Mark current key as rate limited
+  rateLimitedKeys.set(currentKeyIndex, Date.now());
+  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited`);
+
+  // Find next available key that's not rate limited
+  let attempts = 0;
+  while (attempts < API_KEYS.length) {
+    currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+    if (!rateLimitedKeys.has(currentKeyIndex)) {
+      console.log(`🔄 Switched to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+      return API_KEYS[currentKeyIndex];
+    }
+    attempts++;
+  }
+
+  // All keys are rate limited, clear oldest and use it
+  if (rateLimitedKeys.size > 0) {
+    const oldestKey = Array.from(rateLimitedKeys.entries())
+      .sort((a, b) => a[1] - b[1])[0][0];
+    rateLimitedKeys.delete(oldestKey);
+    currentKeyIndex = oldestKey;
+    console.log(`🔄 All keys rate limited, retrying oldest key ${currentKeyIndex + 1}`);
+    return API_KEYS[currentKeyIndex];
+  }
+
+  return null;
 };
 
 // Check if error is rate limit related
@@ -398,7 +446,7 @@ export const generateDailyPlan = async (
 
       // Check if rate limited and we have more keys to try
       if (isRateLimitError(error) && retriesLeft > 1) {
-        const newKey = rotateApiKey();
+        const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected, switching to next API key...`);
           ai = new GoogleGenAI({ apiKey: newKey });
@@ -532,7 +580,7 @@ OUTPUT: JSON format.
 
       // Check if rate limited and we have more keys to try
       if (isRateLimitError(error) && retriesLeft > 1) {
-        const newKey = rotateApiKey();
+        const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected on AI Overview, switching to next API key...`);
           ai = new GoogleGenAI({ apiKey: newKey });

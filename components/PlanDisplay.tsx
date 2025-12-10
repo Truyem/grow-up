@@ -5,6 +5,8 @@ import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { MusicPlayer } from './ui/MusicPlayer';
+import { ApiStatusBadge } from './ui/ApiStatusBadge';
+import { getApiStatus, ApiStatus } from '../services/geminiService';
 import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets } from 'lucide-react';
 
 interface PlanDisplayProps {
@@ -179,6 +181,15 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+  const [apiStatus, setApiStatus] = useState<ApiStatus>(() => getApiStatus());
+
+  // Update API status periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setApiStatus(getApiStatus());
+    }, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
 
@@ -371,6 +382,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         <p className="text-gray-400 text-sm max-w-md mx-auto">
           {plan.workout.summary}
         </p>
+
+        {/* API Status Badge */}
+        {apiStatus.totalKeys > 0 && (
+          <div className="flex justify-center pt-2">
+            <ApiStatusBadge status={apiStatus} />
+          </div>
+        )}
       </div>
 
       {/* TIME OPTIMIZATION CARD */}
