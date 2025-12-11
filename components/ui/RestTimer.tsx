@@ -12,7 +12,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
   const [timeLeft, setTimeLeft] = useState(defaultDuration);
   const [isActive, setIsActive] = useState(false);
   const [duration, setDuration] = useState(defaultDuration);
-  
+
   const audioContextRef = useRef<AudioContext | null>(null);
 
   // --- TIMER LOGIC ---
@@ -21,9 +21,9 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
       // If the timer was closed and re-opened with a different default duration (e.g. 60 min walk), update it
       // Only update if not currently active to prevent overwriting running timer
       if (!isActive) {
-         setTimeLeft(defaultDuration);
-         setDuration(defaultDuration);
-         setIsActive(true);
+        setTimeLeft(defaultDuration);
+        setDuration(defaultDuration);
+        setIsActive(true);
       }
     }
   }, [isOpen, defaultDuration]);
@@ -58,7 +58,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
-      
+
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
 
@@ -79,7 +79,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -88,89 +88,160 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
 
   if (!isOpen) return null;
 
+  // Calculate progress percentage for circular indicator
+  const progressPercent = duration > 0 ? ((duration - timeLeft) / duration) * 100 : 0;
+  const circumference = 2 * Math.PI * 45; // radius = 45
+  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] animate-fade-in">
-      <div className="bg-[#0f172a]/95 backdrop-blur-xl border-b border-white/10 shadow-[0_5px_30px_rgba(0,0,0,0.6)] px-4 py-3 pt-safe">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          
-          {/* Top Row: Timer & Status */}
-          <div className="flex items-center justify-between w-full sm:w-auto gap-6">
-            <div className="flex items-center gap-4">
-              <div className={`text-4xl font-mono font-bold tracking-widest ${timeLeft < 10 && timeLeft > 0 ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
-                {formatTime(timeLeft)}
+    <div className="fixed top-0 left-0 right-0 z-[60] animate-slide-down">
+      <div className="bg-gradient-to-b from-[#0f172a]/98 to-[#0f172a]/95 backdrop-blur-2xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] px-4 py-4 pt-safe">
+        <div className="max-w-6xl mx-auto">
+
+          {/* Main Timer Display with Circular Progress */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+
+            {/* Left: Timer Display with Circular Progress Ring */}
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                {/* Circular Progress SVG */}
+                <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                  {/* Background circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.05)"
+                    strokeWidth="4"
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="url(#gradient)"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    className="transition-all duration-1000 ease-linear"
+                  />
+                  <defs>
+                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#06b6d4" />
+                      <stop offset="100%" stopColor="#3b82f6" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                {/* Timer Text in Center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className={`text-3xl font-mono font-bold tracking-wider transition-all duration-300 ${timeLeft < 10 && timeLeft > 0
+                      ? 'text-red-400 animate-pulse'
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400'
+                    }`}>
+                    {formatTime(timeLeft)}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-gray-400 font-medium uppercase tracking-wider flex flex-col">
-                 <span>{isActive ? 'Đang chạy' : 'Tạm dừng'}</span>
-                 <span className="text-[10px] text-gray-600">Rest / Cardio Timer</span>
+
+              {/* Status Text */}
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-bold text-white">
+                  {isActive ? '⏱️ Đang chạy' : '⏸️ Tạm dừng'}
+                </div>
+                <div className="text-xs text-gray-500 font-medium">
+                  Rest Timer
+                </div>
               </div>
             </div>
-            
-            {/* Close Button (Mobile Only) */}
-            <button onClick={onClose} className="sm:hidden p-2 text-gray-500 hover:text-white">
-              <X className="w-6 h-6" />
+
+            {/* Center: Controls */}
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              {/* Time Adjustment Buttons */}
+              <div className="flex items-center gap-2 bg-white/5 rounded-full p-1.5 border border-white/10 backdrop-blur-sm">
+                <button
+                  onClick={() => adjustTime(-10)}
+                  className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer"
+                  title="Giảm 10 giây"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+
+                {/* Play/Pause Button - Enhanced with gradient */}
+                <button
+                  onClick={() => setIsActive(!isActive)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-95 cursor-pointer
+                    ${isActive
+                      ? 'bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/50 hover:bg-yellow-500/30'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/30 hover:shadow-cyan-500/50'
+                    }
+                  `}
+                  title={isActive ? 'Tạm dừng' : 'Bắt đầu'}
+                >
+                  {isActive ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                </button>
+
+                <button
+                  onClick={() => adjustTime(10)}
+                  className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer"
+                  title="Thêm 10 giây"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Reset Button */}
+              <button
+                onClick={() => { setTimeLeft(defaultDuration); setDuration(defaultDuration); setIsActive(true); }}
+                className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer"
+                title="Reset về thời gian ban đầu"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              {/* Walking Preset Button */}
+              <button
+                onClick={() => { setTimeLeft(3600); setDuration(3600); setIsActive(true); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 font-bold text-sm whitespace-nowrap transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/10"
+                title="Đặt timer 60 phút cho đi bộ"
+              >
+                <Footprints className="w-4 h-4" />
+                60 phút
+              </button>
+            </div>
+
+            {/* Right: Close Button */}
+            <button
+              onClick={onClose}
+              className="p-2.5 rounded-full bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-gray-500 hover:text-red-400 transition-all active:scale-95 cursor-pointer"
+              title="Đóng timer"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
-
-          {/* Middle Row: Controls */}
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-center overflow-x-auto">
-             {/* Timer Controls */}
-             <div className="flex items-center gap-2 bg-white/5 rounded-full p-1 border border-white/5">
-               <button 
-                 onClick={() => adjustTime(-10)}
-                 className="p-2 rounded-full hover:bg-white/10 text-gray-300 active:scale-95 transition-all"
-               >
-                 <Minus className="w-4 h-4" />
-               </button>
-
-               <button 
-                 onClick={() => setIsActive(!isActive)}
-                 className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-95
-                   ${isActive ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' : 'bg-cyan-500 text-black font-bold'}
-                 `}
-               >
-                 {isActive ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-               </button>
-
-               <button 
-                 onClick={() => adjustTime(10)}
-                 className="p-2 rounded-full hover:bg-white/10 text-gray-300 active:scale-95 transition-all"
-               >
-                 <Plus className="w-4 h-4" />
-               </button>
-
-               <button 
-                 onClick={() => { setTimeLeft(defaultDuration); setDuration(defaultDuration); setIsActive(true); }}
-                 className="p-2 rounded-full hover:bg-white/10 text-gray-300 active:scale-95 transition-all"
-                 title="Reset"
-               >
-                 <RotateCcw className="w-4 h-4" />
-               </button>
-             </div>
-
-             {/* Quick Preset for Walking */}
-             <button 
-                onClick={() => { setTimeLeft(3600); setDuration(3600); setIsActive(true); }}
-                className="flex items-center gap-1 px-3 py-2 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs font-bold whitespace-nowrap"
-                title="Set timer to 60 minutes for walking"
-             >
-                <Footprints className="w-3 h-3" /> 60m
-             </button>
-          </div>
-
-          {/* Right: Close (Desktop) */}
-          <button 
-            onClick={onClose}
-            className="hidden sm:block p-2 -mr-2 text-gray-500 hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
         </div>
       </div>
-      
-      {/* Safe area spacer */}
+
+      {/* Safe area spacer + Animation styles */}
       <style>{`
         .pt-safe {
-          padding-top: env(safe-area-inset-top, 20px);
+          padding-top: env(safe-area-inset-top, 16px);
+        }
+        @keyframes slide-down {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-down {
+          animation: slide-down 0.4s ease-out forwards;
         }
       `}</style>
     </div>
