@@ -272,7 +272,7 @@ export const generateDailyPlan = async (
   // Map JS Day (0-6) to User Split Day (1-7) where Sunday is Day 7
   const currentDayNumber = dayIndex === 0 ? 7 : dayIndex;
 
-  const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Full Body/Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
+  const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
   const currentSplitName = dayNames[currentDayNumber];
 
   const schema = {
@@ -445,42 +445,42 @@ export const generateDailyPlan = async (
     - Russian Twists: primaryMuscleGroups: ["Obliques"], secondaryMuscleGroups: ["Abs - Upper"]
     - Plank: primaryMuscleGroups: ["Core", "Abs - Upper"], secondaryMuscleGroups: ["Shoulders", "Glutes"]
 
-    **Muscle Group Options (BE SPECIFIC):**
+    **Danh Sách Nhóm Cơ Chi Tiết (BẮT BUỘC SỬ DỤNG CHÍNH XÁC):**
     
-    **Chest (Blue):**
-    - "Chest - Upper" (Clavicular head, Incline movements)
-    - "Chest - Middle" (Sternal head, Flat movements)
-    - "Chest - Lower" (Costal head, Decline movements)
+    **Ngực (Blue):**
+    - "Chest - Upper" (Đầu xương đòn, các động tác Incline)
+    - "Chest - Middle" (Đầu xương ức, các động tác Flat)
+    - "Chest - Lower" (Đầu xương sườn, các động tác Decline)
     
-    **Shoulders (Red):**
-    - "Front Delts" (Anterior deltoid, Pressing movements)
-    - "Side Delts" (Lateral deltoid, Lateral raises)
-    - "Rear Delts" (Posterior deltoid, Rows/Reverse flyes)
+    **Vai (Red):**
+    - "Front Delts" (Đầu vai trước, các động tác đẩy)
+    - "Side Delts" (Đầu vai giữa, các động tác nâng ngang)
+    - "Rear Delts" (Đầu vai sau, các động tác chèo/bay ngược)
     
-    **Back (Yellow):**
-    - "Lats" (Latissimus dorsi, Pull-ups/Rows)
-    - "Upper Back" (Rhomboids, Mid traps, Horizontal pulls)
-    - "Lower Back" (Erector spinae, Deadlifts)
-    - "Traps" (Upper trapezius, Shrugs)
+    **Lưng (Yellow):**
+    - "Lats" (Cơ lưng xô, Pull-ups/Rows)
+    - "Upper Back" (Cơ thoi, cơ giữa lưng, các động tác kéo ngang)
+    - "Lower Back" (Cơ dựng sống, Deadlifts)
+    - "Traps" (Cơ thang trên, Shrugs)
     
-    **Arms:**
-    - "Biceps" (Biceps brachii, Curls) - Pink
-    - "Triceps - Long Head" (Overhead extensions) - Green
-    - "Triceps - Lateral Head" (Pushdowns) - Green
-    - "Triceps" (General tricep work when both heads are equally targeted) - Green
-    - "Forearms" (Wrist curls, Grip work) - Pink
+    **Tay:**
+    - "Biceps" (Cơ nhị đầu cánh tay, Curls) - Pink
+    - "Triceps - Long Head" (Đầu dài cơ tam đầu, Overhead extensions) - Green
+    - "Triceps - Lateral Head" (Đầu ngoài cơ tam đầu, Pushdowns) - Green
+    - "Triceps" (Tập cơ tam đầu tổng quát khi cả hai đầu được kích hoạt đều) - Green
+    - "Forearms" (Cơ cẳng tay, Wrist curls, bài tập nắm) - Pink
     
-    **Legs (Purple):**
-    - "Quads" (Quadriceps, Squats/Leg extensions)
-    - "Hamstrings" (Leg curls, RDLs)
-    - "Glutes" (Hip thrusts, Lunges)
-    - "Calves" (Calf raises)
+    **Chân (Purple):**
+    - "Quads" (Cơ tứ đầu đùi, Squats/Leg extensions)
+    - "Hamstrings" (Cơ gân kheo, Leg curls, RDLs)
+    - "Glutes" (Cơ mông, Hip thrusts, Lunges)
+    - "Calves" (Cơ bắp chân, Calf raises)
     
-    **Core (Orange):**
-    - "Abs - Upper" (Upper rectus abdominis, Crunches)
-    - "Abs - Lower" (Lower rectus abdominis, Leg raises)
-    - "Obliques" (Side planks, Russian twists)
-    - "Core" (General stability, Planks, Compound movements)
+    **Bụng (Orange):**
+    - "Abs - Upper" (Cơ bụng trên, Crunches)
+    - "Abs - Lower" (Cơ bụng dưới, Leg raises)
+    - "Obliques" (Cơ chéo bụng, Side planks, Russian twists)
+    - "Core" (Cơ lõi tổng quát, Planks, các động tác phức hợp)
 
 
     ### NUTRITION RULES (DYNAMIC MATH)
