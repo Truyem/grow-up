@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
-import { MusicPlayer } from './ui/MusicPlayer';
+
 import { ApiStatusBadge } from './ui/ApiStatusBadge';
 import { getApiStatus, ApiStatus } from '../services/geminiService';
 import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets } from 'lucide-react';
@@ -431,8 +431,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
             {currentWorkout.description}
           </p>
 
-          {/* Music Player Embedded Here */}
-          <MusicPlayer />
+
 
           {/* Filter Bar */}
           <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
