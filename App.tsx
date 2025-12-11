@@ -1,13 +1,14 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
 import { AnalysisView } from './components/AnalysisView';
 import { Toast } from './components/ui/Toast';
-import { generateDailyPlan } from './services/geminiService';
+import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
+import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
 import { Sparkles, History } from 'lucide-react';
 
 // Default equipment list
@@ -59,6 +60,15 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('input');
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>(() => getApiStatus());
+
+  // Update API status periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setApiStatus(getApiStatus());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
   // Auto-save on page unload/visibility change to prevent data loss
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -354,6 +364,16 @@ export default function App() {
             <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
               Lịch trình tập luyện thông minh & Sáng tạo.
             </p>
+
+            {/* API Status Badge - Global */}
+            {apiStatus.totalKeys > 0 && (
+              <div className="flex justify-center pt-4">
+                <ApiStatusBadge
+                  status={apiStatus}
+                  onKeyChange={() => setApiStatus(getApiStatus())}
+                />
+              </div>
+            )}
           </div>
         )}
 
