@@ -177,8 +177,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <button
             onClick={() => setUserData({ ...userData, trainingMode: 'standard' })}
             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'standard'
-                ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
-                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+              ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+              : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
           >
             <BrainCircuit className="w-8 h-8 flex-shrink-0" />
@@ -191,8 +191,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <button
             onClick={() => setUserData({ ...userData, trainingMode: 'saitama' })}
             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'saitama'
-                ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
-                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+              : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
           >
             <Target className="w-8 h-8 flex-shrink-0" />
@@ -257,8 +257,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <button
             onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${userData.nutritionGoal === 'bulking'
-                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+              : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
           >
             <TrendingUp className="w-8 h-8 flex-shrink-0" />
@@ -271,8 +271,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           <button
             onClick={() => setUserData({ ...userData, nutritionGoal: 'cutting' })}
             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${userData.nutritionGoal === 'cutting'
-                ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
-                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+              ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+              : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
               }`}
           >
             <TrendingDown className="w-8 h-8 flex-shrink-0" />
@@ -328,8 +328,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
                 key={level}
                 onClick={() => setUserData({ ...userData, fatigue: level })}
                 className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${userData.fatigue === level
-                    ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 border shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                    : 'bg-black/20 border-transparent text-gray-400 hover:bg-black/30 border'
+                  ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 border shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                  : 'bg-black/20 border-transparent text-gray-400 hover:bg-black/30 border'
                   }`}
               >
                 {level}
@@ -346,10 +346,10 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
                 key={muscle}
                 onClick={() => handleMuscleChange(muscle)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border cursor-pointer ${userData.soreMuscles.includes(muscle)
-                    ? muscle === MuscleGroup.None
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                      : 'bg-pink-500/20 border-pink-500 text-pink-300'
-                    : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20'
+                  ? muscle === MuscleGroup.None
+                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                    : 'bg-pink-500/20 border-pink-500 text-pink-300'
+                  : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20'
                   }`}
               >
                 {muscle}
@@ -455,8 +455,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             <button
               onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
               className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Medium
-                  ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
                 }`}
             >
               <BatteryCharging className="w-6 h-6 flex-shrink-0" />
@@ -469,8 +469,8 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             <button
               onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
               className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Hard
-                  ? 'bg-red-500/20 border-red-500 text-red-300'
-                  : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                ? 'bg-red-500/20 border-red-500 text-red-300'
+                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
                 }`}
             >
               <BatteryFull className="w-6 h-6 flex-shrink-0" />

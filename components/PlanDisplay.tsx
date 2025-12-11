@@ -1,9 +1,10 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { DailyPlan, Exercise, Meal, WorkoutLevel } from '../types';
+import { DailyPlan, Exercise, Meal, WorkoutLevel, MuscleGroup } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
+import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 
 
 import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets } from 'lucide-react';
@@ -94,6 +95,38 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
               )}
             </div>
           </div>
+
+          {/* Muscle Groups Display */}
+          {(exercise.primaryMuscleGroups || exercise.secondaryMuscleGroups) && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {exercise.primaryMuscleGroups && exercise.primaryMuscleGroups.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] text-cyan-400 font-bold">🎯</span>
+                  {exercise.primaryMuscleGroups.map((muscle, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                    >
+                      {muscle}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {exercise.secondaryMuscleGroups && exercise.secondaryMuscleGroups.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] text-gray-400 font-bold">💪</span>
+                  {exercise.secondaryMuscleGroups.map((muscle, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                    >
+                      {muscle}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <div
@@ -412,6 +445,71 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
             {currentWorkout.description}
           </p>
 
+          {/* Muscle Group Allocation Visualization */}
+          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+            <h4 className="text-sm font-bold text-cyan-300 mb-3 flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              Phân bổ nhóm cơ hôm nay
+            </h4>
+            <HumanBodyMuscleMap
+              selectedMuscles={(() => {
+                // Extract all muscle groups from exercises
+                const muscleSet = new Set<MuscleGroup>();
+                const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+
+                allExercises.forEach(ex => {
+                  // Map muscle group strings to MuscleGroup enum values
+                  const mapMuscleString = (muscleStr: string): MuscleGroup | null => {
+                    // Chest
+                    if (muscleStr.includes('Chest - Upper')) return MuscleGroup.ChestUpper;
+                    if (muscleStr.includes('Chest - Middle')) return MuscleGroup.ChestMiddle;
+                    if (muscleStr.includes('Chest - Lower')) return MuscleGroup.ChestLower;
+                    // Shoulders
+                    if (muscleStr.includes('Front Delts')) return MuscleGroup.FrontDelts;
+                    if (muscleStr.includes('Side Delts')) return MuscleGroup.SideDelts;
+                    if (muscleStr.includes('Rear Delts')) return MuscleGroup.RearDelts;
+                    // Back
+                    if (muscleStr.includes('Lats')) return MuscleGroup.Lats;
+                    if (muscleStr.includes('Upper Back')) return MuscleGroup.UpperBack;
+                    if (muscleStr.includes('Lower Back')) return MuscleGroup.LowerBack;
+                    if (muscleStr.includes('Traps')) return MuscleGroup.Traps;
+                    // Arms
+                    if (muscleStr === 'Biceps') return MuscleGroup.Biceps;
+                    if (muscleStr.includes('Triceps - Long Head')) return MuscleGroup.TricepsLong;
+                    if (muscleStr.includes('Triceps - Lateral Head')) return MuscleGroup.TricepsLateral;
+                    if (muscleStr.includes('Forearms')) return MuscleGroup.Forearms;
+                    // Legs
+                    if (muscleStr.includes('Quads')) return MuscleGroup.Quads;
+                    if (muscleStr.includes('Hamstrings')) return MuscleGroup.Hamstrings;
+                    if (muscleStr.includes('Glutes')) return MuscleGroup.Glutes;
+                    if (muscleStr.includes('Calves')) return MuscleGroup.Calves;
+                    // Core
+                    if (muscleStr.includes('Abs - Upper')) return MuscleGroup.UpperAbs;
+                    if (muscleStr.includes('Abs - Lower')) return MuscleGroup.LowerAbs;
+                    if (muscleStr.includes('Obliques')) return MuscleGroup.Obliques;
+                    return null;
+                  };
+
+                  ex.primaryMuscleGroups?.forEach(muscle => {
+                    const mapped = mapMuscleString(muscle);
+                    if (mapped) muscleSet.add(mapped);
+                  });
+                  ex.secondaryMuscleGroups?.forEach(muscle => {
+                    const mapped = mapMuscleString(muscle);
+                    if (mapped) muscleSet.add(mapped);
+                  });
+                });
+
+                return Array.from(muscleSet);
+              })()}
+              onMuscleToggle={() => { }} // Read-only, no toggle
+              showLabels={true}
+              interactive={false} // Not interactive in plan view
+            />
+            <p className="text-xs text-gray-500 text-center mt-3 italic">
+              Các nhóm cơ được tập trong buổi hôm nay
+            </p>
+          </div>
 
 
           {/* Filter Bar */}

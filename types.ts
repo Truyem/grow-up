@@ -7,11 +7,39 @@ export enum FatigueLevel {
 }
 
 export enum MuscleGroup {
-  Chest = 'Ngực',
-  Shoulders = 'Vai',
-  Arms = 'Tay',
-  Back = 'Lưng',
-  Legs = 'Chân',
+  // Chest (Ngực)
+  ChestUpper = 'Ngực trên',
+  ChestMiddle = 'Ngực giữa',
+  ChestLower = 'Ngực dưới',
+
+  // Shoulders (Vai)
+  FrontDelts = 'Vai trước',
+  SideDelts = 'Vai giữa',
+  RearDelts = 'Vai sau',
+
+  // Back (Lưng)
+  UpperBack = 'Lưng trên',
+  Lats = 'Lưng xô',
+  LowerBack = 'Lưng dưới',
+  Traps = 'Cơ thang',
+
+  // Arms (Tay)
+  Biceps = 'Tay trước',
+  TricepsLong = 'Tay sau (Đầu dài)',
+  TricepsLateral = 'Tay sau (Đầu bên)',
+  Forearms = 'Cẳng tay',
+
+  // Legs (Chân)
+  Quads = 'Đùi trước',
+  Hamstrings = 'Đùi sau',
+  Glutes = 'Mông',
+  Calves = 'Bắp chân',
+
+  // Core (Bụng)
+  UpperAbs = 'Bụng trên',
+  LowerAbs = 'Bụng dưới',
+  Obliques = 'Bụng chéo',
+
   None = 'Không đau',
 }
 
@@ -53,6 +81,8 @@ export interface Exercise {
   equipment?: string;
   colorCode?: ExerciseColor;
   isBFR?: boolean;
+  primaryMuscleGroups?: string[];    // Main muscles worked (e.g., "Chest - Upper", "Triceps")
+  secondaryMuscleGroups?: string[];  // Supporting muscles
 }
 
 export interface Meal {

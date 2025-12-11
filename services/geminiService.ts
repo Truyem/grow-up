@@ -168,25 +168,25 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
     morning: [
-      { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?" },
-      { name: "Single Arm Walking Lunges (Purple - Legs)", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!" }
+      { name: "Decline Push-up (Red - Shoulder)", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?", primaryMuscleGroups: ["Front Delts", "Chest - Upper"], secondaryMuscleGroups: ["Triceps", "Core"] },
+      { name: "Single Arm Walking Lunges (Purple - Legs)", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
-      { name: "One Arm Bicep Curls (Pink - Biceps)", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!" },
-      { name: "Hanging Leg Raise (Orange - Abs)", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)" },
-      { name: "Burpees (Orange - Cardio)", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)" }
+      { name: "One Arm Bicep Curls (Pink - Biceps)", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!", primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"] },
+      { name: "Hanging Leg Raise (Orange - Abs)", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)", primaryMuscleGroups: ["Abs - Lower", "Core"], secondaryMuscleGroups: ["Hip Flexors"] },
+      { name: "Burpees (Orange - Cardio)", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)", primaryMuscleGroups: ["Full Body", "Cardio"], secondaryMuscleGroups: ["Chest", "Legs", "Core"] }
     ]
   } : {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp + Daily Abs & Cardio.",
     morning: [
-      { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!" },
-      { name: "One Arm Dumbbell Squat (Purple - Legs)", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!" }
+      { name: "Push-up (Blue - Chest)", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!", primaryMuscleGroups: ["Chest - Middle"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
+      { name: "One Arm Dumbbell Squat (Purple - Legs)", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
-      { name: "Band Pull Apart (Yellow - Back)", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!" },
-      { name: "Plank (Orange - Abs)", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)" },
-      { name: "Jumping Jacks (Orange - Cardio)", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)" }
+      { name: "Band Pull Apart (Yellow - Back)", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!", primaryMuscleGroups: ["Rear Delts", "Upper Back"], secondaryMuscleGroups: ["Traps"] },
+      { name: "Plank (Orange - Abs)", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)", primaryMuscleGroups: ["Core", "Abs"], secondaryMuscleGroups: ["Shoulders", "Glutes"] },
+      { name: "Jumping Jacks (Orange - Cardio)", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)", primaryMuscleGroups: ["Cardio", "Full Body"], secondaryMuscleGroups: ["Shoulders", "Calves"] }
     ]
   };
 
@@ -272,7 +272,7 @@ export const generateDailyPlan = async (
   // Map JS Day (0-6) to User Split Day (1-7) where Sunday is Day 7
   const currentDayNumber = dayIndex === 0 ? 7 : dayIndex;
 
-  const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Rest)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
+  const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Full Body/Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
   const currentSplitName = dayNames[currentDayNumber];
 
   const schema = {
@@ -307,7 +307,9 @@ export const generateDailyPlan = async (
                     notes: { type: Type.STRING },
                     equipment: { type: Type.STRING },
                     colorCode: { type: Type.STRING },
-                    isBFR: { type: Type.BOOLEAN }
+                    isBFR: { type: Type.BOOLEAN },
+                    primaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    secondaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } }
                   }
                 }
               },
@@ -322,7 +324,9 @@ export const generateDailyPlan = async (
                     notes: { type: Type.STRING },
                     equipment: { type: Type.STRING },
                     colorCode: { type: Type.STRING },
-                    isBFR: { type: Type.BOOLEAN }
+                    isBFR: { type: Type.BOOLEAN },
+                    primaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    secondaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } }
                   }
                 }
               }
@@ -379,13 +383,13 @@ export const generateDailyPlan = async (
     - Day 1 (Mon): Push (Chest, Shoulder, Triceps)
     - Day 2 (Tue): Pull (Back, Biceps)
     - Day 3 (Wed): Legs (Quads, Hamstring, Calves, Glutes) + Abs
-    - Day 4 (Thu): REST DAY (Active Recovery)
+    - Day 4 (Thu): Full Body / Arms & Abs (Biceps, Triceps, Abs, Light Compound)
     - Day 5 (Fri): Chest & Back
     - Day 6 (Sat): Shoulder & Arms (Biceps, Triceps)
     - Day 7 (Sun): REST DAY (Active Recovery)
 
     **DAILY ABS & CARDIO (FOR STANDARD MODE)**: EVERY SINGLE DAY (Day 1-7) MUST include 1 Abs exercise + 1 Cardio exercise in the Evening session.
-    **REST DAY RULES**: Main Activity: "Đi bộ (Walking) (Cardio)" - 60 Minutes + Light Abs.
+    **REST DAY RULES (Day 7 ONLY)**: Main Activity: "Đi bộ (Walking) (Cardio)" - 60 Minutes + Light Abs.
     `;
   }
 
@@ -414,6 +418,70 @@ export const generateDailyPlan = async (
     - **Pink**: Biceps (Tay trước)
     - **Purple**: Legs (Chân/Mông) & Lower Body
     - **Orange**: Abs (Bụng) & Cardio
+
+    ### MUSCLE GROUP TRACKING (MANDATORY)
+    For EVERY exercise, you MUST specify:
+    - **primaryMuscleGroups**: Array of main muscles being worked (1-2 muscles)
+    - **secondaryMuscleGroups**: Array of supporting muscles (0-3 muscles)
+
+    **CRITICAL RULE - MUSCLE SPECIFICITY**: 
+    - NEVER use generic terms like "Chest", "Back", "Shoulders", "Arms", or "Legs"
+    - ALWAYS use specific anatomical regions (e.g., "Chest - Upper", "Lats", "Front Delts")
+    - Be precise about which part of the muscle is being targeted
+
+    **Examples:**
+    - Incline Bench Press: primaryMuscleGroups: ["Chest - Upper", "Triceps"], secondaryMuscleGroups: ["Front Delts"]
+    - Flat Bench Press: primaryMuscleGroups: ["Chest - Middle", "Triceps"], secondaryMuscleGroups: ["Front Delts"]
+    - Decline Push-ups: primaryMuscleGroups: ["Chest - Lower", "Front Delts"], secondaryMuscleGroups: ["Triceps", "Core"]
+    - Pull-ups: primaryMuscleGroups: ["Lats", "Upper Back"], secondaryMuscleGroups: ["Biceps", "Rear Delts"]
+    - Barbell Rows: primaryMuscleGroups: ["Upper Back", "Lats"], secondaryMuscleGroups: ["Rear Delts", "Biceps"]
+    - Squats: primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"]
+    - Romanian Deadlifts: primaryMuscleGroups: ["Hamstrings", "Glutes"], secondaryMuscleGroups: ["Lower Back"]
+    - Bicep Curls: primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"]
+    - Overhead Tricep Extension: primaryMuscleGroups: ["Triceps - Long Head"], secondaryMuscleGroups: ["Core"]
+    - Tricep Pushdowns: primaryMuscleGroups: ["Triceps - Lateral Head"], secondaryMuscleGroups: []
+    - Crunches: primaryMuscleGroups: ["Abs - Upper"], secondaryMuscleGroups: ["Core"]
+    - Leg Raises: primaryMuscleGroups: ["Abs - Lower"], secondaryMuscleGroups: ["Hip Flexors"]
+    - Russian Twists: primaryMuscleGroups: ["Obliques"], secondaryMuscleGroups: ["Abs - Upper"]
+    - Plank: primaryMuscleGroups: ["Core", "Abs - Upper"], secondaryMuscleGroups: ["Shoulders", "Glutes"]
+
+    **Muscle Group Options (BE SPECIFIC):**
+    
+    **Chest (Blue):**
+    - "Chest - Upper" (Clavicular head, Incline movements)
+    - "Chest - Middle" (Sternal head, Flat movements)
+    - "Chest - Lower" (Costal head, Decline movements)
+    
+    **Shoulders (Red):**
+    - "Front Delts" (Anterior deltoid, Pressing movements)
+    - "Side Delts" (Lateral deltoid, Lateral raises)
+    - "Rear Delts" (Posterior deltoid, Rows/Reverse flyes)
+    
+    **Back (Yellow):**
+    - "Lats" (Latissimus dorsi, Pull-ups/Rows)
+    - "Upper Back" (Rhomboids, Mid traps, Horizontal pulls)
+    - "Lower Back" (Erector spinae, Deadlifts)
+    - "Traps" (Upper trapezius, Shrugs)
+    
+    **Arms:**
+    - "Biceps" (Biceps brachii, Curls) - Pink
+    - "Triceps - Long Head" (Overhead extensions) - Green
+    - "Triceps - Lateral Head" (Pushdowns) - Green
+    - "Triceps" (General tricep work when both heads are equally targeted) - Green
+    - "Forearms" (Wrist curls, Grip work) - Pink
+    
+    **Legs (Purple):**
+    - "Quads" (Quadriceps, Squats/Leg extensions)
+    - "Hamstrings" (Leg curls, RDLs)
+    - "Glutes" (Hip thrusts, Lunges)
+    - "Calves" (Calf raises)
+    
+    **Core (Orange):**
+    - "Abs - Upper" (Upper rectus abdominis, Crunches)
+    - "Abs - Lower" (Lower rectus abdominis, Leg raises)
+    - "Obliques" (Side planks, Russian twists)
+    - "Core" (General stability, Planks, Compound movements)
+
 
     ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
