@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { WorkoutHistoryItem, AIOverview } from '../types';
+import { WorkoutHistoryItem, AIOverview, MuscleGroup } from '../types';
 import { GlassCard } from './ui/GlassCard';
+import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 import { generateAIOverview } from '../services/geminiService';
 import {
   ArrowLeft, TrendingUp, Activity, CalendarCheck, Award,
@@ -407,45 +408,71 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ history, onBack }) =
           </div>
         </GlassCard>
 
+
         {/* Muscle Distribution */}
         {muscleDistribution.length > 0 && (
           <GlassCard title="Phân bố nhóm cơ" icon={<Activity className="w-6 h-6" />}>
-            <div className="h-[250px] w-full mt-4 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={muscleDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {muscleDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(0,0,0,0.9)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '12px'
-                    }}
-                    formatter={(value: number, name: string) => [`${value} bài`, name]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="mt-4">
+              <HumanBodyMuscleMap
+                selectedMuscles={(() => {
+                  // Convert muscle distribution to MuscleGroup enum values
+                  const muscleSet = new Set<MuscleGroup>();
+
+                  muscleDistribution.forEach(muscle => {
+                    // Map Vietnamese muscle names to MuscleGroup enum
+                    if (muscle.name === 'Ngực') {
+                      muscleSet.add(MuscleGroup.ChestUpper);
+                      muscleSet.add(MuscleGroup.ChestMiddle);
+                      muscleSet.add(MuscleGroup.ChestLower);
+                    } else if (muscle.name === 'Vai') {
+                      muscleSet.add(MuscleGroup.FrontDelts);
+                      muscleSet.add(MuscleGroup.SideDelts);
+                      muscleSet.add(MuscleGroup.RearDelts);
+                    } else if (muscle.name === 'Lưng') {
+                      muscleSet.add(MuscleGroup.Lats);
+                      muscleSet.add(MuscleGroup.UpperBack);
+                      muscleSet.add(MuscleGroup.LowerBack);
+                      muscleSet.add(MuscleGroup.Traps);
+                    } else if (muscle.name === 'Tay') {
+                      muscleSet.add(MuscleGroup.Biceps);
+                      muscleSet.add(MuscleGroup.TricepsLong);
+                      muscleSet.add(MuscleGroup.TricepsLateral);
+                      muscleSet.add(MuscleGroup.Forearms);
+                    } else if (muscle.name === 'Chân') {
+                      muscleSet.add(MuscleGroup.Quads);
+                      muscleSet.add(MuscleGroup.Hamstrings);
+                      muscleSet.add(MuscleGroup.Glutes);
+                      muscleSet.add(MuscleGroup.Calves);
+                    } else if (muscle.name === 'Bụng') {
+                      muscleSet.add(MuscleGroup.UpperAbs);
+                      muscleSet.add(MuscleGroup.LowerAbs);
+                      muscleSet.add(MuscleGroup.Obliques);
+                    }
+                  });
+
+                  return Array.from(muscleSet);
+                })()}
+                onMuscleToggle={() => { }} // Read-only
+                showLabels={true}
+                interactive={false} // Not interactive in analysis view
+              />
             </div>
-            {/* Legend */}
-            <div className="flex flex-wrap justify-center gap-3 mt-2">
+
+            {/* Stats below the body */}
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
               {muscleDistribution.map((m, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
-                  <span className="text-gray-400">{m.name}</span>
+                <div key={i} className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
+                  <div className="w-4 h-4 rounded-full mx-auto mb-2" style={{ backgroundColor: m.color }} />
+                  <p className="text-xs text-gray-400 mb-1">{m.name}</p>
+                  <p className="text-lg font-bold text-white">{m.value}</p>
+                  <p className="text-[10px] text-gray-500">bài tập</p>
                 </div>
               ))}
             </div>
+
+            <p className="text-xs text-gray-500 text-center mt-4 italic">
+              Các nhóm cơ đã tập trong lịch sử
+            </p>
           </GlassCard>
         )}
       </div>
