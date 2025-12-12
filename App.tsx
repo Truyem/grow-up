@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import wallpaper from './wallpaper.jpg';
+import wallpaperMb from './wallpaper-mb.jpg';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
@@ -343,10 +344,18 @@ export default function App() {
 
       {/* Background Image */}
       <div className="fixed inset-0 z-0">
+        {/* PC Wallpaper */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
           style={{
             backgroundImage: `url(${wallpaper})`
+          }}
+        />
+        {/* Mobile Wallpaper */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
+          style={{
+            backgroundImage: `url(${wallpaperMb})`
           }}
         />
         {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
