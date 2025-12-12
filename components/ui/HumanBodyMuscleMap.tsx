@@ -576,30 +576,6 @@ export const HumanBodyMuscleMap: React.FC<HumanBodyMuscleMapProps> = ({
                 </div>
             </div>
 
-            {/* Selected Muscles Summary */}
-            {selectedMuscles.length > 0 && selectedMuscles[0] !== MuscleGroup.None && (
-                <div className="w-full max-w-md px-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20">
-                        <div className="text-xs font-medium text-red-400 mb-2">Các vùng đang đau:</div>
-                        <div className="flex flex-wrap gap-1.5">
-                            {selectedMuscles.map((muscle) => {
-                                const colors = getMuscleColors(muscle);
-                                return (
-                                    <span
-                                        key={muscle}
-                                        className="px-2 py-1 rounded-lg text-[10px] font-semibold text-white cursor-pointer hover:scale-105 transition-transform"
-                                        style={{ backgroundColor: `${colors.base}90` }}
-                                        onClick={() => handleMuscleClick(muscle)}
-                                    >
-                                        {muscleLabels[muscle]} ✕
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Legend */}
             <div className="flex flex-wrap gap-3 justify-center text-xs px-4">
                 {[
