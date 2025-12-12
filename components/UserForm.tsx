@@ -113,7 +113,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
   return (
     <div className="space-y-6 animate-fade-in">
 
-      {/* --- STREAK CARD WITH SICK DAY BUTTON --- */}
+      {/* --- STREAK CARD --- */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4">
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-4">
@@ -132,16 +132,6 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
           </div>
         </div>
-
-        {/* Sick Day Button */}
-        <button
-          onClick={onSickDay}
-          className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium hover:bg-red-500/30 hover:border-red-500/50 transition-all cursor-pointer active:scale-[0.98]"
-        >
-          <Thermometer className="w-4 h-4" />
-          <span>Hôm nay bị ốm/bệnh (Giữ chuỗi)</span>
-        </button>
-
         {/* Decorative BG */}
         <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
           <Flame className="w-32 h-32" />
@@ -334,7 +324,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       </GlassCard>
 
       <GlassCard title="Tình trạng sức khỏe" icon={<Activity className="w-6 h-6" />}>
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-sm text-gray-300 mb-2">Mức độ mệt mỏi</label>
           <div className="flex gap-2">
             {Object.values(FatigueLevel).map((level) => (
@@ -351,6 +341,15 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             ))}
           </div>
         </div>
+
+        {/* Sick Day Button */}
+        <button
+          onClick={onSickDay}
+          className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium hover:bg-red-500/30 hover:border-red-500/50 transition-all cursor-pointer active:scale-[0.98]"
+        >
+          <Thermometer className="w-4 h-4" />
+          <span>Hôm nay bị ốm/bệnh (Giữ chuỗi)</span>
+        </button>
 
         {/* Muscle Group Selection - Grid Layout */}
         <div>

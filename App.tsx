@@ -337,6 +337,39 @@ export default function App() {
     }
   };
 
+  // Handle sick day - maintain streak without breaking it
+  const handleSickDay = () => {
+    const todayDate = new Date().toDateString();
+    const updatedStats = {
+      ...userStats,
+      lastLoginDate: todayDate  // Update last login to today to not break streak tomorrow
+    };
+    setUserStats(updatedStats);
+    localStorage.setItem('user_stats', JSON.stringify(updatedStats));
+
+    // Add a "sick day" entry to history
+    const todayStr = getTodayString();
+    const sickDayEntry: WorkoutHistoryItem = {
+      date: todayStr,
+      timestamp: Date.now(),
+      levelSelected: 'Ốm/Bệnh',
+      summary: 'Ngày nghỉ do ốm hoặc bệnh - Streak được giữ nguyên',
+      completedExercises: [],
+      userNotes: 'Nghỉ ngơi để hồi phục sức khỏe',
+      exercisesSummary: 'Không tập (Ngày ốm)'
+    };
+
+    // Check if already marked sick today
+    const alreadySickToday = workoutHistory.some(h => h.date === todayStr && h.levelSelected === 'Ốm/Bệnh');
+    if (!alreadySickToday) {
+      const newHistory = [sickDayEntry, ...workoutHistory];
+      setWorkoutHistory(newHistory);
+      localStorage.setItem('gym_history', JSON.stringify(newHistory));
+    }
+
+    setToastMessage(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
+  };
+
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
 
@@ -422,6 +455,7 @@ export default function App() {
                 userStats={userStats}
                 onSubmit={handleGenerate}
                 isLoading={loading}
+                onSickDay={handleSickDay}
               />
 
               <button
