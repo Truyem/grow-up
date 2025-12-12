@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target, ChevronDown } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target, ChevronDown, Thermometer } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -11,9 +11,10 @@ interface UserFormProps {
   userStats: UserStats;
   onSubmit: () => void;
   isLoading: boolean;
+  onSickDay: () => void;  // Callback when user marks sick day
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userStats, onSubmit, isLoading }) => {
+export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userStats, onSubmit, isLoading, onSickDay }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [newEquipment, setNewEquipment] = useState('');
   const [newIngredient, setNewIngredient] = useState('');
@@ -112,23 +113,35 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
   return (
     <div className="space-y-6 animate-fade-in">
 
-      {/* --- STREAK CARD ONLY --- */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4 flex items-center justify-between group cursor-pointer hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] transition-all">
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
-            <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
+      {/* --- STREAK CARD WITH SICK DAY BUTTON --- */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4">
+        <div className="flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
+              <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
+              <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
-            <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
+          <div className="text-right">
+            <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+              {userStats.streak}
+            </span>
+            <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
           </div>
         </div>
-        <div className="text-right relative z-10">
-          <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-            {userStats.streak}
-          </span>
-          <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
-        </div>
+
+        {/* Sick Day Button */}
+        <button
+          onClick={onSickDay}
+          className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium hover:bg-red-500/30 hover:border-red-500/50 transition-all cursor-pointer active:scale-[0.98]"
+        >
+          <Thermometer className="w-4 h-4" />
+          <span>Hôm nay bị ốm/bệnh (Giữ chuỗi)</span>
+        </button>
+
         {/* Decorative BG */}
         <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
           <Flame className="w-32 h-32" />

@@ -6,6 +6,9 @@ interface HumanBodyMuscleMapProps {
     onMuscleToggle: (muscle: MuscleGroup) => void;
     showLabels?: boolean;
     interactive?: boolean;
+    title?: string;  // Optional title - context-specific
+    description?: string;  // Optional description
+    hideHeader?: boolean;  // Hide title section entirely
 }
 
 // Vietnamese label mapping
@@ -72,6 +75,9 @@ export const HumanBodyMuscleMap: React.FC<HumanBodyMuscleMapProps> = ({
     onMuscleToggle,
     showLabels = true,
     interactive = true,
+    title,
+    description,
+    hideHeader = false,
 }) => {
     const [hoveredMuscle, setHoveredMuscle] = useState<MuscleGroup | null>(null);
 
@@ -157,13 +163,19 @@ export const HumanBodyMuscleMap: React.FC<HumanBodyMuscleMapProps> = ({
 
     return (
         <div className="flex flex-col items-center gap-6 w-full">
-            {/* Title */}
-            <div className="text-center">
-                <h3 className="text-lg font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    Chọn vùng cơ đang đau
-                </h3>
-                <p className="text-xs text-gray-400 mt-1">Nhấn vào các vùng cơ trên hình</p>
-            </div>
+            {/* Title - Only show if not hidden and has content */}
+            {!hideHeader && (title || description) && (
+                <div className="text-center">
+                    {title && (
+                        <h3 className="text-lg font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                            {title}
+                        </h3>
+                    )}
+                    {description && (
+                        <p className="text-xs text-gray-400 mt-1">{description}</p>
+                    )}
+                </div>
+            )}
 
             {/* Body Views Container */}
             <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 w-full">
