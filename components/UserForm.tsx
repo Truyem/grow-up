@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target, ChevronDown } from 'lucide-react';
 
 interface UserFormProps {
   userData: UserInput;
@@ -18,6 +18,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
   const [newEquipment, setNewEquipment] = useState('');
   const [newIngredient, setNewIngredient] = useState('');
   const [newConsumedFood, setNewConsumedFood] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -338,23 +339,84 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
           </div>
         </div>
 
+        {/* Muscle Group Selection - Grid Layout */}
         <div>
           <label className="block text-sm text-gray-300 mb-2">Nhóm cơ đang đau (Để tránh tập nặng)</label>
-          <div className="flex flex-wrap gap-2">
-            {Object.values(MuscleGroup).map((muscle) => (
-              <button
-                key={muscle}
-                onClick={() => handleMuscleChange(muscle)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border cursor-pointer ${userData.soreMuscles.includes(muscle)
-                  ? muscle === MuscleGroup.None
-                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                    : 'bg-pink-500/20 border-pink-500 text-pink-300'
-                  : 'bg-black/20 border-white/5 text-gray-400 hover:border-white/20'
-                  }`}
-              >
-                {muscle}
-              </button>
-            ))}
+
+          {/* None Option */}
+          <button
+            onClick={() => handleMuscleChange(MuscleGroup.None)}
+            className={`w-full py-3 rounded-xl text-sm font-medium transition-all cursor-pointer mb-3 border ${userData.soreMuscles.includes(MuscleGroup.None)
+              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+              : 'bg-black/20 border-white/5 text-gray-400 hover:bg-white/5 hover:border-white/20'
+              }`}
+          >
+            {MuscleGroup.None} (Không đau)
+          </button>
+
+          {/* Muscle Groups - Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 min-[400px]:gap-3">
+            {Object.entries({
+              'Ngực': [MuscleGroup.ChestUpper, MuscleGroup.ChestMiddle, MuscleGroup.ChestLower],
+              'Vai': [MuscleGroup.FrontDelts, MuscleGroup.SideDelts, MuscleGroup.RearDelts],
+              'Lưng': [MuscleGroup.UpperBack, MuscleGroup.Lats, MuscleGroup.LowerBack, MuscleGroup.Traps],
+              'Tay': [MuscleGroup.Biceps, MuscleGroup.TricepsLong, MuscleGroup.TricepsLateral, MuscleGroup.Forearms],
+              'Chân': [MuscleGroup.Quads, MuscleGroup.Hamstrings, MuscleGroup.Glutes, MuscleGroup.Calves],
+              'Bụng': [MuscleGroup.UpperAbs, MuscleGroup.LowerAbs, MuscleGroup.Obliques],
+            }).map(([category, muscles]) => {
+              const selectedCount = muscles.filter(m => userData.soreMuscles.includes(m)).length;
+              const isExpanded = activeCategory === category;
+              const hasSelection = selectedCount > 0;
+
+              return (
+                <div
+                  key={category}
+                  className={`flex flex-col rounded-xl overflow-hidden transition-all duration-300 border ${hasSelection
+                    ? 'bg-pink-500/5 border-pink-500/30'
+                    : 'bg-black/20 border-white/10 hover:border-white/20'
+                    }`}
+                >
+                  <button
+                    onClick={() => setActiveCategory(isExpanded ? null : category)}
+                    className="flex items-center justify-between p-3 w-full cursor-pointer hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium text-sm ${hasSelection ? 'text-pink-300' : 'text-gray-300'}`}>
+                        {category}
+                      </span>
+                      {hasSelection && (
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pink-500 text-[10px] font-bold text-white">
+                          {selectedCount}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <div className={`
+                    overflow-hidden transition-all duration-300 bg-black/20
+                    ${isExpanded ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'}
+                  `}>
+                    <div className="p-2 grid grid-cols-1 gap-1.5">
+                      {muscles.map((muscle) => (
+                        <button
+                          key={muscle}
+                          onClick={() => handleMuscleChange(muscle)}
+                          className={`
+                            w-full px-3 py-2 rounded-lg text-xs font-medium text-left transition-all border
+                            ${userData.soreMuscles.includes(muscle)
+                              ? 'bg-pink-500/20 border-pink-500/50 text-pink-300'
+                              : 'bg-transparent border-transparent text-gray-400 hover:bg-white/5 hover:text-gray-200'}
+                          `}
+                        >
+                          {muscle}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </GlassCard>
