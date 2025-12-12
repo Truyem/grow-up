@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
+import wallpaper from './wallpaper.jpg';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
@@ -338,15 +339,21 @@ export default function App() {
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
 
+
+
       {/* Background Image */}
       <div className="fixed inset-0 z-0">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105"
           style={{
-            backgroundImage: `url('https://images.pexels.com/photos/268533/pexels-photo-268533.jpeg?cs=srgb&dl=pexels-pixabay-268533.jpg&fm=jpg')`
+            backgroundImage: `url(${wallpaper})`
           }}
         />
-        <div className="absolute inset-0 bg-black/80" />
+        {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+
+        {/* Gradient overlay for better text readability at the bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent" />
       </div>
 
       {/* Content Layer */}
