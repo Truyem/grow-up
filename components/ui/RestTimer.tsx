@@ -7,7 +7,7 @@ interface RestTimerProps {
   defaultDuration?: number;
 }
 
-export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDuration = 60 }) => {
+export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDuration = 30 }) => {
   // Timer State
   const [timeLeft, setTimeLeft] = useState(defaultDuration);
   const [isActive, setIsActive] = useState(false);
