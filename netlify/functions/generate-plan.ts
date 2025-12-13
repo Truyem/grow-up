@@ -41,22 +41,26 @@ const getApiKeys = (): string[] => {
 // Add your production domains here
 const ALLOWED_ORIGINS = [
     'https://grow-up.netlify.app',       // Your Netlify domain
-    'https://your-custom-domain.com',     // Your custom domain (update this!)
-    'http://localhost:5173',              // Local dev
+    'https://growup.truyem789.site',     // Your custom domain
+    'http://localhost:5173',              // Vite dev
     'http://localhost:8888',              // Netlify dev
+    'http://localhost:3000',              // Other common dev port
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:8888',
 ];
 
 // Check if origin is allowed
 const isOriginAllowed = (origin: string | null): boolean => {
-    if (!origin) return false;
-    // Also allow any subdomain of netlify.app for preview deploys
+    // Allow null origin (same-origin requests, server-to-server, or Postman-like tools on same domain)
+    if (!origin) return true;
+    // Allow any subdomain of netlify.app for preview deploys
     if (origin.endsWith('.netlify.app')) return true;
     return ALLOWED_ORIGINS.includes(origin);
 };
 
 // Get CORS origin (return specific origin if allowed, or null)
 const getCorsOrigin = (origin: string | null): string | null => {
-    if (isOriginAllowed(origin)) return origin;
+    if (isOriginAllowed(origin)) return origin || '*';
     return null;
 };
 
