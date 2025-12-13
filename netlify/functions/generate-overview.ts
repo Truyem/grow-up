@@ -1,5 +1,5 @@
-import type { Context } from "@netlify/functions";
 import { GoogleGenAI, Type } from "@google/genai";
+import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 
 interface WorkoutHistoryItem {
     date: string;
@@ -26,62 +26,64 @@ interface AIOverview {
     };
 }
 
-// Load API keys from environment
-const getApiKeys = (): string[] => {
-    const keys: string[] = [];
+// API Key management
+interface ApiKeyState {
+    keys: string[];
+    currentIndex: number;
+    rateLimitedIndices: Set<number>;
+}
 
-    // Try numbered keys first (API_KEY_1, API_KEY_2, etc.)
-    let i = 1;
-    while (process.env[`API_KEY_${i}`]) {
-        keys.push(process.env[`API_KEY_${i}`]!);
-        i++;
-    }
-
-    // Fallback to single API_KEY
-    if (keys.length === 0 && process.env.API_KEY) {
-        keys.push(process.env.API_KEY);
-    }
-
-    // Fallback to GEMINI_API_KEY (common naming convention)
-    if (keys.length === 0 && process.env.GEMINI_API_KEY) {
-        keys.push(process.env.GEMINI_API_KEY);
-    }
-
-    // Log for debugging
-    console.log(`🔑 [Overview] Loaded ${keys.length} API key(s)`);
-
-    return keys;
+const state: ApiKeyState = {
+    keys: [],
+    currentIndex: 0,
+    rateLimitedIndices: new Set(),
 };
 
-const rateLimitedKeys: Map<number, number> = new Map();
-let currentKeyIndex = 0;
-
-const getCurrentApiKey = (apiKeys: string[]): string | null => {
-    if (apiKeys.length === 0) return null;
-    return apiKeys[currentKeyIndex % apiKeys.length];
-};
-
-const markRateLimitedAndRotate = (apiKeys: string[]): string | null => {
-    if (apiKeys.length === 0) return null;
-    rateLimitedKeys.set(currentKeyIndex, Date.now());
-
-    let attempts = 0;
-    while (attempts < apiKeys.length) {
-        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-        if (!rateLimitedKeys.has(currentKeyIndex)) {
-            return apiKeys[currentKeyIndex];
+const initializeKeys = () => {
+    if (state.keys.length === 0) {
+        const keys: string[] = [];
+        let i = 1;
+        while (process.env[`API_KEY_${i}`]) {
+            keys.push(process.env[`API_KEY_${i}`]!);
+            i++;
         }
-        attempts++;
+        if (keys.length === 0 && process.env.API_KEY) {
+            keys.push(process.env.API_KEY);
+        }
+        if (keys.length === 0 && process.env.GEMINI_API_KEY) {
+            keys.push(process.env.GEMINI_API_KEY);
+        }
+        state.keys = keys;
+        console.log(`🔑 [Overview] Loaded ${keys.length} API key(s)`);
+    }
+};
+
+const getCurrentKey = (): string | undefined => {
+    initializeKeys();
+    return state.keys[state.currentIndex];
+};
+
+const rotateToNextKey = (): boolean => {
+    initializeKeys();
+    if (state.keys.length <= 1) return false;
+
+    const startIndex = state.currentIndex;
+    let nextIndex = (state.currentIndex + 1) % state.keys.length;
+
+    while (nextIndex !== startIndex) {
+        if (!state.rateLimitedIndices.has(nextIndex)) {
+            state.currentIndex = nextIndex;
+            return true;
+        }
+        nextIndex = (nextIndex + 1) % state.keys.length;
     }
 
-    if (rateLimitedKeys.size > 0) {
-        const oldestKey = Array.from(rateLimitedKeys.entries())
-            .sort((a, b) => a[1] - b[1])[0][0];
-        rateLimitedKeys.delete(oldestKey);
-        currentKeyIndex = oldestKey;
-        return apiKeys[currentKeyIndex];
-    }
-    return null;
+    state.currentIndex = (state.currentIndex + 1) % state.keys.length;
+    return false;
+};
+
+const markCurrentKeyAsRateLimited = (): void => {
+    state.rateLimitedIndices.add(state.currentIndex);
 };
 
 const isRateLimitError = (error: unknown): boolean => {
@@ -90,8 +92,7 @@ const isRateLimitError = (error: unknown): boolean => {
         return message.includes('429') ||
             message.includes('rate limit') ||
             message.includes('quota') ||
-            message.includes('resource exhausted') ||
-            message.includes('too many requests');
+            message.includes('resource exhausted');
     }
     return false;
 };
@@ -123,82 +124,81 @@ const getFallbackAIOverview = (history: WorkoutHistoryItem[]): AIOverview => {
     };
 };
 
-export default async (req: Request, context: Context) => {
-    // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            }
-        });
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Content-Type': 'application/json',
+    };
+
+    // Handle preflight
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
     }
 
-    if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json' }
-        });
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' }),
+        };
     }
-
-    const API_KEYS = getApiKeys();
 
     try {
-        const body = await req.json();
+        const body = JSON.parse(event.body || '{}');
         const { history, userData } = body as { history: WorkoutHistoryItem[]; userData?: UserInput };
 
         if (!history || history.length === 0) {
-            return new Response(JSON.stringify(getFallbackAIOverview([])), {
-                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-            });
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify(getFallbackAIOverview([])),
+            };
         }
 
-        const apiKey = getCurrentApiKey(API_KEYS);
-        if (!apiKey) {
-            return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        const generateWithRetry = async (retryCount = 0): Promise<string> => {
+            const apiKey = getCurrentKey();
+            if (!apiKey) {
+                return JSON.stringify(getFallbackAIOverview(history));
+            }
+
+            const ai = new GoogleGenAI({ apiKey });
+            const model = "gemini-2.5-flash";
+
+            const lastWeekHistory = history.filter(h => {
+                const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                return h.timestamp >= weekAgo;
             });
-        }
 
-        let ai = new GoogleGenAI({ apiKey });
-        let retriesLeft = API_KEYS.length;
-        const model = "gemini-2.5-flash";
+            const historySummary = lastWeekHistory.map(h => ({
+                date: h.date,
+                level: h.levelSelected,
+                exercises: h.completedExercises?.length || 0,
+                exerciseNames: h.completedExercises?.slice(0, 5).join(', ') || 'N/A'
+            }));
 
-        const lastWeekHistory = history.filter(h => {
-            const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            return h.timestamp >= weekAgo;
-        });
-
-        const historySummary = lastWeekHistory.map(h => ({
-            date: h.date,
-            level: h.levelSelected,
-            exercises: h.completedExercises?.length || 0,
-            exerciseNames: h.completedExercises?.slice(0, 5).join(', ') || 'N/A'
-        }));
-
-        const schema = {
-            type: Type.OBJECT,
-            properties: {
-                summary: { type: Type.STRING },
-                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-                improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
-                recommendation: { type: Type.STRING },
-                motivationalQuote: { type: Type.STRING },
-                weeklyStats: {
-                    type: Type.OBJECT,
-                    properties: {
-                        workoutsCompleted: { type: Type.NUMBER },
-                        totalExercises: { type: Type.NUMBER },
-                        estimatedCaloriesBurned: { type: Type.NUMBER },
-                        consistency: { type: Type.NUMBER }
+            const schema = {
+                type: Type.OBJECT,
+                properties: {
+                    summary: { type: Type.STRING },
+                    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    recommendation: { type: Type.STRING },
+                    motivationalQuote: { type: Type.STRING },
+                    weeklyStats: {
+                        type: Type.OBJECT,
+                        properties: {
+                            workoutsCompleted: { type: Type.NUMBER },
+                            totalExercises: { type: Type.NUMBER },
+                            estimatedCaloriesBurned: { type: Type.NUMBER },
+                            consistency: { type: Type.NUMBER }
+                        }
                     }
                 }
-            }
-        };
+            };
 
-        const prompt = `
+            const prompt = `
 ROLE: Huấn luyện viên cá nhân chuyên nghiệp, phân tích tiến trình tập luyện.
 
 CONTEXT: Lịch sử tập (7 ngày gần nhất):
@@ -218,9 +218,8 @@ RULES:
 - weeklyStats: consistency = (workouts/7)*100
 
 OUTPUT: JSON format.
-    `;
+`;
 
-        while (retriesLeft > 0) {
             try {
                 const response = await ai.models.generateContent({
                     model: model,
@@ -233,36 +232,35 @@ OUTPUT: JSON format.
 
                 const jsonText = response.text;
                 if (!jsonText) throw new Error("Empty response");
-
-                return new Response(jsonText, {
-                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-                });
+                return jsonText;
             } catch (error) {
                 console.error("AI Overview Error:", error);
 
-                if (isRateLimitError(error) && retriesLeft > 1) {
-                    const newKey = markRateLimitedAndRotate(API_KEYS);
-                    if (newKey) {
-                        ai = new GoogleGenAI({ apiKey: newKey });
-                        retriesLeft--;
-                        continue;
-                    }
+                if (isRateLimitError(error) && retryCount < state.keys.length) {
+                    markCurrentKeyAsRateLimited();
+                    rotateToNextKey();
+                    return generateWithRetry(retryCount + 1);
                 }
 
-                return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-                });
+                return JSON.stringify(getFallbackAIOverview(history));
             }
-        }
+        };
 
-        return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-        });
+        const result = await generateWithRetry();
+
+        return {
+            statusCode: 200,
+            headers,
+            body: result,
+        };
     } catch (error) {
         console.error("Function error:", error);
-        return new Response(JSON.stringify({ error: 'Internal server error' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-        });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Internal server error' }),
+        };
     }
 };
+
+export { handler };
