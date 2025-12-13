@@ -1,19 +1,19 @@
 import type { Context } from "@netlify/functions";
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Types from the main app - flexible to accept various formats
+// Types from the main app
 interface UserInput {
     weight: number;
     height: number;
     equipment: string[];
     nutritionGoal: 'bulking' | 'cutting';
-    selectedIntensity: string;  // Accept any string, normalize later
+    selectedIntensity: 'Medium' | 'Hard';
     useCreatine: boolean;
     soreMuscles: string[];
     fatigue: string;
     consumedFood: string[];
     availableIngredients: string[];
-    trainingMode: string;  // Accept any string (standard, ai, saitama)
+    trainingMode: 'ai' | 'saitama';
 }
 
 interface WorkoutHistoryItem {
@@ -35,33 +35,6 @@ const getApiKeys = (): string[] => {
         keys.push(process.env.API_KEY);
     }
     return keys;
-};
-
-// ===== SECURITY: Allowed Origins =====
-// Add your production domains here
-const ALLOWED_ORIGINS = [
-    'https://grow-up.netlify.app',       // Your Netlify domain
-    'https://growup.truyem789.site',     // Your custom domain
-    'http://localhost:5173',              // Vite dev
-    'http://localhost:8888',              // Netlify dev
-    'http://localhost:3000',              // Other common dev port
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:8888',
-];
-
-// Check if origin is allowed
-const isOriginAllowed = (origin: string | null): boolean => {
-    // Allow null origin (same-origin requests, server-to-server, or Postman-like tools on same domain)
-    if (!origin) return true;
-    // Allow any subdomain of netlify.app for preview deploys
-    if (origin.endsWith('.netlify.app')) return true;
-    return ALLOWED_ORIGINS.includes(origin);
-};
-
-// Get CORS origin (return specific origin if allowed, or null)
-const getCorsOrigin = (origin: string | null): string | null => {
-    if (isOriginAllowed(origin)) return origin || '*';
-    return null;
 };
 
 // Track rate-limited keys (in-memory, resets on cold start)
@@ -128,11 +101,11 @@ const calculateTDEE = (bmr: number): number => {
     return Math.round(bmr * 1.55);
 };
 
-const estimateWorkoutBurn = (intensity: string): number => {
-    return intensity.toLowerCase() === 'hard' ? 450 : 300;
+const estimateWorkoutBurn = (intensity: 'Medium' | 'Hard'): number => {
+    return intensity === 'Hard' ? 450 : 300;
 };
 
-const calculateTargetCalories = (weight: number, height: number, goal: 'bulking' | 'cutting', intensity: string) => {
+const calculateTargetCalories = (weight: number, height: number, goal: 'bulking' | 'cutting', intensity: 'Medium' | 'Hard') => {
     const bmr = calculateBMR(weight, height);
     const tdee = calculateTDEE(bmr);
     const burn = estimateWorkoutBurn(intensity);
@@ -191,24 +164,12 @@ const getFallbackPlan = (userData: UserInput) => {
 };
 
 export default async (req: Request, context: Context) => {
-    const origin = req.headers.get('origin');
-    const corsOrigin = getCorsOrigin(origin);
-
-    // ===== SECURITY: Block unauthorized origins =====
-    if (!isOriginAllowed(origin)) {
-        console.warn(`🚫 Blocked request from unauthorized origin: ${origin}`);
-        return new Response(JSON.stringify({ error: 'Forbidden' }), {
-            status: 403,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
             headers: {
-                'Access-Control-Allow-Origin': corsOrigin || '',
+                'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
             }
@@ -427,7 +388,7 @@ export default async (req: Request, context: Context) => {
                 return new Response(jsonText, {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': corsOrigin || ''
+                        'Access-Control-Allow-Origin': '*'
                     }
                 });
             } catch (error) {
@@ -446,7 +407,7 @@ export default async (req: Request, context: Context) => {
                 return new Response(JSON.stringify(getFallbackPlan(userData)), {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': corsOrigin || ''
+                        'Access-Control-Allow-Origin': '*'
                     }
                 });
             }
@@ -455,7 +416,7 @@ export default async (req: Request, context: Context) => {
         return new Response(JSON.stringify(getFallbackPlan(userData)), {
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': corsOrigin || ''
+                'Access-Control-Allow-Origin': '*'
             }
         });
     } catch (error) {
@@ -464,7 +425,7 @@ export default async (req: Request, context: Context) => {
             status: 500,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': corsOrigin || ''
+                'Access-Control-Allow-Origin': '*'
             }
         });
     }
