@@ -26,14 +26,33 @@ interface WorkoutHistoryItem {
 // Load API keys from environment
 const getApiKeys = (): string[] => {
     const keys: string[] = [];
+
+    // Try numbered keys first (API_KEY_1, API_KEY_2, etc.)
     let i = 1;
     while (process.env[`API_KEY_${i}`]) {
         keys.push(process.env[`API_KEY_${i}`]!);
         i++;
     }
+
+    // Fallback to single API_KEY
     if (keys.length === 0 && process.env.API_KEY) {
         keys.push(process.env.API_KEY);
     }
+
+    // Fallback to GEMINI_API_KEY (common naming convention)
+    if (keys.length === 0 && process.env.GEMINI_API_KEY) {
+        keys.push(process.env.GEMINI_API_KEY);
+    }
+
+    // Log for debugging (will appear in Netlify function logs)
+    console.log(`🔑 Loaded ${keys.length} API key(s)`);
+    if (keys.length > 0) {
+        console.log(`🔑 First key starts with: ${keys[0].substring(0, 10)}...`);
+    } else {
+        console.log(`⚠️ No API keys found! Check environment variables.`);
+        console.log(`Available env vars: ${Object.keys(process.env).filter(k => k.includes('API') || k.includes('GEMINI')).join(', ')}`);
+    }
+
     return keys;
 };
 
