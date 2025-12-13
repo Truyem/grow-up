@@ -40,6 +40,29 @@ const getApiKeys = (): string[] => {
     return keys;
 };
 
+// ===== SECURITY: Allowed Origins =====
+// Add your production domains here
+const ALLOWED_ORIGINS = [
+    'https://grow-up.netlify.app',       // Your Netlify domain
+    'https://your-custom-domain.com',     // Your custom domain (update this!)
+    'http://localhost:5173',              // Local dev
+    'http://localhost:8888',              // Netlify dev
+];
+
+// Check if origin is allowed
+const isOriginAllowed = (origin: string | null): boolean => {
+    if (!origin) return false;
+    // Also allow any subdomain of netlify.app for preview deploys
+    if (origin.endsWith('.netlify.app')) return true;
+    return ALLOWED_ORIGINS.includes(origin);
+};
+
+// Get CORS origin (return specific origin if allowed, or null)
+const getCorsOrigin = (origin: string | null): string | null => {
+    if (isOriginAllowed(origin)) return origin;
+    return null;
+};
+
 const rateLimitedKeys: Map<number, number> = new Map();
 let currentKeyIndex = 0;
 
@@ -111,12 +134,24 @@ const getFallbackAIOverview = (history: WorkoutHistoryItem[]): AIOverview => {
 };
 
 export default async (req: Request, context: Context) => {
+    const origin = req.headers.get('origin');
+    const corsOrigin = getCorsOrigin(origin);
+
+    // ===== SECURITY: Block unauthorized origins =====
+    if (!isOriginAllowed(origin)) {
+        console.warn(`🚫 Blocked request from unauthorized origin: ${origin}`);
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
             headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': corsOrigin || '',
                 'Access-Control-Allow-Methods': 'POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
             }
@@ -138,14 +173,14 @@ export default async (req: Request, context: Context) => {
 
         if (!history || history.length === 0) {
             return new Response(JSON.stringify(getFallbackAIOverview([])), {
-                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
             });
         }
 
         const apiKey = getCurrentApiKey(API_KEYS);
         if (!apiKey) {
             return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
             });
         }
 
@@ -222,7 +257,7 @@ OUTPUT: JSON format.
                 if (!jsonText) throw new Error("Empty response");
 
                 return new Response(jsonText, {
-                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
                 });
             } catch (error) {
                 console.error("AI Overview Error:", error);
@@ -237,19 +272,19 @@ OUTPUT: JSON format.
                 }
 
                 return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
                 });
             }
         }
 
         return new Response(JSON.stringify(getFallbackAIOverview(history)), {
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
         });
     } catch (error) {
         console.error("Function error:", error);
         return new Response(JSON.stringify({ error: 'Internal server error' }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': corsOrigin || '' }
         });
     }
 };
