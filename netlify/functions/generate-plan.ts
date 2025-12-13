@@ -1,19 +1,19 @@
 import type { Context } from "@netlify/functions";
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Types from the main app
+// Types from the main app - flexible to accept various formats
 interface UserInput {
     weight: number;
     height: number;
     equipment: string[];
     nutritionGoal: 'bulking' | 'cutting';
-    selectedIntensity: 'Medium' | 'Hard';
+    selectedIntensity: string;  // Accept any string, normalize later
     useCreatine: boolean;
     soreMuscles: string[];
     fatigue: string;
     consumedFood: string[];
     availableIngredients: string[];
-    trainingMode: 'ai' | 'saitama';
+    trainingMode: string;  // Accept any string (standard, ai, saitama)
 }
 
 interface WorkoutHistoryItem {
@@ -128,11 +128,11 @@ const calculateTDEE = (bmr: number): number => {
     return Math.round(bmr * 1.55);
 };
 
-const estimateWorkoutBurn = (intensity: 'Medium' | 'Hard'): number => {
-    return intensity === 'Hard' ? 450 : 300;
+const estimateWorkoutBurn = (intensity: string): number => {
+    return intensity.toLowerCase() === 'hard' ? 450 : 300;
 };
 
-const calculateTargetCalories = (weight: number, height: number, goal: 'bulking' | 'cutting', intensity: 'Medium' | 'Hard') => {
+const calculateTargetCalories = (weight: number, height: number, goal: 'bulking' | 'cutting', intensity: string) => {
     const bmr = calculateBMR(weight, height);
     const tdee = calculateTDEE(bmr);
     const burn = estimateWorkoutBurn(intensity);
