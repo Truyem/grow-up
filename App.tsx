@@ -3,15 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import wallpaper from './wallpaper.jpg';
 import wallpaperMb from './wallpaper-mb.jpg';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { HistoryView } from './components/HistoryView';
-import { AnalysisView } from './components/AnalysisView';
+// AnalysisView merged into HistoryView
+
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
-import { Sparkles, History } from 'lucide-react';
+import { Sparkles, History, Dumbbell } from 'lucide-react';
 
 // Default equipment list
 const DEFAULT_EQUIPMENT = [
@@ -63,6 +64,7 @@ export default function App() {
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => getApiStatus());
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   // Update API status periodically
   useEffect(() => {
@@ -124,6 +126,15 @@ export default function App() {
       } catch (e) {
         console.error("Failed to load history", e);
       }
+    }
+
+
+    // 2a. Load Expenses
+    const savedExpenses = localStorage.getItem('user_expenses');
+    if (savedExpenses) {
+      try {
+        setExpenses(JSON.parse(savedExpenses));
+      } catch (e) { console.error("Failed to load expenses", e); }
     }
 
     // 2. Load Stats & Handle Streak Logic
@@ -272,6 +283,11 @@ export default function App() {
     localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
   }, [userData]);
 
+  // Save Expenses
+  useEffect(() => {
+    localStorage.setItem('user_expenses', JSON.stringify(expenses));
+  }, [expenses]);
+
   const handleGenerate = async () => {
     setLoading(true);
     // Pass workout history to the service
@@ -319,22 +335,62 @@ export default function App() {
       completedExercises,
       userNotes: userNotes || "",
       exercisesSummary,
-      nutrition // Save nutrition to history
+      nutrition, // Save nutrition to history
+      weight: userData.weight // Save current weight
     };
 
-    let updatedHistory: WorkoutHistoryItem[] = [];
-    updatedHistory = [newItem, ...workoutHistory];
+    // Logic: Only keep 1 workout per day. Keep the one with the MOST exercises.
+    const nowLocal = new Date();
+    // Generate YYYY-MM-DD key using local time manually to avoid timezone issues
+    const todayKey = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
 
+    const isSameDay = (ts: number) => {
+      const d = new Date(ts);
+      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return dKey === todayKey;
+    };
+
+    // Filter existing items: split into "Today's items" and "Others"
+    // Use both date string AND timestamp check to be thorough against legacy data
+    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
+    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
+
+    let itemToSave = newItem;
+
+    if (existingTodayItems.length > 0) {
+      // Find existing item with max exercises
+      let bestExisting = existingTodayItems[0];
+      for (let i = 1; i < existingTodayItems.length; i++) {
+        const curr = existingTodayItems[i];
+        const currCount = curr.completedExercises ? curr.completedExercises.length : 0;
+        const bestCount = bestExisting.completedExercises ? bestExisting.completedExercises.length : 0;
+        if (currCount > bestCount) {
+          bestExisting = curr;
+        }
+      }
+
+      const bestExistingCount = bestExisting.completedExercises ? bestExisting.completedExercises.length : 0;
+      const newCount = newItem.completedExercises ? newItem.completedExercises.length : 0;
+
+      if (bestExistingCount > newCount) {
+        // Keep existing as it has more exercises
+        itemToSave = bestExisting;
+      } else {
+        // New is better or equal
+        itemToSave = newItem;
+      }
+    }
+
+    const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
     localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
   };
 
   const handleDeleteHistoryItem = async (timestamp: number) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa lịch sử tập luyện của ngày này không?")) {
-      const updatedHistory = workoutHistory.filter(item => item.timestamp !== timestamp);
-      setWorkoutHistory(updatedHistory);
-      localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
-    }
+    // Logic moved to HistoryView for custom modal. Here we just delete.
+    const updatedHistory = workoutHistory.filter(item => item.timestamp !== timestamp);
+    setWorkoutHistory(updatedHistory);
+    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
   };
 
   // Handle sick day - maintain streak without breaking it
@@ -401,7 +457,7 @@ export default function App() {
       {/* Content Layer */}
       <div className="relative z-10 container mx-auto px-4 py-10 max-w-5xl">
 
-        {/* Header */}
+        {/* Header - Simplified for Dashboard */}
         {viewMode === 'input' && (
           <div className="text-center mb-10 space-y-3 animate-fade-in relative">
             <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
@@ -426,6 +482,24 @@ export default function App() {
           </div>
         )}
 
+        {/* Global Navigation Tabs */}
+        <div className="flex justify-center mb-8 gap-4">
+          <button
+            onClick={() => setViewMode(plan ? 'plan' : 'input')}
+            className={`px-4 py-2 rounded-full flex items-center gap-2 transition-all ${['input', 'plan'].includes(viewMode) ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <Dumbbell className="w-4 h-4" />
+            Tập luyện
+          </button>
+          <button
+            onClick={() => setViewMode('history')}
+            className={`px-4 py-2 rounded-full flex items-center gap-2 transition-all ${['history', 'analysis'].includes(viewMode) ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <History className="w-4 h-4" />
+            Lịch sử
+          </button>
+        </div>
+
         {/* Main View Switch */}
         <div className="transition-all duration-500 ease-in-out">
           {viewMode === 'plan' && plan ? (
@@ -437,18 +511,12 @@ export default function App() {
           ) : viewMode === 'history' ? (
             <HistoryView
               history={workoutHistory}
+              userData={userData}
               onBack={() => setViewMode('input')}
               onDelete={handleDeleteHistoryItem}
-              onAnalyze={() => setViewMode('analysis')}
-            />
-          ) : viewMode === 'analysis' ? (
-            <AnalysisView
-              history={workoutHistory}
-              onBack={() => setViewMode('history')}
             />
           ) : (
             <div className="max-w-2xl mx-auto space-y-4">
-              {/* Pass userStats to UserForm */}
               <UserForm
                 userData={userData}
                 setUserData={setUserData}
@@ -468,10 +536,10 @@ export default function App() {
             </div>
           )}
         </div>
+      </div>
 
-        <div className="mt-20 text-center text-xs text-gray-600">
-          <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
-        </div>
+      <div className="mt-20 text-center text-xs text-gray-600">
+        <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
       </div>
 
       {/* Toast Notification */}

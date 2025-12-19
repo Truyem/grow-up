@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { FatigueLevel, MuscleGroup, UserInput, Intensity, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target, ChevronDown, Thermometer } from 'lucide-react';
+import { Activity, Calendar, Ruler, Weight, BatteryCharging, BatteryFull, Dumbbell, Plus, X, Refrigerator, Utensils, Flame, TrendingUp, TrendingDown, Swords, BrainCircuit, Zap, Droplets, Target, ChevronDown, Thermometer, Sparkles, Loader2 } from 'lucide-react';
+import { parseFridgeItems } from '../services/geminiService';
 
 interface UserFormProps {
   userData: UserInput;
@@ -20,6 +21,18 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
   const [newIngredient, setNewIngredient] = useState('');
   const [newConsumedFood, setNewConsumedFood] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [isScanningFridge, setIsScanningFridge] = useState(false);
+
+  // Local state for weight input to handle commas/dots
+  const [weightInput, setWeightInput] = useState(userData.weight.toString());
+
+  // Sync weightInput when userData.weight changes (e.g. loaded from storage), but avoid overriding user typing
+  useEffect(() => {
+    // Only sync if the numeric values are different to prevent cursor jumping/formatting overrides while typing
+    if (Math.abs(parseFloat(weightInput.replace(',', '.')) - userData.weight) > 0.01) {
+      setWeightInput(userData.weight.toString());
+    }
+  }, [userData.weight]);
 
   useEffect(() => {
     const now = new Date();
@@ -83,6 +96,27 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
       ...prev,
       availableIngredients: (prev.availableIngredients || []).filter((_, index) => index !== indexToRemove)
     }));
+  };
+
+  const handleAIFridgeScan = async () => {
+    if (!newIngredient.trim()) return;
+    setIsScanningFridge(true);
+    try {
+      const parsedIngredients = await parseFridgeItems(newIngredient);
+      setUserData(prev => ({
+        ...prev,
+        availableIngredients: [
+          ...(prev.availableIngredients || []),
+          ...parsedIngredients
+        ]
+      }));
+      setNewIngredient('');
+    } catch (error) {
+      console.error("AI Scan Failed", error);
+      // Fallback or Toast? assuming simple console for now or internal error state
+    } finally {
+      setIsScanningFridge(false);
+    }
   };
 
   const handleAddConsumedFood = () => {
@@ -152,10 +186,20 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
             <label className="block text-sm text-gray-300 mb-2">Cân nặng (kg)</label>
             <div className="relative">
               <Weight className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+              <Weight className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
               <input
-                type="number"
-                value={userData.weight}
-                onChange={(e) => setUserData({ ...userData, weight: Number(e.target.value) })}
+                type="text"
+                inputMode="decimal"
+                value={weightInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWeightInput(val);
+                  // Parse: replace comma with dot, allow partial inputs like "60."
+                  const parsed = parseFloat(val.replace(',', '.'));
+                  if (!isNaN(parsed)) {
+                    setUserData(prev => ({ ...prev, weight: parsed }));
+                  }
+                }}
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
               />
             </div>
@@ -446,8 +490,20 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               placeholder="VD: 500g Ức gà, 10 quả trứng..."
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
+            {newIngredient.length > 5 ? (
+              <button
+                onClick={handleAIFridgeScan}
+                disabled={isScanningFridge}
+                className="p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 rounded-xl border border-purple-500/30 hover:bg-purple-500/30 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+                title="Thêm nhanh bằng AI (Tách món, phân loại)"
+              >
+                {isScanningFridge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                <span className="hidden sm:inline font-bold text-xs">AI Scan</span>
+              </button>
+            ) : null}
             <button
               onClick={handleAddIngredient}
+              disabled={isScanningFridge}
               className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
@@ -461,7 +517,7 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
                   key={index}
                   className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-200 group hover:border-emerald-500/40 transition-all"
                 >
-                  <span>{item}</span>
+                  <span>{typeof item === 'string' ? item : `${item.name} (${item.quantity}${item.unit})`}</span>
                   <button
                     onClick={() => handleRemoveIngredient(index)}
                     className="text-emerald-500/50 hover:text-red-400 transition-colors cursor-pointer"

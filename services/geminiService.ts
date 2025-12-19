@@ -161,8 +161,18 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
   const isBulking = userData.nutritionGoal === 'bulking';
   const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0)); // 2.2g or 2.0g per kg
 
+  // Macro Calculation
+  // Fat: 0.9g/kg (Moderate)
+  const fatTarget = Math.round(userData.weight * 0.9);
+
+  // Carbs: Remaining Calories / 4
+  // 1g Protein = 4kcal, 1g Fat = 9kcal, 1g Carb = 4kcal
+  const caloriesFromProtein = proteinTarget * 4;
+  const caloriesFromFat = fatTarget * 9;
+  const remainingCalories = target - caloriesFromProtein - caloriesFromFat;
+  const carbTarget = Math.max(0, Math.round(remainingCalories / 4));
+
   const intensity = userData.selectedIntensity;
-  const waterIntake = calculateWaterIntake(userData.weight, userData.useCreatine);
 
   const workout: WorkoutLevel = intensity === Intensity.Hard ? {
     levelName: "Cháy hết mình (Hard)",
@@ -208,9 +218,10 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     nutrition: {
       totalCalories: target,
       totalProtein: proteinTarget,
-      waterIntake: waterIntake,
+      totalCarbs: carbTarget, // Replaces Water
+      totalFat: fatTarget, // Replaces Water
       totalCost: 150000,
-      advice: `Mục tiêu: ${isBulking ? 'Bulking (+400kcal)' : 'Cutting (-400kcal)'}. TDEE: ${tdee}. Nước: ${waterIntake}L`,
+      advice: `Mục tiêu: ${isBulking ? 'Bulking (Tăng cân)' : 'Cutting (Giảm cân)'}. TDEE: ${tdee}. Macros: ${proteinTarget}g Protein, ${carbTarget}g Carbs, ${fatTarget}g Fat.`,
       meals: [
         {
           name: "Bữa Sáng (07:00)",
@@ -263,7 +274,12 @@ export const generateDailyPlan = async (
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
   const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0; // High protein
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
-  const waterTarget = calculateWaterIntake(userData.weight, userData.useCreatine);
+
+  // Macro Pre-calc for Prompt Context
+  const fatTarget = Math.round(userData.weight * 0.9);
+  const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
+  const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
+
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
 
   // Determine Day Number (1-7)
@@ -339,7 +355,8 @@ export const generateDailyPlan = async (
         properties: {
           totalCalories: { type: Type.NUMBER },
           totalProtein: { type: Type.NUMBER },
-          waterIntake: { type: Type.NUMBER }, // New field in schema
+          totalCarbs: { type: Type.NUMBER }, // New field
+          totalFat: { type: Type.NUMBER },   // New field
           totalCost: { type: Type.NUMBER },
           advice: { type: Type.STRING },
           meals: {
@@ -486,8 +503,7 @@ export const generateDailyPlan = async (
 
     ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
-    - **PROTEIN TARGET**: ${proteinTarget}g (${proteinMultiplier}g/kg).
-    - **WATER INTAKE TARGET**: ${waterTarget} Liters (Calculated based on weight + Creatine usage).
+    - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING'}.
     - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef).
     - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}. If empty, use generic economical veggies.
@@ -675,4 +691,75 @@ OUTPUT: JSON format.
   }
 
   return getFallbackAIOverview(history);
+};
+
+// --- FRIDGE ARGUMENT PARSING ---
+
+export const parseFridgeItems = async (text: string): Promise<{ id: string, name: string, quantity: number, unit: string }[]> => {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey || !text.trim()) {
+    console.warn("No API Key or empty text for fridge parsing");
+    return [];
+  }
+
+  let ai = new GoogleGenAI({ apiKey });
+  let retriesLeft = API_KEYS.length;
+  const model = "gemini-2.5-flash";
+
+  const schema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        id: { type: Type.STRING },
+        name: { type: Type.STRING },
+        quantity: { type: Type.NUMBER },
+        unit: { type: Type.STRING },
+        category: { type: Type.STRING, enum: ['protein', 'carb', 'fat', 'veg', 'spice', 'other'] }
+      }
+    }
+  };
+
+  const prompt = `
+    ROLE: Data Parser specific to cooking ingredients.
+    INPUT: "${text}"
+    TASK: Parse the input string into a structured JSON array of ingredients.
+    RULES:
+    - Translate ingredient names to standard Vietnamese (e.g., "ức gà", "trứng", "gạo").
+    - Extract approximate quantity and unit. If not specified, estimate reasonable default (e.g. 1 unit, 100g).
+    - Assign a category.
+    - generate a random short ID for each item.
+    - If input contains multiple items (e.g., "500g chicken and 10 eggs"), split them.
+    OUTPUT: JSON Array.
+  `;
+
+  while (retriesLeft > 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
+
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("Empty response");
+
+      return JSON.parse(jsonText);
+    } catch (error) {
+      console.error("Fridge Parse Error:", error);
+      if (isRateLimitError(error) && retriesLeft > 1) {
+        const newKey = markRateLimitedAndRotate();
+        if (newKey) {
+          ai = new GoogleGenAI({ apiKey: newKey });
+          retriesLeft--;
+          continue;
+        }
+      }
+      return [];
+    }
+  }
+  return [];
 };

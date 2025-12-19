@@ -62,8 +62,27 @@ export interface UserInput {
   trainingMode: TrainingMode;
   useCreatine: boolean; // New field
   equipment: string[];
-  availableIngredients: string[];
+  availableIngredients: Ingredient[];
   consumedFood: string[];
+}
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  category?: 'protein' | 'carb' | 'fat' | 'veg' | 'spice' | 'other';
+  expiryDate?: string;
+  caloriesPer100g?: number;
+}
+
+export interface Expense {
+  id: string;
+  name: string;
+  category: 'supplement' | 'equipment' | 'food' | 'other';
+  price: number;
+  date: string;
+  note?: string;
 }
 
 export interface UserStats {
@@ -116,7 +135,8 @@ export interface DailyPlan {
   nutrition: {
     totalCalories: number;
     totalProtein: number;
-    waterIntake: number; // Liters
+    totalCarbs: number; // New
+    totalFat: number;   // New
     totalCost: number;
     meals: Meal[];
     advice: string;
@@ -134,10 +154,12 @@ export interface WorkoutHistoryItem {
   nutrition?: {
     totalCalories: number;
     totalProtein: number;
-    waterIntake?: number;
+    totalCarbs?: number; // Optional for backward compatibility
+    totalFat?: number;   // Optional for backward compatibility
     totalCost?: number;
     meals: Meal[];
   };
+  weight?: number; // Recorded weight for that day
 }
 
 // AI Overview - Insights from Gemini AI about workout progress

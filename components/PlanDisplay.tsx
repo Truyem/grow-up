@@ -15,6 +15,11 @@ interface PlanDisplayProps {
   onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition']) => void;
 }
 
+const formatCurrencyInput = (value: string) => {
+  // Basic formatter for input display
+  return value.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
@@ -192,7 +197,7 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
           <div className="flex flex-wrap gap-2 text-xs font-bold mt-1 sm:mt-0">
             <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
             <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
-            <span className="px-2 py-1 bg-yellow-500/20 rounded text-yellow-300 border border-yellow-500/30">~{formatCurrency(meal.estimatedPrice)}</span>
+            {/* Price removed as per user request */}
           </div>
         </div>
 
@@ -213,6 +218,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+  const [manualCostConfig, setManualCostConfig] = useState<string>(''); // User enters string "50.000"
 
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
@@ -260,7 +266,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   };
 
   const handleOpenYouTube = (exerciseName: string) => {
-    const query = encodeURIComponent(`${exerciseName} exercise tutorial form`);
+    const query = encodeURIComponent(`${exerciseName}`);
 
     // Device Detection
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
@@ -302,12 +308,17 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     // Clear the progress cache since we are finishing it
     localStorage.removeItem('workout_progress');
 
+    const finalNutrition = {
+      ...plan.nutrition,
+      totalCost: parseInt(manualCostConfig.replace(/\./g, '') || '0')
+    };
+
     onComplete(
       currentWorkout.levelName,
       plan.workout.summary,
       completedExercisesList,
       userNote,
-      plan.nutrition
+      finalNutrition
     );
   };
 
@@ -596,7 +607,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         </GlassCard>
 
         <GlassCard title="Thực Đơn Tăng Cân (Bulking)" icon={<Utensils className="w-6 h-6" />}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
             <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
               <p className="text-xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
@@ -605,14 +616,31 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
               <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Protein</p>
               <p className="text-xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
             </div>
-            {/* New Water Intake Card */}
-            <div className="bg-blue-500/10 rounded-xl p-3 text-center border border-blue-500/20">
-              <p className="text-blue-200/70 text-[10px] uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Droplets className="w-3 h-3" /> Nước</p>
-              <p className="text-xl font-bold text-blue-300">{plan.nutrition.waterIntake || 2}L</p>
+            {/* New Macro Cards */}
+            <div className="bg-orange-500/10 rounded-xl p-3 text-center border border-orange-500/20">
+              <p className="text-orange-200/70 text-[10px] uppercase tracking-widest mb-1">Carbs</p>
+              <p className="text-xl font-bold text-orange-300">{plan.nutrition.totalCarbs || 0}g</p>
             </div>
             <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
-              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền</p>
-              <p className="text-sm font-bold text-yellow-300">{formatCurrency(plan.nutrition.totalCost)}</p>
+              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Fat</p>
+              <p className="text-xl font-bold text-yellow-300">{plan.nutrition.totalFat || 0}g</p>
+            </div>
+            {/* Price Card */}
+            <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20 relative group">
+              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền (Tự ghi)</p>
+              <div className="flex items-center justify-center gap-1">
+                <input
+                  type="text"
+                  value={manualCostConfig}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\./g, '').replace(/\D/g, '');
+                    setManualCostConfig(formatCurrencyInput(val));
+                  }}
+                  placeholder="Nhập giá..."
+                  className="w-full bg-transparent text-center font-bold text-yellow-300 focus:outline-none placeholder-yellow-500/30"
+                />
+                <span className="text-xs text-yellow-500">đ</span>
+              </div>
             </div>
           </div>
 
