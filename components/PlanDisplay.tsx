@@ -197,6 +197,8 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
           <div className="flex flex-wrap gap-2 text-xs font-bold mt-1 sm:mt-0">
             <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
             <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
+            {meal.carbs !== undefined && <span className="px-2 py-1 bg-black/30 rounded text-orange-300 border border-white/5">{meal.carbs}g Carb</span>}
+            {meal.fat !== undefined && <span className="px-2 py-1 bg-black/30 rounded text-yellow-300 border border-white/5">{meal.fat}g Fat</span>}
             {/* Price removed as per user request */}
           </div>
         </div>
@@ -427,7 +429,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
               <AlarmClock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu (Tránh 12-14h)</h4>
+              <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu</h4>
               <div className="flex gap-4 mt-1">
                 <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
                   <Sun className="w-3.5 h-3.5 text-yellow-400" />

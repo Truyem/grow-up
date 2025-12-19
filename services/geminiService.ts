@@ -227,6 +227,8 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           name: "Bữa Sáng (07:00)",
           calories: Math.round(target * 0.25),
           protein: Math.round(proteinTarget * 0.25),
+          carbs: Math.round(carbTarget * 0.25),
+          fat: Math.round(fatTarget * 0.25),
           description: "2 lát Bánh mì đen + 3 Lòng trắng trứng (Trứng ốp la bỏ lòng đỏ)",
           estimatedPrice: 20000
         },
@@ -234,6 +236,8 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           name: "Bữa Trưa (12:30)",
           calories: Math.round(target * 0.35),
           protein: Math.round(proteinTarget * 0.35),
+          carbs: Math.round(carbTarget * 0.35),
+          fat: Math.round(fatTarget * 0.35),
           description: `${carbSource} + 200g Ức gà áp chảo + ${vegSource}`,
           estimatedPrice: 50000
         },
@@ -241,6 +245,8 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           name: "Bữa Tối (19:00)",
           calories: Math.round(target * 0.25),
           protein: Math.round(proteinTarget * 0.25),
+          carbs: Math.round(carbTarget * 0.25),
+          fat: Math.round(fatTarget * 0.25),
           description: `${carbSource} + 200g Cá/Thịt nạc + ${vegSource}`,
           estimatedPrice: 60000
         },
@@ -248,6 +254,8 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           name: "Bữa Phụ (21:30)",
           calories: Math.round(target * 0.15),
           protein: Math.round(proteinTarget * 0.15),
+          carbs: Math.round(carbTarget * 0.15),
+          fat: Math.round(fatTarget * 0.15),
           description: "1 Hộp Sữa chua không đường + 1 quả Chuối",
           estimatedPrice: 15000
         }
@@ -258,8 +266,10 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
 
 export const generateDailyPlan = async (
   userData: UserInput,
-  history: WorkoutHistoryItem[]
+  fullHistory: WorkoutHistoryItem[]
 ): Promise<DailyPlan> => {
+  // Optimization: Only use the last 14 days of history to speed up processing
+  const history = fullHistory.slice(-14);
   const apiKey = getCurrentApiKey();
   if (!apiKey) {
     console.warn("No API Keys found. Using fallback plan.");
@@ -268,7 +278,7 @@ export const generateDailyPlan = async (
 
   let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length; // Try each key once
-  const model = "gemini-2.5-flash";
+  const model = "gemini-3-flash-preview";
 
   // --- PRE-CALCULATE MATH ---
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
@@ -367,6 +377,8 @@ export const generateDailyPlan = async (
                 name: { type: Type.STRING },
                 calories: { type: Type.NUMBER },
                 protein: { type: Type.NUMBER },
+                carbs: { type: Type.NUMBER },
+                fat: { type: Type.NUMBER },
                 description: { type: Type.STRING },
                 estimatedPrice: { type: Type.NUMBER }
               }
@@ -418,14 +430,18 @@ export const generateDailyPlan = async (
     
     ${workoutInstructionBlock}
 
-    ### GENERAL WORKOUT RULES (APPLY TO ALL MODES)
-    - **EXERCISE NAMES**: ALL exercise names MUST be in ENGLISH ONLY. DO NOT use Vietnamese names for exercises.
+    ### LANGUAGE & LOCALIZATION RULES (STRICT)
+    - **VIETNAMESE REQUIRED**: ALL textual content (Summary, Description, Advice, Meal Names, Meal Descriptions, Reasoning) MUST be in **VIETNAMESE**.
+    - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press"). Do NOT translate exercise names.
+    - **CONCISENESS**: Keep all descriptions Short & Fast. Max 1 sentence for summary and reasoning.
+
+    ### GENERAL WORKOUT RULES
     - **INTENSITY**: ${userData.selectedIntensity} (Medium=Hypertrophy, Hard=Failure/Overload).
     - **EQUIPMENT AVAILABLE**: ${userData.equipment.join(', ')}.
-    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool (e.g., Bench, Pull-up Bar, Machine), you MUST substitute with a **BODYWEIGHT** equivalent.
+    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool, substitute with a **BODYWEIGHT** equivalent.
     - **ONE DUMBBELL RULE**: Unless equipment list says "2x" or "đôi", user only has ONE dumbbell. use UNILATERAL exercises.
     - **CARDIO NAMING**: If the exercise is Walking or Running, you MUST append "(Cardio)" to the name.
-    - **TIME OPTIMIZATION**: Avoid scheduling workout between 12:00 - 14:00 (Study time). Suggest optimal time.
+
 
     ### COLOR CODING RULES (MANDATORY)
     Assign a 'colorCode' to EVERY exercise based on the PRIMARY muscle group involved:
@@ -505,8 +521,10 @@ export const generateDailyPlan = async (
     - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING'}.
-    - **PROTEIN OPTIMIZATION**: Select foods with high protein density (e.g., Chicken Breast, Egg Whites, Whey, Lean Beef).
-    - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}. If empty, use generic economical veggies.
+    - **PROTEIN OPTIMIZATION**: Select foods with high protein density.
+    - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}.
+    - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Keep it simple (e.g., "200g Ức gà + Cơm").
+    - **MEAL MACROS**: You MUST estimate 'carbs' and 'fat' (in grams) for EACH meal individually. Ensure the sum matches the daily total approx.
     - **CARBS**: 
        - Breakfast: NO RICE (Bread/Sweet Potato/Oats only).
        - Lunch/Dinner: White Rice is allowed (High amount for Bulk, Controlled amount for Cut).
@@ -599,7 +617,7 @@ export const generateAIOverview = async (
 
   let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length;
-  const model = "gemini-2.5-flash";
+  const model = "gemini-3-flash-preview";
 
   // Prepare history summary for context
   const lastWeekHistory = history.filter(h => {
@@ -704,7 +722,7 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
 
   let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length;
-  const model = "gemini-2.5-flash";
+  const model = "gemini-3-flash-preview";
 
   const schema = {
     type: Type.ARRAY,

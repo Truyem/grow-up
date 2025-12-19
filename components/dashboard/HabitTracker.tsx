@@ -6,8 +6,8 @@ interface HabitTrackerProps {
     history: WorkoutHistoryItem[];
 }
 
-// User requested "only 30 days", so 5 weeks x 7 days = 35 days fits perfectly in the grid.
-const WEEKS_TO_SHOW = 5;
+// User requested "90 days", so 13 weeks x 7 days = 91 days fits perfectly.
+const WEEKS_TO_SHOW = 13;
 
 export const HabitTracker: React.FC<HabitTrackerProps> = ({ history }) => {
     const [selectedDay, setSelectedDay] = useState<{ date: string, count: number } | null>(null);

@@ -110,6 +110,8 @@ export interface Meal {
   protein: number;
   description: string;
   estimatedPrice: number;
+  carbs?: number;
+  fat?: number;
 }
 
 export interface WorkoutLevel {

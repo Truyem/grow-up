@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { WorkoutHistoryItem, MuscleGroup, UserInput, AIOverview } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, Droplets, DollarSign, CalendarCheck, AlertTriangle, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, Droplets, DollarSign, CalendarCheck, AlertTriangle, X, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, YAxis } from 'recharts';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
@@ -34,7 +34,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
+  const [showAIOverview, setShowAIOverview] = useState(false); // Inline toggle
 
   // --- STATS CALCULATION ---
   const stats = useMemo(() => {
@@ -137,14 +137,26 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
   };
 
   const handleAnalyze = async () => {
+    // If already checking/open, toggle off
+    if (showAIOverview) {
+      setShowAIOverview(false);
+      return;
+    }
+
+    // If not open:
+    // 1. If data exists, just show it
+    if (aiOverview) {
+      setShowAIOverview(true);
+      return;
+    }
+
+    // 2. If no data, fetch it
     if (history.length === 0) return;
     setIsAnalyzing(true);
     try {
-      // If we already have data and it's fresh (optional optimization), we could reuse it.
-      // For now, always re-generate to be safe with latest history.
       const result = await generateAIOverview(history, userData);
       setAiOverview(result);
-      setShowAIModal(true);
+      setShowAIOverview(true);
     } catch (e) {
       console.error("AI Overview failed", e);
     } finally {
@@ -154,7 +166,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-white cursor-pointer">
             <ArrowLeft className="w-6 h-6" />
@@ -162,15 +174,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
           <h2 className="text-2xl font-bold text-white">Lịch sử & Tiến độ</h2>
         </div>
 
-        {/* AI Analyze Button */}
+        {/* AI Analyze Button (Toggle) */}
         {history.length > 0 && (
           <button
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border border-purple-500/30 font-semibold text-sm transition-all shadow-lg shadow-purple-900/20
+            className={`flex items-center gap-2 px-4 py-2 rounded-full border font-semibold text-sm transition-all shadow-lg
                 ${isAnalyzing
-                ? 'bg-purple-500/10 text-purple-300 cursor-wait'
-                : 'bg-purple-600 hover:bg-purple-500 text-white hover:shadow-purple-500/40'}`}
+                ? 'bg-purple-500/10 text-purple-300 border-purple-500/30 cursor-wait'
+                : showAIOverview
+                  ? 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                  : 'bg-purple-600 hover:bg-purple-500 text-white border-purple-500 shadow-purple-900/20 hover:shadow-purple-500/40'}`}
           >
             {isAnalyzing ? (
               <>
@@ -179,13 +193,70 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
-                AI Overview
+                <Sparkles className={`w-4 h-4 ${showAIOverview ? 'text-purple-400' : ''}`} />
+                {showAIOverview ? 'Đóng AI Overview' : 'AI Overview'}
+                {showAIOverview ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </>
             )}
           </button>
         )}
       </div>
+
+      {/* AI Overview INLINE Display */}
+      {showAIOverview && aiOverview && (
+        <div className="animate-fade-in-down mb-6">
+          <GlassCard className="relative overflow-hidden !border-purple-500/30 !bg-[#0f172a]/80">
+            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+              <Sparkles className="w-32 h-32 text-purple-500" />
+            </div>
+
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">AI Phân Tích</h3>
+                  <p className="text-xs text-purple-300">Dựa trên dữ liệu tập luyện của bạn</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                  <p className="text-gray-200 text-sm leading-relaxed">{aiOverview.summary}</p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
+                    <h4 className="text-sm font-bold text-emerald-400 mb-2 flex items-center gap-2"><Award className="w-3 h-3" /> Điểm mạnh</h4>
+                    <ul className="space-y-1">
+                      {aiOverview.strengths.slice(0, 3).map((s, i) => (
+                        <li key={i} className="text-xs text-gray-300 flex items-start gap-2"><span className="text-emerald-500">•</span> {s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-orange-500/5 rounded-xl p-4 border border-orange-500/10">
+                    <h4 className="text-sm font-bold text-orange-400 mb-2 flex items-center gap-2"><Target className="w-3 h-3" /> Cải thiện</h4>
+                    <ul className="space-y-1">
+                      {aiOverview.improvements.slice(0, 3).map((s, i) => (
+                        <li key={i} className="text-xs text-gray-300 flex items-start gap-2"><span className="text-orange-500">•</span> {s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-blue-500/5 rounded-xl p-3 border border-blue-500/10 flex gap-3 items-center">
+                  <Flame className="w-8 h-8 text-blue-400 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-bold text-blue-300 uppercase mb-1">Lời khuyên</h4>
+                    <p className="text-xs text-gray-300 italic">"{aiOverview.recommendation}"</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      )}
 
       <section>
         <HabitTracker history={history} />
@@ -409,87 +480,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                 className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:scale-[1.02]"
               >
                 Xóa ngay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Overview Modal */}
-      {showAIModal && aiOverview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="bg-[#0f172a] border border-purple-500/30 rounded-3xl p-6 max-w-2xl w-full shadow-2xl overflow-y-auto max-h-[90vh] relative">
-            <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-purple-500/20 rounded-xl">
-                <Sparkles className="w-6 h-6 text-purple-400" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold text-white">AI Phân Tích & Đánh Giá</h3>
-                <p className="text-sm text-purple-300">Dựa trên dữ liệu tập luyện 7 ngày qua</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {/* Summary */}
-              <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-cyan-400" /> Tổng quan
-                </h4>
-                <p className="text-gray-300 leading-relaxed">{aiOverview.summary}</p>
-              </div>
-
-              {/* Strengths & Improvements */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-emerald-500/5 rounded-2xl p-5 border border-emerald-500/20">
-                  <h4 className="text-base font-bold text-emerald-400 mb-3 flex items-center gap-2">
-                    <Award className="w-4 h-4" /> Điểm mạnh
-                  </h4>
-                  <ul className="space-y-2">
-                    {aiOverview.strengths.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                        <span className="text-emerald-500 mt-1">•</span> {s}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-orange-500/5 rounded-2xl p-5 border border-orange-500/20">
-                  <h4 className="text-base font-bold text-orange-400 mb-3 flex items-center gap-2">
-                    <Target className="w-4 h-4" /> Cần cải thiện
-                  </h4>
-                  <ul className="space-y-2">
-                    {aiOverview.improvements.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                        <span className="text-orange-500 mt-1">•</span> {s}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Recommendation */}
-              <div className="bg-blue-500/5 rounded-2xl p-5 border border-blue-500/20">
-                <h4 className="text-base font-bold text-blue-400 mb-2 flex items-center gap-2">
-                  <Flame className="w-4 h-4" /> Lời khuyên cho tuần tới
-                </h4>
-                <p className="text-gray-300 italic">"{aiOverview.recommendation}"</p>
-              </div>
-
-              {/* Quote */}
-              <div className="text-center pt-4 border-t border-white/5">
-                <p className="text-gray-400 italic text-sm font-serif">
-                  {aiOverview.motivationalQuote}
-                </p>
-              </div>
-
-              <button
-                onClick={() => setShowAIModal(false)}
-                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all mt-2"
-              >
-                Đã hiểu
               </button>
             </div>
           </div>
