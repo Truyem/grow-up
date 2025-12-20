@@ -30,8 +30,8 @@ const MUSCLE_COLORS: Record<string, string> = {
 };
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDelete, userData }) => {
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
+  const [deleteTimeout, setDeleteTimeout] = useState<NodeJS.Timeout | null>(null);
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAIOverview, setShowAIOverview] = useState(false); // Inline toggle
@@ -124,15 +124,23 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
   };
 
   const handleDeleteRequest = (timestamp: number) => {
-    setItemToDelete(timestamp);
-    setShowDeleteModal(true);
-  };
+    if (confirmingDeleteId === timestamp) {
+      // Second click - confirm delete
+      if (deleteTimeout) clearTimeout(deleteTimeout);
+      onDelete(timestamp);
+      setConfirmingDeleteId(null);
+      setDeleteTimeout(null);
+    } else {
+      // First click - start confirmation
+      if (deleteTimeout) clearTimeout(deleteTimeout);
+      setConfirmingDeleteId(timestamp);
 
-  const confirmDelete = () => {
-    if (itemToDelete) {
-      onDelete(itemToDelete);
-      setShowDeleteModal(false);
-      setItemToDelete(null);
+      const timeout = setTimeout(() => {
+        setConfirmingDeleteId(null);
+        setDeleteTimeout(null);
+      }, 3000); // 3 second window
+
+      setDeleteTimeout(timeout);
     }
   };
 
@@ -380,11 +388,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
                   </div>
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteRequest(item.timestamp); }}
-                    className="relative flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold text-red-400 bg-red-500/5 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 transition-all duration-200 w-24 group/btn"
-                    title="Xóa lịch sử ngày này"
+                    className={`relative flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 w-24 group/btn ${confirmingDeleteId === item.timestamp
+                      ? 'bg-red-600 text-white border-red-400 shadow-lg shadow-red-600/40 scale-105'
+                      : 'text-red-400 bg-red-500/5 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300'
+                      }`}
+                    title={confirmingDeleteId === item.timestamp ? "Nhấn lần nữa để xóa" : "Xóa lịch sử ngày này"}
                     type="button"
                   >
-                    <Trash2 className="w-3 h-3 group-hover/btn:scale-110 transition-transform" /> Xóa
+                    <Trash2 className={`w-3 h-3 transition-transform ${confirmingDeleteId === item.timestamp ? 'animate-pulse' : 'group-hover/btn:scale-110'}`} />
+                    {confirmingDeleteId === item.timestamp ? "Xác nhận?" : "Xóa"}
                   </button>
                 </div>
 
@@ -455,36 +467,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onDel
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[#1e293b] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-100">
-            <div className="flex items-center gap-3 text-red-400 mb-4">
-              <div className="p-3 bg-red-500/10 rounded-full">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Xác nhận xóa</h3>
-            </div>
-            <p className="text-gray-300 mb-6 leading-relaxed">
-              Bạn có chắc chắn muốn xóa lịch sử tập luyện của ngày này không? Hành động này không thể hoàn tác.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-400 bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:scale-[1.02]"
-              >
-                Xóa ngay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
