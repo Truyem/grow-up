@@ -24,6 +24,7 @@ import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
 import { Sparkles, History, Dumbbell } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
+import { OnlineCounter } from './components/ui/OnlineCounter';
 
 // Default equipment list
 const DEFAULT_EQUIPMENT = [
@@ -484,15 +485,16 @@ export default function App() {
               Lịch trình tập luyện thông minh & Sáng tạo.
             </p>
 
-            {/* API Status Badge - Global */}
-            {apiStatus.totalKeys > 0 && (
-              <div className="flex justify-center pt-4">
+            {/* API Status Badge & Online Counter - Global */}
+            <div className="flex flex-col items-center gap-3 pt-4">
+              {apiStatus.totalKeys > 0 && (
                 <ApiStatusBadge
                   status={apiStatus}
                   onKeyChange={() => setApiStatus(getApiStatus())}
                 />
-              </div>
-            )}
+              )}
+              <OnlineCounter />
+            </div>
           </div>
         )}
 
