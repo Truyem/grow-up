@@ -11,8 +11,8 @@ console.error = (...args: any[]) => {
   originalConsoleError(...args);
 };
 
-import wallpaper from './wallpaper.jpg';
-import wallpaperMb from './wallpaper-mb.jpg';
+import wallpaper from './wallpaper.webp';
+import wallpaperMb from './wallpaper-mb.webp';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
@@ -446,22 +446,9 @@ export default function App() {
 
 
 
-      {/* Background Image */}
-      <div className="fixed inset-0 z-0">
-        {/* PC Wallpaper */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
-          style={{
-            backgroundImage: `url(${wallpaper})`
-          }}
-        />
-        {/* Mobile Wallpaper */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
-          style={{
-            backgroundImage: `url(${wallpaperMb})`
-          }}
-        />
+      {/* Optimized Background Layer */}
+      <div className="fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 bg-main-wallpaper bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105" />
         {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
