@@ -476,6 +476,17 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
                 estimatedPrice: { type: Type.NUMBER }
               }
             }
+          },
+          consumedIngredients: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                quantity: { type: Type.NUMBER },
+                unit: { type: Type.STRING }
+              }
+            }
           }
         }
       }
@@ -490,7 +501,8 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     - **CALCULATED TARGET**: ${Math.round(target)} kcal.
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${goalText}.
-    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.join(', ')}.
+    - **GOAL**: ${goalText}.
+    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.map(i => typeof i === 'string' ? i : `${i.quantity}${i.unit || ''} ${i.name}`).join(', ')}.
     - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
     - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
     - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
@@ -502,6 +514,8 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     - Creatine: ${userData.useCreatine ? "YES" : "NO"}.
 
     Generate JSON response with 'nutrition' field.
+    IMPORTANT: In 'consumedIngredients', list EXACTLY which ingredients from the user's available list were used and the quantity.
+    Example: If user has "10 eggs" and you use 2, return [{"name": "Trứng", "quantity": 2, "unit": "quả"}].
   `;
 
   const response = await ai.models.generateContent({
