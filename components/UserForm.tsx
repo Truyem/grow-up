@@ -490,23 +490,12 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
               placeholder="VD: 500g Ức gà, 10 quả trứng..."
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
-            {newIngredient.length > 5 ? (
-              <button
-                onClick={handleAIFridgeScan}
-                disabled={isScanningFridge}
-                className="p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 rounded-xl border border-purple-500/30 hover:bg-purple-500/30 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-                title="Thêm nhanh bằng AI (Tách món, phân loại)"
-              >
-                {isScanningFridge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                <span className="hidden sm:inline font-bold text-xs">AI Scan</span>
-              </button>
-            ) : null}
             <button
-              onClick={handleAddIngredient}
+              onClick={handleAIFridgeScan}
               disabled={isScanningFridge}
               className="p-3 bg-cyan-500/20 text-cyan-300 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/30 transition-all active:scale-95 cursor-pointer"
             >
-              <Plus className="w-5 h-5" />
+              {isScanningFridge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
             </button>
           </div>
 
