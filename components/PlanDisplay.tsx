@@ -223,10 +223,30 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [manualCostConfig, setManualCostConfig] = useState<string>(''); // User enters string "50.000"
 
 
-  const currentWorkout: WorkoutLevel = plan.workout.detail;
+  const currentWorkout: WorkoutLevel = plan?.workout?.detail;
+
+  if (!currentWorkout || !currentWorkout.morning || !currentWorkout.evening) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 animate-fade-in">
+        <div className="p-4 rounded-full bg-red-500/10 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+        </div>
+        <h3 className="text-xl font-bold text-red-400">Lỗi Dữ Liệu Lịch Tập</h3>
+        <p className="text-gray-400 text-center max-w-md">
+          Dữ liệu nhận được từ AI không đúng định dạng. Vui lòng nhấn nút "Thử lại" để tạo lại lịch tập mới.
+        </p>
+        <button
+          onClick={onReset}
+          className="px-6 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition-all font-bold"
+        >
+          Thử Lại
+        </button>
+      </div>
+    );
+  }
 
   // Combine all exercises to calculate progress
-  const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+  const allExercises = [...(currentWorkout.morning || []), ...(currentWorkout.evening || [])];
   const totalExercises = allExercises.length;
 
   // Calculate checked based on composite keys "mor-X" and "eve-X"
