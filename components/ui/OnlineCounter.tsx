@@ -41,15 +41,18 @@ export const OnlineCounter: React.FC = () => {
     };
 
     useEffect(() => {
-        // Initial heartbeat and fetch
-        sendHeartbeat();
-        fetchOnlineCount();
+        // Delay initial calls to avoid network contention during page load
+        const initialDelay = setTimeout(() => {
+            sendHeartbeat();
+            fetchOnlineCount();
+        }, 3000); // 3 second delay
 
         // Set up intervals
-        const heartbeatInterval = setInterval(sendHeartbeat, 30000); // Heartbeat every 30s
-        const fetchInterval = setInterval(fetchOnlineCount, 45000);   // Fetch every 45s
+        const heartbeatInterval = setInterval(sendHeartbeat, 30000);
+        const fetchInterval = setInterval(fetchOnlineCount, 45000);
 
         return () => {
+            clearTimeout(initialDelay);
             clearInterval(heartbeatInterval);
             clearInterval(fetchInterval);
         };
