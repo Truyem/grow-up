@@ -305,45 +305,6 @@ export default function App() {
     // Pass workout history to the service
     const generatedPlan = await generateDailyPlan(userData, workoutHistory);
 
-    // CONSUMED INGREDIENTS LOGIC
-    if (generatedPlan.nutrition.consumedIngredients && generatedPlan.nutrition.consumedIngredients.length > 0) {
-      const consumed = generatedPlan.nutrition.consumedIngredients;
-
-      setUserData(prev => {
-        let currentIngredients = [...(prev.availableIngredients || [])];
-        const normalize = (s: string) => s.toLowerCase().trim();
-
-        consumed.forEach(usedItem => {
-          // Find matching ingredient in user's list
-          const matchIndex = currentIngredients.findIndex(item => {
-            if (typeof item === 'string') return false;
-            // Allow loose matching on name (e.g. "Trứng" vs "Trứng gà")
-            return normalize(item.name).includes(normalize(usedItem.name)) ||
-              normalize(usedItem.name).includes(normalize(item.name));
-          });
-
-          if (matchIndex >= 0) {
-            const target = currentIngredients[matchIndex] as any;
-            const newQuantity = (target.quantity || 0) - (usedItem.quantity || 0);
-
-            if (newQuantity <= 0) {
-              // Remove if depleted
-              currentIngredients.splice(matchIndex, 1);
-            } else {
-              // Update quantity
-              currentIngredients[matchIndex] = { ...target, quantity: newQuantity };
-            }
-          }
-        });
-
-        // Show toast specific to consumption
-        const consumedNames = consumed.map(c => `${c.quantity}${c.unit} ${c.name}`).join(', ');
-        setToastMessage(`Đã trừ nguyên liệu: ${consumedNames}`);
-
-        return { ...prev, availableIngredients: currentIngredients };
-      });
-    }
-
     setPlan(generatedPlan);
     setViewMode('plan');
 

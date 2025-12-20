@@ -142,7 +142,6 @@ export interface DailyPlan {
     totalCost: number;
     meals: Meal[];
     advice: string;
-    consumedIngredients?: { name: string; quantity: number; unit: string }[];
   };
 }
 

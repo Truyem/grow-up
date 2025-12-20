@@ -103,39 +103,13 @@ export const UserForm: React.FC<UserFormProps> = ({ userData, setUserData, userS
     setIsScanningFridge(true);
     try {
       const parsedIngredients = await parseFridgeItems(newIngredient);
-
-      setUserData(prev => {
-        const currentIngredients = [...(prev.availableIngredients || [])];
-
-        parsedIngredients.forEach(newItem => {
-          // Normalize for comparison
-          const normalize = (s: string) => s.toLowerCase().trim();
-
-          const existingIndex = currentIngredients.findIndex(item => {
-            if (typeof item === 'string') return false; // Skip legacy strings
-            return normalize(item.name) === normalize(newItem.name) &&
-              normalize(item.unit) === normalize(newItem.unit);
-          });
-
-          if (existingIndex >= 0) {
-            // Merge with existing
-            const target = currentIngredients[existingIndex] as any; // Cast to any to access fields safely
-            currentIngredients[existingIndex] = {
-              ...target,
-              quantity: (target.quantity || 0) + (newItem.quantity || 0)
-            };
-          } else {
-            // Add new
-            currentIngredients.push(newItem as any);
-          }
-        });
-
-        return {
-          ...prev,
-          availableIngredients: currentIngredients
-        };
-      });
-
+      setUserData(prev => ({
+        ...prev,
+        availableIngredients: [
+          ...(prev.availableIngredients || []),
+          ...parsedIngredients
+        ]
+      }));
       setNewIngredient('');
     } catch (error) {
       console.error("AI Scan Failed", error);

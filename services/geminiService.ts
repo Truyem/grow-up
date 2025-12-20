@@ -5,8 +5,8 @@ import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, Fati
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
 
 const MODELS = {
-  WORKOUT: "gemini-2.0-flash", // Upgraded to stable fast model
-  FOOD_SCAN: "gemini-2.0-flash", // Upgraded
+  WORKOUT: "gemini-3-flash-preview",
+  FOOD_SCAN: "gemma-3-27b-it",
   OVERVIEW: "gemini-2.5-flash",
   MENU: "gemini-2.5-flash",
 };
@@ -16,9 +16,6 @@ let currentKeyIndex = 0;
 
 // Track rate-limited API keys (index -> timestamp when it was rate limited)
 const rateLimitedKeys: Map<number, number> = new Map();
-
-// Timeout configuration
-const API_TIMEOUT_MS = 25000; // 25 seconds timeout
 
 // API Status type for external consumption
 export interface ApiStatus {
@@ -64,7 +61,7 @@ const markRateLimitedAndRotate = (): string | null => {
 
   // Mark current key as rate limited
   rateLimitedKeys.set(currentKeyIndex, Date.now());
-  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited/timed out`);
+  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited`);
 
   // Find next available key that's not rate limited
   let attempts = 0;
@@ -90,7 +87,7 @@ const markRateLimitedAndRotate = (): string | null => {
   return null;
 };
 
-// Check if error is rate limit related OR timeout
+// Check if error is rate limit related
 const isRateLimitError = (error: unknown): boolean => {
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
@@ -100,30 +97,9 @@ const isRateLimitError = (error: unknown): boolean => {
       message.includes('resource exhausted') ||
       message.includes('too many requests') ||
       message.includes('503') ||
-      message.includes('500') ||
-      message.includes('timeout') ||
-      message.includes('aborted');
+      message.includes('500');
   }
   return false;
-};
-
-// Timeout Wrapper Helper
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> => {
-  let timeoutHandle: NodeJS.Timeout;
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      reject(new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutHandle!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutHandle!);
-    throw error;
-  }
 };
 
 // Helper to get current formatted date
@@ -451,16 +427,11 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     Generate JSON response with 'date', 'schedule', and 'workout' fields.
   `;
 
-  // Wrapped in timeout
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: { responseMimeType: "application/json", responseSchema: schema },
-    }),
-    API_TIMEOUT_MS,
-    "GenerateWorkout"
-  );
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema },
+  });
 
   const jsonText = response.text;
   if (!jsonText) throw new Error("Empty workout response");
@@ -505,17 +476,6 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
                 estimatedPrice: { type: Type.NUMBER }
               }
             }
-          },
-          consumedIngredients: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                quantity: { type: Type.NUMBER },
-                unit: { type: Type.STRING }
-              }
-            }
           }
         }
       }
@@ -530,8 +490,7 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     - **CALCULATED TARGET**: ${Math.round(target)} kcal.
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${goalText}.
-    - **GOAL**: ${goalText}.
-    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.map(i => typeof i === 'string' ? i : `${i.quantity}${i.unit || ''} ${i.name}`).join(', ')}.
+    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.join(', ')}.
     - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
     - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
     - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
@@ -543,20 +502,13 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     - Creatine: ${userData.useCreatine ? "YES" : "NO"}.
 
     Generate JSON response with 'nutrition' field.
-    IMPORTANT: In 'consumedIngredients', list EXACTLY which ingredients from the user's available list were used and the quantity.
-    Example: If user has "10 eggs" and you use 2, return [{"name": "Trứng", "quantity": 2, "unit": "quả"}].
   `;
 
-  // Wrapped in timeout
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: { responseMimeType: "application/json", responseSchema: schema },
-    }),
-    API_TIMEOUT_MS,
-    "GenerateNutrition"
-  );
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema },
+  });
 
   const jsonText = response.text;
   if (!jsonText) throw new Error("Empty nutrition response");
@@ -718,18 +670,14 @@ OUTPUT: JSON format.
 
   while (retriesLeft > 0) {
     try {
-      const response = await withTimeout(
-        ai.models.generateContent({
-          model: model,
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: schema,
-          },
-        }),
-        API_TIMEOUT_MS,
-        "GenerateAIOverview"
-      );
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      });
 
       const jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
@@ -797,15 +745,11 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
 
   while (retriesLeft > 0) {
     try {
-      const response = await withTimeout(
-        ai.models.generateContent({
-          model: model,
-          contents: prompt,
-          // Config removed to avoid "JSON mode not enabled" error
-        }),
-        API_TIMEOUT_MS,
-        "ParseFridgeItems"
-      );
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        // Config removed to avoid "JSON mode not enabled" error
+      });
 
       let jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
