@@ -5,8 +5,8 @@ import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, Fati
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
 
 const MODELS = {
-  WORKOUT: "gemini-3-flash-preview",
-  FOOD_SCAN: "gemma-3-27b-it",
+  WORKOUT: "gemini-2.0-flash", // Upgraded to stable fast model
+  FOOD_SCAN: "gemini-2.0-flash", // Upgraded
   OVERVIEW: "gemini-2.5-flash",
   MENU: "gemini-2.5-flash",
 };
@@ -16,6 +16,9 @@ let currentKeyIndex = 0;
 
 // Track rate-limited API keys (index -> timestamp when it was rate limited)
 const rateLimitedKeys: Map<number, number> = new Map();
+
+// Timeout configuration
+const API_TIMEOUT_MS = 25000; // 25 seconds timeout
 
 // API Status type for external consumption
 export interface ApiStatus {
@@ -61,7 +64,7 @@ const markRateLimitedAndRotate = (): string | null => {
 
   // Mark current key as rate limited
   rateLimitedKeys.set(currentKeyIndex, Date.now());
-  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited`);
+  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited/timed out`);
 
   // Find next available key that's not rate limited
   let attempts = 0;
@@ -87,7 +90,7 @@ const markRateLimitedAndRotate = (): string | null => {
   return null;
 };
 
-// Check if error is rate limit related
+// Check if error is rate limit related OR timeout
 const isRateLimitError = (error: unknown): boolean => {
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
@@ -97,9 +100,30 @@ const isRateLimitError = (error: unknown): boolean => {
       message.includes('resource exhausted') ||
       message.includes('too many requests') ||
       message.includes('503') ||
-      message.includes('500');
+      message.includes('500') ||
+      message.includes('timeout') ||
+      message.includes('aborted');
   }
   return false;
+};
+
+// Timeout Wrapper Helper
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> => {
+  let timeoutHandle: NodeJS.Timeout;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutHandle!);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutHandle!);
+    throw error;
+  }
 };
 
 // Helper to get current formatted date
@@ -427,11 +451,16 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     Generate JSON response with 'date', 'schedule', and 'workout' fields.
   `;
 
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: schema },
-  });
+  // Wrapped in timeout
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: { responseMimeType: "application/json", responseSchema: schema },
+    }),
+    API_TIMEOUT_MS,
+    "GenerateWorkout"
+  );
 
   const jsonText = response.text;
   if (!jsonText) throw new Error("Empty workout response");
@@ -518,11 +547,16 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     Example: If user has "10 eggs" and you use 2, return [{"name": "Trứng", "quantity": 2, "unit": "quả"}].
   `;
 
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: schema },
-  });
+  // Wrapped in timeout
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: { responseMimeType: "application/json", responseSchema: schema },
+    }),
+    API_TIMEOUT_MS,
+    "GenerateNutrition"
+  );
 
   const jsonText = response.text;
   if (!jsonText) throw new Error("Empty nutrition response");
@@ -684,14 +718,18 @@ OUTPUT: JSON format.
 
   while (retriesLeft > 0) {
     try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
-      });
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: model,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+          },
+        }),
+        API_TIMEOUT_MS,
+        "GenerateAIOverview"
+      );
 
       const jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
@@ -759,11 +797,15 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
 
   while (retriesLeft > 0) {
     try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        // Config removed to avoid "JSON mode not enabled" error
-      });
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: model,
+          contents: prompt,
+          // Config removed to avoid "JSON mode not enabled" error
+        }),
+        API_TIMEOUT_MS,
+        "ParseFridgeItems"
+      );
 
       let jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
