@@ -1,6 +1,16 @@
 
 
 import React, { useState, useEffect } from 'react';
+
+// Suppress Recharts defaultProps warning
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  if (typeof args[0] === 'string' && /defaultProps will be removed from function components/.test(args[0])) {
+    return;
+  }
+  originalConsoleError(...args);
+};
+
 import wallpaper from './wallpaper.jpg';
 import wallpaperMb from './wallpaper-mb.jpg';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense } from './types';
@@ -13,6 +23,7 @@ import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
 import { Sparkles, History, Dumbbell } from 'lucide-react';
+import { LoadingAnimation } from './components/ui/LoadingAnimation';
 
 // Default equipment list
 const DEFAULT_EQUIPMENT = [
@@ -428,6 +439,9 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
+
+      {/* Loading Animation Overlay */}
+      {loading && <LoadingAnimation />}
 
 
 

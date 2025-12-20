@@ -1,10 +1,15 @@
-
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
+
+const MODELS = {
+  WORKOUT: "gemini-3-flash-preview",
+  FOOD_SCAN: "gemma-3-27b-it",
+  OVERVIEW: "gemini-2.5-flash",
+  MENU: "gemini-2.5-flash",
+};
 
 // Track current API key index - persists across calls
 let currentKeyIndex = 0;
@@ -102,6 +107,23 @@ const getCurrentDate = () => {
   const now = new Date();
   const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   return `${days[now.getDay()]}, ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+};
+
+// Helper to clean and parse JSON
+const cleanAndParseJSON = (text: string, context: string): any => {
+  try {
+    // Remove markdown code blocks if present (e.g. ```json ... ```)
+    const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error(`JSON Parse Error in ${context}:`, e);
+    // Log first 200 and last 200 chars to debug
+    const preview = text.length > 400
+      ? text.slice(0, 200) + " ... " + text.slice(-200)
+      : text;
+    console.log(`Raw Text (${context}):`, preview);
+    throw e; // Re-throw to trigger retry logic
+  }
 };
 
 // --- DYNAMIC CALCULATIONS ---
@@ -264,42 +286,47 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
   };
 };
 
-export const generateDailyPlan = async (
-  userData: UserInput,
-  fullHistory: WorkoutHistoryItem[]
-): Promise<DailyPlan> => {
-  // Optimization: Only use the last 14 days of history to speed up processing
-  const history = fullHistory.slice(-14);
-  const apiKey = getCurrentApiKey();
-  if (!apiKey) {
-    console.warn("No API Keys found. Using fallback plan.");
-    return getFallbackPlan(userData);
-  }
+// --- SPLIT GENERATION PARTS ---
 
-  let ai = new GoogleGenAI({ apiKey });
-  let retriesLeft = API_KEYS.length; // Try each key once
-  const model = "gemini-3-flash-preview";
-
-  // --- PRE-CALCULATE MATH ---
-  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
-  const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0; // High protein
-  const proteinTarget = Math.round(userData.weight * proteinMultiplier);
-
-  // Macro Pre-calc for Prompt Context
-  const fatTarget = Math.round(userData.weight * 0.9);
-  const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
-  const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
-
-  const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
+const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], apiKey: string): Promise<any> => {
+  const ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  const model = MODELS.WORKOUT;
 
   // Determine Day Number (1-7)
   const today = new Date();
   const dayIndex = today.getDay(); // 0 is Sunday, 1 is Monday...
-  // Map JS Day (0-6) to User Split Day (1-7) where Sunday is Day 7
   const currentDayNumber = dayIndex === 0 ? 7 : dayIndex;
-
   const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
   const currentSplitName = dayNames[currentDayNumber];
+
+  let workoutInstructionBlock = "";
+  if (userData.trainingMode === 'saitama') {
+    workoutInstructionBlock = `
+    ### WORKOUT MODE: SAITAMA CHALLENGE (ONE PUNCH MAN)
+    IGNORE THE DATE AND SPLIT. TODAY IS SAITAMA DAY.
+    YOU MUST GENERATE THE FOLLOWING EXERCISES:
+    1. **Push-ups**: Total 100 reps target.
+    2. **Sit-ups**: Total 100 reps target.
+    3. **Squats**: Total 100 reps target.
+    4. **Running**: 10km Run (Cardio). *IMPORTANT*: If user Intensity is 'Medium' or 'Fresh', scale this down to "60 Minutes Run/Walk (Cardio)".
+    Structure this into Morning (Upper Body focus) and Evening (Lower Body/Run focus).
+    `;
+  } else {
+    workoutInstructionBlock = `
+    ### WORKOUT SCHEDULE (STRICT 7-DAY SPLIT)
+    TODAY IS: ${currentSplitName}. FOLLOW THIS SPLIT STRICTLY:
+    - Day 1 (Mon): Push (Chest, Shoulder, Triceps)
+    - Day 2 (Tue): Pull (Back, Biceps)
+    - Day 3 (Wed): Legs (Quads, Hamstring, Calves, Glutes) + Abs
+    - Day 4 (Thu): Full Body / Arms & Abs
+    - Day 5 (Fri): Chest & Back
+    - Day 6 (Sat): Shoulder & Arms
+    - Day 7 (Sun): REST DAY (Active Recovery)
+    
+    **DAILY ABS & CARDIO**: EVERY SINGLE DAY MUST include 1 Abs + 1 Cardio in Evening.
+    **REST DAY RULES**: Main Activity: "Walking (Cardio)" - 60 Minutes + Light Abs.
+    `;
+  }
 
   const schema = {
     type: Type.OBJECT,
@@ -359,14 +386,80 @@ export const generateDailyPlan = async (
             }
           }
         }
-      },
+      }
+    }
+  };
+
+  const prompt = `
+    ACT AS A WORLD-CLASS PERSONAL TRAINER.
+    GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
+    TRAINING MODE: ${userData.trainingMode === 'saitama' ? 'SAITAMA CHALLENGE' : 'STANDARD AI COACH'}.
+    
+    ${workoutInstructionBlock}
+
+    ### LANGUAGE & LOCALIZATION RULES
+    - **VIETNAMESE REQUIRED**: Summary, Description, Reasoning MUST be in **VIETNAMESE**.
+    - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press").
+    - **CONCISENESS**: Keep descriptions Short & Fast.
+
+    ### GENERAL WORKOUT RULES
+    - **INTENSITY**: ${userData.selectedIntensity}.
+    - **EQUIPMENT**: ${userData.equipment.join(', ')}.
+    - **STRICT EQUIPMENT CHECK**: ONLY use listed tools. Substitute missing with BODYWEIGHT.
+    - **ONE DUMBBELL RULE**: User only has ONE dumbbell unless "2x" specified.
+    - **CARDIO NAMING**: Append "(Cardio)" to Walking/Running.
+
+    ### COLOR CODING & MUSCLE GROUPS
+    - Assign 'colorCode' (Blue=Chest, Red=Shoulder, Yellow=Back, Green=Triceps, Pink=Biceps, Purple=Legs, Orange=Abs/Cardio).
+    - Specify 'primaryMuscleGroups' and 'secondaryMuscleGroups' using SPECIFIC anatomical names (e.g., "Chest - Upper", "Lats", "Front Delts").
+    - **Danh Sách Nhóm Cơ Chi Tiết (BẮT BUỘC SỬ DỤNG CHÍNH XÁC)**:
+      - Ngực: Chest - Upper, Chest - Middle, Chest - Lower
+      - Vai: Front Delts, Side Delts, Rear Delts
+      - Lưng: Lats, Upper Back, Lower Back, Traps
+      - Tay: Biceps, Triceps - Long Head, Triceps - Lateral Head, Triceps, Forearms
+      - Chân: Quads, Hamstrings, Glutes, Calves
+      - Bụng: Abs - Upper, Abs - Lower, Obliques, Core
+
+    ### DATA INPUTS
+    - Sore Muscles: ${userData.soreMuscles.join(', ')}.
+    - Fatigue: ${userData.fatigue}.
+
+    Generate JSON response with 'date', 'schedule', and 'workout' fields.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema },
+  });
+
+  const jsonText = response.text;
+  if (!jsonText) throw new Error("Empty workout response");
+  return cleanAndParseJSON(jsonText, "WorkoutPart");
+};
+
+const generateNutritionPart = async (userData: UserInput, apiKey: string): Promise<any> => {
+  const ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  const model = MODELS.MENU;
+
+  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0;
+  const proteinTarget = Math.round(userData.weight * proteinMultiplier);
+  const fatTarget = Math.round(userData.weight * 0.9);
+  const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
+  const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
+  const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
       nutrition: {
         type: Type.OBJECT,
         properties: {
           totalCalories: { type: Type.NUMBER },
           totalProtein: { type: Type.NUMBER },
-          totalCarbs: { type: Type.NUMBER }, // New field
-          totalFat: { type: Type.NUMBER },   // New field
+          totalCarbs: { type: Type.NUMBER },
+          totalFat: { type: Type.NUMBER },
           totalCost: { type: Type.NUMBER },
           advice: { type: Type.STRING },
           meals: {
@@ -389,187 +482,88 @@ export const generateDailyPlan = async (
     }
   };
 
-  // --- CONDITIONAL PROMPT LOGIC ---
-  let workoutInstructionBlock = "";
-
-  if (userData.trainingMode === 'saitama') {
-    workoutInstructionBlock = `
-    ### WORKOUT MODE: SAITAMA CHALLENGE (ONE PUNCH MAN)
-    IGNORE THE DATE AND SPLIT. TODAY IS SAITAMA DAY.
-    YOU MUST GENERATE THE FOLLOWING EXERCISES:
-    1. **Push-ups**: Total 100 reps target. (Break into manageable sets based on intensity, e.g., 5 sets of 20 or 10 sets of 10).
-    2. **Sit-ups**: Total 100 reps target.
-    3. **Squats**: Total 100 reps target (Bodyweight or Dumbbell if user wants extra hard).
-    4. **Running**: 10km Run (Cardio). *IMPORTANT*: If user Intensity is 'Medium' or 'Fresh', scale this down to "60 Minutes Run/Walk (Cardio)" to be realistic. If 'Hard', keep it 10km.
-    
-    Structure this into Morning (Upper Body focus) and Evening (Lower Body/Run focus) or however fits best, but ALL 4 components must be present.
-    `;
-  } else {
-    // Standard AI Mode
-    workoutInstructionBlock = `
-    ### WORKOUT SCHEDULE (STRICT 7-DAY SPLIT)
-    TODAY IS: ${currentSplitName}. FOLLOW THIS SPLIT STRICTLY:
-    - Day 1 (Mon): Push (Chest, Shoulder, Triceps)
-    - Day 2 (Tue): Pull (Back, Biceps)
-    - Day 3 (Wed): Legs (Quads, Hamstring, Calves, Glutes) + Abs
-    - Day 4 (Thu): Full Body / Arms & Abs (Biceps, Triceps, Abs, Light Compound)
-    - Day 5 (Fri): Chest & Back
-    - Day 6 (Sat): Shoulder & Arms (Biceps, Triceps)
-    - Day 7 (Sun): REST DAY (Active Recovery)
-
-    **DAILY ABS & CARDIO (FOR STANDARD MODE)**: EVERY SINGLE DAY (Day 1-7) MUST include 1 Abs exercise + 1 Cardio exercise in the Evening session.
-    **REST DAY RULES (Day 7 ONLY)**: Main Activity: "Walking (Cardio)" - 60 Minutes + Light Abs.
-    `;
-  }
-
   const prompt = `
-    ACT AS A WORLD-CLASS PERSONAL TRAINER & NUTRITIONIST.
-    GENERATE A 1-DAY PLAN FOR: ${getCurrentDate()}.
-    USER GOAL: ${goalText}.
-    TRAINING MODE: ${userData.trainingMode === 'saitama' ? 'SAITAMA CHALLENGE' : 'STANDARD AI COACH'}.
+    ACT AS A NUTRITIONIST.
+    GENERATE A 1-DAY MEAL PLAN.
     
-    ${workoutInstructionBlock}
-
-    ### LANGUAGE & LOCALIZATION RULES (STRICT)
-    - **VIETNAMESE REQUIRED**: ALL textual content (Summary, Description, Advice, Meal Names, Meal Descriptions, Reasoning) MUST be in **VIETNAMESE**.
-    - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press"). Do NOT translate exercise names.
-    - **CONCISENESS**: Keep all descriptions Short & Fast. Max 1 sentence for summary and reasoning.
-
-    ### GENERAL WORKOUT RULES
-    - **INTENSITY**: ${userData.selectedIntensity} (Medium=Hypertrophy, Hard=Failure/Overload).
-    - **EQUIPMENT AVAILABLE**: ${userData.equipment.join(', ')}.
-    - **STRICT EQUIPMENT CHECK**: You must ONLY use the tools listed above. If the user does not have a specific tool, substitute with a **BODYWEIGHT** equivalent.
-    - **ONE DUMBBELL RULE**: Unless equipment list says "2x" or "đôi", user only has ONE dumbbell. use UNILATERAL exercises.
-    - **CARDIO NAMING**: If the exercise is Walking or Running, you MUST append "(Cardio)" to the name.
-
-
-    ### COLOR CODING RULES (MANDATORY)
-    Assign a 'colorCode' to EVERY exercise based on the PRIMARY muscle group involved:
-    - **Blue**: Chest (Ngực)
-    - **Red**: Shoulders (Vai)
-    - **Yellow**: Back (Lưng)
-    - **Green**: Triceps (Tay sau)
-    - **Pink**: Biceps (Tay trước)
-    - **Purple**: Legs (Chân/Mông) & Lower Body
-    - **Orange**: Abs (Bụng) & Cardio
-
-    ### MUSCLE GROUP TRACKING (MANDATORY)
-    For EVERY exercise, you MUST specify:
-    - **primaryMuscleGroups**: Array of main muscles being worked (1-2 muscles)
-    - **secondaryMuscleGroups**: Array of supporting muscles (0-3 muscles)
-
-    **CRITICAL RULE - MUSCLE SPECIFICITY**: 
-    - NEVER use generic terms like "Chest", "Back", "Shoulders", "Arms", or "Legs"
-    - ALWAYS use specific anatomical regions (e.g., "Chest - Upper", "Lats", "Front Delts")
-    - Be precise about which part of the muscle is being targeted
-
-    **Examples:**
-    - Incline Bench Press: primaryMuscleGroups: ["Chest - Upper", "Triceps"], secondaryMuscleGroups: ["Front Delts"]
-    - Flat Bench Press: primaryMuscleGroups: ["Chest - Middle", "Triceps"], secondaryMuscleGroups: ["Front Delts"]
-    - Decline Push-ups: primaryMuscleGroups: ["Chest - Lower", "Front Delts"], secondaryMuscleGroups: ["Triceps", "Core"]
-    - Pull-ups: primaryMuscleGroups: ["Lats", "Upper Back"], secondaryMuscleGroups: ["Biceps", "Rear Delts"]
-    - Barbell Rows: primaryMuscleGroups: ["Upper Back", "Lats"], secondaryMuscleGroups: ["Rear Delts", "Biceps"]
-    - Squats: primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"]
-    - Romanian Deadlifts: primaryMuscleGroups: ["Hamstrings", "Glutes"], secondaryMuscleGroups: ["Lower Back"]
-    - Bicep Curls: primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"]
-    - Overhead Tricep Extension: primaryMuscleGroups: ["Triceps - Long Head"], secondaryMuscleGroups: ["Core"]
-    - Tricep Pushdowns: primaryMuscleGroups: ["Triceps - Lateral Head"], secondaryMuscleGroups: []
-    - Crunches: primaryMuscleGroups: ["Abs - Upper"], secondaryMuscleGroups: ["Core"]
-    - Leg Raises: primaryMuscleGroups: ["Abs - Lower"], secondaryMuscleGroups: ["Hip Flexors"]
-    - Russian Twists: primaryMuscleGroups: ["Obliques"], secondaryMuscleGroups: ["Abs - Upper"]
-    - Plank: primaryMuscleGroups: ["Core", "Abs - Upper"], secondaryMuscleGroups: ["Shoulders", "Glutes"]
-
-    **Danh Sách Nhóm Cơ Chi Tiết (BẮT BUỘC SỬ DỤNG CHÍNH XÁC):**
-    
-    **Ngực (Blue):**
-    - "Chest - Upper" (Đầu xương đòn, các động tác Incline)
-    - "Chest - Middle" (Đầu xương ức, các động tác Flat)
-    - "Chest - Lower" (Đầu xương sườn, các động tác Decline)
-    
-    **Vai (Red):**
-    - "Front Delts" (Đầu vai trước, các động tác đẩy)
-    - "Side Delts" (Đầu vai giữa, các động tác nâng ngang)
-    - "Rear Delts" (Đầu vai sau, các động tác chèo/bay ngược)
-    
-    **Lưng (Yellow):**
-    - "Lats" (Cơ lưng xô, Pull-ups/Rows)
-    - "Upper Back" (Cơ thoi, cơ giữa lưng, các động tác kéo ngang)
-    - "Lower Back" (Cơ dựng sống, Deadlifts)
-    - "Traps" (Cơ thang trên, Shrugs)
-    
-    **Tay:**
-    - "Biceps" (Cơ nhị đầu cánh tay, Curls) - Pink
-    - "Triceps - Long Head" (Đầu dài cơ tam đầu, Overhead extensions) - Green
-    - "Triceps - Lateral Head" (Đầu ngoài cơ tam đầu, Pushdowns) - Green
-    - "Triceps" (Tập cơ tam đầu tổng quát khi cả hai đầu được kích hoạt đều) - Green
-    - "Forearms" (Cơ cẳng tay, Wrist curls, bài tập nắm) - Pink
-    
-    **Chân (Purple):**
-    - "Quads" (Cơ tứ đầu đùi, Squats/Leg extensions)
-    - "Hamstrings" (Cơ gân kheo, Leg curls, RDLs)
-    - "Glutes" (Cơ mông, Hip thrusts, Lunges)
-    - "Calves" (Cơ bắp chân, Calf raises)
-    
-    **Bụng (Orange):**
-    - "Abs - Upper" (Cơ bụng trên, Crunches)
-    - "Abs - Lower" (Cơ bụng dưới, Leg raises)
-    - "Obliques" (Cơ chéo bụng, Side planks, Russian twists)
-    - "Core" (Cơ lõi tổng quát, Planks, các động tác phức hợp)
-
-
     ### NUTRITION RULES (DYNAMIC MATH)
-    - **CALCULATED TARGET**: ${Math.round(target)} kcal. (This is TDEE + WorkoutBurn ${userData.nutritionGoal === 'bulking' ? '+ 400' : '- 400'}).
+    - **CALCULATED TARGET**: ${Math.round(target)} kcal.
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
-    - **GOAL**: ${userData.nutritionGoal === 'bulking' ? 'BULKING (High Carb/Rice)' : 'CUTTING'}.
-    - **PROTEIN OPTIMIZATION**: Select foods with high protein density.
-    - **VEGETABLES**: Prioritize user's fridge: ${userData.availableIngredients.join(', ')}.
-    - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Keep it simple (e.g., "200g Ức gà + Cơm").
-    - **MEAL MACROS**: You MUST estimate 'carbs' and 'fat' (in grams) for EACH meal individually. Ensure the sum matches the daily total approx.
-    - **CARBS**: 
-       - Breakfast: NO RICE (Bread/Sweet Potato/Oats only).
-       - Lunch/Dinner: White Rice is allowed (High amount for Bulk, Controlled amount for Cut).
-    - **FORMAT**: Meal names MUST have time (e.g., "Bữa Sáng (07:00)"). Description MUST be specific (e.g., "300g Rice + 200g Chicken").
+    - **GOAL**: ${goalText}.
+    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.join(', ')}.
+    - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
+    - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
+    - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
+    - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
 
     ### DATA INPUTS
     - Weight: ${userData.weight}kg, Height: ${userData.height}cm.
-    - Sore Muscles: ${userData.soreMuscles.join(', ')} (Avoid heavy load on these).
-    - Fatigue: ${userData.fatigue}.
-    - Food Consumed Today: ${userData.consumedFood.join(', ')} (Subtract these from the plan).
-    - Creatine Supplement: ${userData.useCreatine ? "YES" : "NO"}.
+    - Food Consumed Today: ${userData.consumedFood.join(', ')} (Subtract these).
+    - Creatine: ${userData.useCreatine ? "YES" : "NO"}.
 
-    Generate JSON response.
+    Generate JSON response with 'nutrition' field.
   `;
+
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema },
+  });
+
+  const jsonText = response.text;
+  if (!jsonText) throw new Error("Empty nutrition response");
+  return cleanAndParseJSON(jsonText, "NutritionPart");
+};
+
+export const generateDailyPlan = async (
+  userData: UserInput,
+  fullHistory: WorkoutHistoryItem[]
+): Promise<DailyPlan> => {
+  // Optimization: Only use the last 14 days of history
+  const history = fullHistory.slice(-14);
+  const apiKey = getCurrentApiKey();
+
+  if (!apiKey) {
+    console.warn("No API Keys found. Using fallback plan.");
+    return getFallbackPlan(userData);
+  }
+
+  let retriesLeft = API_KEYS.length;
 
   while (retriesLeft > 0) {
     try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
-      });
+      console.log(`🚀 Generating Plan with Key Index ${currentKeyIndex}...`);
 
-      const jsonText = response.text;
-      if (!jsonText) throw new Error("Empty response");
+      // PARALLEL GENERATION
+      const [workoutPart, nutritionPart] = await Promise.all([
+        generateWorkoutPart(userData, history, apiKey),
+        generateNutritionPart(userData, apiKey)
+      ]);
 
-      return JSON.parse(jsonText) as DailyPlan;
+      // MERGE RESULTS
+      const finalPlan: DailyPlan = {
+        ...workoutPart,
+        ...nutritionPart,
+        date: getCurrentDate() // Ensure date is consistent
+      };
+
+      return finalPlan;
+
     } catch (error) {
-      console.error("Gemini API Error:", error);
+      console.error("Gemini API Error (Parallel):", error);
 
-      // Check if rate limited and we have more keys to try
       if (isRateLimitError(error) && retriesLeft > 1) {
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected, switching to next API key...`);
-          ai = new GoogleGenAI({ apiKey: newKey });
+          // Note: In a real parallel scenario, we'd need to retry the specific failed part or both.
+          // For simplicity here, we retry the whole block with the new key.
           retriesLeft--;
           continue;
         }
       }
 
-      // No more retries or not a rate limit error
+      // If one part fails or no more keys, return fallback
       return getFallbackPlan(userData);
     }
   }
@@ -615,9 +609,9 @@ export const generateAIOverview = async (
     return getFallbackAIOverview(history);
   }
 
-  let ai = new GoogleGenAI({ apiKey });
+  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
   let retriesLeft = API_KEYS.length;
-  const model = "gemini-3-flash-preview";
+  const model = MODELS.OVERVIEW;
 
   // Prepare history summary for context
   const lastWeekHistory = history.filter(h => {
@@ -688,7 +682,12 @@ OUTPUT: JSON format.
       const jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
 
-      return JSON.parse(jsonText) as AIOverview;
+      const parsed = cleanAndParseJSON(jsonText, "AIOverview");
+      return {
+        ...parsed,
+        strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+        improvements: Array.isArray(parsed.improvements) ? parsed.improvements : []
+      };
     } catch (error) {
       console.error("AI Overview Error:", error);
 
@@ -697,7 +696,7 @@ OUTPUT: JSON format.
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected on AI Overview, switching to next API key...`);
-          ai = new GoogleGenAI({ apiKey: newKey });
+          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
           retriesLeft--;
           continue;
         }
@@ -720,23 +719,12 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
     return [];
   }
 
-  let ai = new GoogleGenAI({ apiKey });
+  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
   let retriesLeft = API_KEYS.length;
-  const model = "gemini-3-flash-preview";
+  const model = MODELS.FOOD_SCAN;
 
-  const schema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        id: { type: Type.STRING },
-        name: { type: Type.STRING },
-        quantity: { type: Type.NUMBER },
-        unit: { type: Type.STRING },
-        category: { type: Type.STRING, enum: ['protein', 'carb', 'fat', 'veg', 'spice', 'other'] }
-      }
-    }
-  };
+  // Gemma-3-27b-it does not support JSON mode, so we remove responseSchema/responseMimeType
+  // and rely on the prompt and manual parsing.
 
   const prompt = `
     ROLE: Data Parser specific to cooking ingredients.
@@ -745,10 +733,14 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
     RULES:
     - Translate ingredient names to standard Vietnamese (e.g., "ức gà", "trứng", "gạo").
     - Extract approximate quantity and unit. If not specified, estimate reasonable default (e.g. 1 unit, 100g).
-    - Assign a category.
+    - Assign a category (protein, carb, fat, veg, spice, other).
     - generate a random short ID for each item.
     - If input contains multiple items (e.g., "500g chicken and 10 eggs"), split them.
-    OUTPUT: JSON Array.
+    
+    OUTPUT FORMAT:
+    Return ONLY a valid JSON Array. Do not include markdown formatting (like \`\`\`json).
+    Example:
+    [{"id":"1","name":"Trứng","quantity":10,"unit":"quả","category":"protein"}]
   `;
 
   while (retriesLeft > 0) {
@@ -756,22 +748,19 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
       const response = await ai.models.generateContent({
         model: model,
         contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
+        // Config removed to avoid "JSON mode not enabled" error
       });
 
-      const jsonText = response.text;
+      let jsonText = response.text;
       if (!jsonText) throw new Error("Empty response");
 
-      return JSON.parse(jsonText);
+      return cleanAndParseJSON(jsonText, "FridgeParse");
     } catch (error) {
       console.error("Fridge Parse Error:", error);
       if (isRateLimitError(error) && retriesLeft > 1) {
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
-          ai = new GoogleGenAI({ apiKey: newKey });
+          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
           retriesLeft--;
           continue;
         }

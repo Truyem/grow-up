@@ -42,6 +42,13 @@ export default defineConfig(({ mode }) => {
         server: {
             port: 3000,
             open: true,
+            proxy: {
+                '/google-api': {
+                    target: 'https://generativelanguage.googleapis.com',
+                    changeOrigin: true,
+                    rewrite: (path) => path.replace(/^\/google-api/, ''),
+                },
+            },
         },
         build: {
             outDir: 'dist',
