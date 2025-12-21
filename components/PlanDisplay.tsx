@@ -1,18 +1,23 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { DailyPlan, Exercise, Meal, WorkoutLevel, MuscleGroup } from '../types';
+import { DailyPlan, Exercise, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
+import { AddExerciseModal } from './AddExerciseModal';
+import { suggestNextExercises } from '../services/geminiService';
 
 
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets } from 'lucide-react';
+import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets, Plus, Sparkles, Loader2 } from 'lucide-react';
 
 interface PlanDisplayProps {
   plan: DailyPlan;
+  userData: UserInput;
   onReset: () => void;
   onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition']) => void;
+  onUpdatePlan: (updatedPlan: DailyPlan) => void;
+  history: WorkoutHistoryItem[];
 }
 
 const formatCurrencyInput = (value: string) => {
@@ -213,7 +218,7 @@ const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
 
 type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
 
-export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete }) => {
+export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onReset, onComplete, onUpdatePlan, history }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -221,6 +226,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
   const [manualCostConfig, setManualCostConfig] = useState<string>(''); // User enters string "50.000"
+
+  // Add Exercise State
+  const [generatingSection, setGeneratingSection] = useState<'morning' | 'evening' | null>(null);
 
 
   const currentWorkout: WorkoutLevel = plan.workout.detail;
@@ -324,6 +332,27 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     );
   };
 
+  const handleAutoAddExercise = async (section: 'morning' | 'evening') => {
+    setGeneratingSection(section);
+    try {
+      const suggested = await suggestNextExercises(plan, userData, section);
+      if (suggested && suggested.length > 0) {
+        const newExercise = suggested[0];
+        const updatedPlan = { ...plan };
+        if (section === 'morning') {
+          updatedPlan.workout.detail.morning = [...updatedPlan.workout.detail.morning, newExercise];
+        } else {
+          updatedPlan.workout.detail.evening = [...updatedPlan.workout.detail.evening, newExercise];
+        }
+        onUpdatePlan(updatedPlan);
+      }
+    } catch (error) {
+      console.error("AI Suggestion failed", error);
+    } finally {
+      setGeneratingSection(null);
+    }
+  };
+
   // Filter Logic Helper
   const filterExercise = (ex: Exercise) => {
     if (activeFilter === 'All') return true;
@@ -356,7 +385,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
     { id: 'Orange', label: 'Bụng/Tim mạch', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
   ];
 
-  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, filtered: Exercise[]) => (
+  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, filtered: Exercise[], sectionKey: 'morning' | 'evening') => (
     <div className="mb-6 last:mb-0">
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10 text-cyan-200">
         {icon}
@@ -369,6 +398,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           filtered.map((ex) => {
             // Find original index in the unfiltered array to maintain state consistency
             const originalIndex = exercises.indexOf(ex);
+
+            // Fallback for newly added exercises that might not be in the original list if we are filtering?
+            // Actually filtered is derived from exercises.
+            // If we filter, we might hide the new exercise if it doesn't match filter.
+            // But usually we just added it so we might want to see it. 
+            // For now, assume it appears if it matches filter or if filter is All.
+
             const key = `${prefix}-${originalIndex}`;
             return (
               <ExerciseItem
@@ -385,6 +421,27 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           <p className="text-sm text-gray-500 italic py-2">Không có bài tập nào phù hợp với bộ lọc.</p>
         )}
       </div>
+
+      {/* Add Exercise Button */}
+      {!isCompleted && (
+        <button
+          onClick={() => handleAutoAddExercise(sectionKey)}
+          disabled={generatingSection !== null}
+          className="w-full mt-2 py-3 border border-dashed border-white/20 rounded-xl flex items-center justify-center gap-2 text-cyan-400 hover:text-cyan-300 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {generatingSection === sectionKey ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs font-bold uppercase tracking-wider">Đang tìm bài tập phù hợp...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-wider">AI Đề Xuất Bài Tập Mới</span>
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 
@@ -396,6 +453,8 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
         onClose={() => setIsTimerOpen(false)}
         defaultDuration={timerDuration}
       />
+
+
 
       {/* Top Header with Back Button */}
       <div className="flex items-center justify-between mb-2">
@@ -558,10 +617,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
           </div>
 
           {/* Render Morning Session */}
-          {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning)}
+          {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
 
           {/* Render Evening Session */}
-          {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening)}
+          {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening, 'evening')}
 
           <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
             <div className="flex gap-2 items-center text-xs text-gray-500">

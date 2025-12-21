@@ -438,6 +438,11 @@ export default function App() {
     setToastMessage(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
   };
 
+  const handleUpdatePlan = (updatedPlan: DailyPlan) => {
+    setPlan(updatedPlan);
+    localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+  };
+
   return (
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
 
@@ -448,7 +453,16 @@ export default function App() {
 
       {/* Optimized Background Layer */}
       <div className="fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute inset-0 bg-main-wallpaper bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105" />
+        {/* Mobile Background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
+          style={{ backgroundImage: `url(${wallpaperMb})` }}
+        />
+        {/* Desktop Background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
+          style={{ backgroundImage: `url(${wallpaper})` }}
+        />
         {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
@@ -510,6 +524,8 @@ export default function App() {
               plan={plan}
               onReset={handleReset}
               onComplete={handleCompleteWorkout}
+              onUpdatePlan={handleUpdatePlan}
+              history={workoutHistory}
             />
           ) : viewMode === 'history' ? (
             <HistoryView

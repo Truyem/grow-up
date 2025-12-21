@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
@@ -200,25 +200,25 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
     morning: [
-      { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "Ai sẽ vác những chiếc thuyền này?", primaryMuscleGroups: ["Front Delts", "Chest - Upper"], secondaryMuscleGroups: ["Triceps", "Core"] },
-      { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "Chiếm lấy linh hồn của chúng!", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
+      { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "OFFLINE MODE", primaryMuscleGroups: ["Front Delts", "Chest - Upper"], secondaryMuscleGroups: ["Triceps", "Core"] },
+      { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
-      { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "Không đau đớn thì không có thành quả, STAY HARD!", primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"] },
-      { name: "Hanging Leg Raise", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "Cơ bụng số 11! (Daily Abs)", primaryMuscleGroups: ["Abs - Lower", "Core"], secondaryMuscleGroups: ["Hip Flexors"] },
-      { name: "Burpees", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "Tim đập nhanh hơn! (Daily Cardio)", primaryMuscleGroups: ["Full Body", "Cardio"], secondaryMuscleGroups: ["Chest", "Legs", "Core"] }
+      { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "OFFLINE MODE", primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"] },
+      { name: "Hanging Leg Raise", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "OFFLINE MODE (Daily Abs)", primaryMuscleGroups: ["Abs - Lower", "Core"], secondaryMuscleGroups: ["Hip Flexors"] },
+      { name: "Burpees", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Full Body", "Cardio"], secondaryMuscleGroups: ["Chest", "Legs", "Core"] }
     ]
   } : {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp + Daily Abs & Cardio.",
     morning: [
-      { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "Đừng làm thằng hèn, ngực chạm sàn đi!", primaryMuscleGroups: ["Chest - Middle"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
-      { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "Chúng nó không biết tao là ai đâu con trai!", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
+      { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "OFFLINE MODE", primaryMuscleGroups: ["Chest - Middle"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
+      { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
-      { name: "Band Pull Apart", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "Chai sạn tâm trí đi!", primaryMuscleGroups: ["Rear Delts", "Upper Back"], secondaryMuscleGroups: ["Traps"] },
-      { name: "Plank", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "Gồng chặt bụng! (Daily Abs)", primaryMuscleGroups: ["Core", "Abs"], secondaryMuscleGroups: ["Shoulders", "Glutes"] },
-      { name: "Jumping Jacks", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "Đốt mỡ! (Daily Cardio)", primaryMuscleGroups: ["Cardio", "Full Body"], secondaryMuscleGroups: ["Shoulders", "Calves"] }
+      { name: "Band Pull Apart", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "OFFLINE MODE", primaryMuscleGroups: ["Rear Delts", "Upper Back"], secondaryMuscleGroups: ["Traps"] },
+      { name: "Plank", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Abs)", primaryMuscleGroups: ["Core", "Abs"], secondaryMuscleGroups: ["Shoulders", "Glutes"] },
+      { name: "Jumping Jacks", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Cardio", "Full Body"], secondaryMuscleGroups: ["Shoulders", "Calves"] }
     ]
   };
 
@@ -757,6 +757,89 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
       return cleanAndParseJSON(jsonText, "FridgeParse");
     } catch (error) {
       console.error("Fridge Parse Error:", error);
+      if (isRateLimitError(error) && retriesLeft > 1) {
+        const newKey = markRateLimitedAndRotate();
+        if (newKey) {
+          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
+          retriesLeft--;
+          continue;
+        }
+      }
+      return [];
+    }
+  }
+  return [];
+};
+
+
+// --- SINGLE EXERCISE SUGGESTION ---
+
+export const suggestNextExercises = async (
+  currentPlan: DailyPlan,
+  userData: UserInput,
+  section: 'morning' | 'evening'
+): Promise<Exercise[]> => {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey) return []; // Should handle fallback but for single suggest maybe just fail
+
+  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  let retriesLeft = API_KEYS.length;
+  const model = MODELS.WORKOUT; // Use same workout model
+
+  const existingExercises = section === 'morning'
+    ? currentPlan.workout.detail.morning
+    : currentPlan.workout.detail.evening;
+
+  const existingNames = existingExercises.map(e => e.name).join(", ");
+
+  const prompt = `
+    ACT AS A PERSONAL TRAINER.
+    THE USER IS CURRENTLY DOING A WORKOUT SESSION (${section.toUpperCase()}).
+    
+    CURRENT EXERCISES IN THIS SESSION: ${existingNames}
+    USER GOAL: ${userData.nutritionGoal}
+    USER EQUIPMENT: ${userData.equipment.join(', ')}
+    
+    TASK: SUGGEST 1 NEW EXERCISE to add to this session.
+    It should complement the existing exercises (e.g., if they did Chest, maybe add Triceps or another Chest variation).
+    
+    OUTPUT FORMAT: JSON Array with 1 Exercise object.
+    
+    REQUIRED FIELDS: name (English), sets (number), reps (string), notes (Vietnamese, short motivation), colorCode, primaryMuscleGroups, secondaryMuscleGroups.
+  `;
+
+  const schema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING },
+        sets: { type: Type.NUMBER },
+        reps: { type: Type.STRING },
+        notes: { type: Type.STRING },
+        equipment: { type: Type.STRING },
+        colorCode: { type: Type.STRING },
+        isBFR: { type: Type.BOOLEAN },
+        primaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } },
+        secondaryMuscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } }
+      }
+    }
+  };
+
+  while (retriesLeft > 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema: schema },
+      });
+
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("Empty response");
+
+      return cleanAndParseJSON(jsonText, "SuggestExercise");
+    } catch (error) {
+      console.error("Suggest Exercise Error:", error);
       if (isRateLimitError(error) && retriesLeft > 1) {
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
