@@ -171,6 +171,21 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
             </button>
           </div>
 
+          {(exercise.primaryMuscleGroups?.length > 0 || exercise.secondaryMuscleGroups?.length > 0) && (
+            <div className="flex flex-wrap gap-2 mb-2 mt-1 px-1">
+              {exercise.primaryMuscleGroups?.map((m, i) => (
+                <span key={`p-${i}`} className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {m}
+                </span>
+              ))}
+              {exercise.secondaryMuscleGroups?.map((m, i) => (
+                <span key={`s-${i}`} className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 opacity-80">
+                  {m}
+                </span>
+              ))}
+            </div>
+          )}
+
           {exercise.notes && (
             <p
               onClick={onToggle}
