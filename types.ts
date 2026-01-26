@@ -44,18 +44,26 @@ export enum MuscleGroup {
 }
 
 export enum Intensity {
+  Low = 'low',
   Medium = 'medium',
   Hard = 'hard',
 }
 
+export enum HealthCondition {
+  Good = 'Good',
+  Tired = 'Tired',
+  Injured = 'Injured',
+}
+
 export type NutritionGoal = 'bulking' | 'cutting';
 
-export type TrainingMode = 'standard' | 'saitama';
+export type TrainingMode = 'calis' | 'gym';
 
 export interface UserInput {
   weight: number;
   height: number;
   fatigue: FatigueLevel;
+  healthCondition: HealthCondition; // New field
   soreMuscles: MuscleGroup[];
   selectedIntensity: Intensity;
   nutritionGoal: NutritionGoal;
@@ -109,7 +117,6 @@ export interface Meal {
   calories: number;
   protein: number;
   description: string;
-  estimatedPrice: number;
   carbs?: number;
   fat?: number;
 }
@@ -133,16 +140,19 @@ export interface DailyPlan {
   workout: {
     summary: string;
     detail: WorkoutLevel;
+    isGenerated?: boolean; // New flag
   };
   nutrition: {
     totalCalories: number;
     totalProtein: number;
-    totalCarbs: number; // New
-    totalFat: number;   // New
-    totalCost: number;
+    totalCarbs: number;
+    totalFat: number;
+    consumedIngredients?: { name: string, quantity: number, unit: string }[];
     meals: Meal[];
     advice: string;
+    isGenerated?: boolean; // New flag
   };
+
 }
 
 export interface WorkoutHistoryItem {
@@ -159,7 +169,9 @@ export interface WorkoutHistoryItem {
     totalCarbs?: number; // Optional for backward compatibility
     totalFat?: number;   // Optional for backward compatibility
     totalCost?: number;
+    consumedIngredients?: { name: string, quantity: number, unit: string }[];
     meals: Meal[];
+
   };
   weight?: number; // Recorded weight for that day
 }

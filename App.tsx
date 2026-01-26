@@ -13,17 +13,20 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
+import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
-// AnalysisView merged into HistoryView
+
 
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
-import { Sparkles, History, Dumbbell } from 'lucide-react';
+import { Sparkles, History, Dumbbell, Utensils } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
+import { PlanTabs } from './components/ui/PlanTabs';
+
 import { OnlineCounter } from './components/ui/OnlineCounter';
 
 // Default equipment list
@@ -41,10 +44,11 @@ const INITIAL_USER_DATA: UserInput = {
   weight: 61,
   height: 165,
   fatigue: FatigueLevel.Normal,
+  healthCondition: HealthCondition.Good, // Default Health
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium,
   nutritionGoal: 'cutting',
-  trainingMode: 'standard',
+  trainingMode: 'calis',
   useCreatine: false, // Default false
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
@@ -57,7 +61,8 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'input' | 'plan' | 'history' | 'analysis';
+type ViewMode = 'input' | 'workout' | 'nutrition' | 'history';
+
 
 // Helper to match the date format used in service
 const getTodayString = () => {
@@ -72,11 +77,17 @@ export default function App() {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('input');
+  const [viewMode, setViewMode] = useState<ViewMode>('workout');
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => getApiStatus());
   const [expenses, setExpenses] = useState<Expense[]>([]);
+
+  // Debug version to ensure HMR works
+  useEffect(() => {
+    console.log("App Version: 3-Tab Navigation Update");
+  }, []);
+
 
   // Update API status periodically
   useEffect(() => {
@@ -127,6 +138,19 @@ export default function App() {
         console.error("Failed to load user settings", e);
       }
     }
+
+    // 0.1 Load Inventory specific logic (If we separate it or just merge)
+    // For now we persist 'user_settings' which should contain it, but let's double check save logic
+    const savedInventory = localStorage.getItem('user_inventory');
+    if (savedInventory) {
+      try {
+        const parsedInventory = JSON.parse(savedInventory);
+        setUserData(prev => ({ ...prev, availableIngredients: parsedInventory }));
+      } catch (e) {
+        console.error("Failed to load inventory", e);
+      }
+    }
+
 
     // 1. Load History
     let currentHistory: WorkoutHistoryItem[] = [];
@@ -265,8 +289,9 @@ export default function App() {
         } else {
           // If plan is for TODAY, load it normally
           setPlan(cachedPlan);
-          setViewMode('plan');
+          setViewMode('workout');
           console.log("Loaded cached plan for today:", todayStr);
+
         }
 
       } catch (e) {
@@ -300,16 +325,124 @@ export default function App() {
     localStorage.setItem('user_expenses', JSON.stringify(expenses));
   }, [expenses]);
 
-  const handleGenerate = async () => {
-    setLoading(true);
-    // Pass workout history to the service
-    const generatedPlan = await generateDailyPlan(userData, workoutHistory);
+  const handleGenerate = async (type: 'workout' | 'nutrition' | 'history') => {
+    // If history tab, just switch view
+    if (type === 'history') {
+      setViewMode('history');
+      return;
+    }
 
-    setPlan(generatedPlan);
-    setViewMode('plan');
+    setLoading(true);
+
+    // Generate ONLY the requested part
+    // Type cast is safe because we check for 'history' above
+    const generationType = type as 'workout' | 'nutrition';
+
+    // Pass workout history to the service
+    const generatedPartial = await generateDailyPlan(userData, workoutHistory, generationType);
+
+    // MERGE LOGIC:
+    // If we already have a plan, we keep the OTHER part.
+    // If we don't have a plan, we might need a blank structure for the other part to avoid crashes.
+
+    let finalPlan: DailyPlan;
+
+    if (!plan) {
+      // If no previous plan, the generated partial is mostly complete but might miss the other half.
+      // However, generatedPartial ALWAYS has a fallback for the missing half, so it is safe to usage.
+      finalPlan = generatedPartial;
+    } else {
+      // If we have a previous plan, we must ONLY update the part we just generated.
+      // Failing to do this causes the "fallback" placeholder from generatedPartial
+      // to overwrite the user's existing (real) plan for the other part.
+      finalPlan = { ...plan };
+
+      if (generationType === 'workout') {
+        finalPlan.workout = generatedPartial.workout;
+        finalPlan.schedule = generatedPartial.schedule; // Schedule is usually tied to workout
+      }
+
+      if (generationType === 'nutrition') {
+        finalPlan.nutrition = generatedPartial.nutrition;
+      }
+
+      // Always update date
+      finalPlan.date = generatedPartial.date || plan.date;
+    }
+
+    setPlan(finalPlan);
+
+    // Switch to the relevant view
+    setViewMode(generationType);
+
+    // --- INVENTORY DEDUCTION LOGIC (Only runs if nutrition was generated) ---
+    if (generationType === 'nutrition' && generatedPartial.nutrition?.consumedIngredients && generatedPartial.nutrition.consumedIngredients.length > 0) {
+      const usedItems = generatedPartial.nutrition.consumedIngredients;
+      let updatedIngredients = [...(userData.availableIngredients || [])];
+
+      let deductionLog: string[] = [];
+
+      usedItems.forEach(used => {
+        // 1. Try Match by ID (Most Accurate)
+        let matchIndex = -1;
+        if ((used as any).id) {
+          matchIndex = updatedIngredients.findIndex(inv => inv.id === (used as any).id);
+        }
+
+        // 2. Fallback to Name Matching if ID failed or missing
+        if (matchIndex === -1) {
+          const usedName = used.name.toLowerCase().trim();
+          matchIndex = updatedIngredients.findIndex(inv => {
+            const invName = inv.name.toLowerCase().trim();
+            return invName === usedName || invName.includes(usedName) || usedName.includes(invName);
+          });
+        }
+
+        if (matchIndex !== -1) {
+          const invItem = updatedIngredients[matchIndex];
+          // Simple unit handling - assuming AI tries to match units or we just subtract if units match
+          // If units differ (e.g. kg vs g), this minimal version might struggle without complex conversion lib.
+          // For now, prompt instructs AI to try matching provided units.
+          // If units match, subtract.
+
+          // Basic conversion for g/kg commonly used in food
+          let quantityToDeduct = used.quantity;
+
+          if (used.unit === 'g' && invItem.unit === 'kg') {
+            quantityToDeduct = used.quantity / 1000;
+          } else if (used.unit === 'kg' && invItem.unit === 'g') {
+            quantityToDeduct = used.quantity * 1000;
+          }
+
+          const newQuantity = Math.max(0, invItem.quantity - quantityToDeduct);
+
+          if (newQuantity <= 0) {
+            // Mark for removal or keep at 0? Let's remove if 0
+            deductionLog.push(`Hết: ${invItem.name}`);
+            updatedIngredients[matchIndex] = { ...invItem, quantity: 0 }; // Mark 0 first
+          } else {
+            deductionLog.push(`Dùng ${quantityToDeduct} ${invItem.unit} ${invItem.name}`);
+            updatedIngredients[matchIndex] = { ...invItem, quantity: parseFloat(newQuantity.toFixed(2)) };
+          }
+        }
+      });
+
+      // Filter out 0 items if desired, or keep them to show "Out of stock"
+      // User request implied "5 - 4 = 1", so we update quantity.
+      // Let's filter out items that reached exactly 0 to clean up.
+      const finalIngredients = updatedIngredients.filter(i => i.quantity > 0);
+
+      if (deductionLog.length > 0) {
+        setToastMessage(`Đã trừ kho: ${deductionLog.join(', ')}`);
+        // Update user data with new inventory
+        setUserData(prev => ({ ...prev, availableIngredients: finalIngredients }));
+      }
+    }
+
 
     // Save to local storage cache
-    localStorage.setItem('daily_plan_cache', JSON.stringify(generatedPlan));
+    localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
+
     // Clear any old progress when generating a fresh plan
     localStorage.removeItem('workout_progress');
 
@@ -317,12 +450,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+
   const handleReset = () => {
     // Direct reset without confirmation dialog to ensure button responsiveness
     setPlan(null);
     localStorage.removeItem('daily_plan_cache');
     localStorage.removeItem('workout_progress'); // Also clear progress on manual reset
-    setViewMode('input');
+    setViewMode('workout');
   };
 
   const handleCompleteWorkout = async (
@@ -438,7 +572,14 @@ export default function App() {
     setToastMessage(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
   };
 
+  // Save user data changes
+  useEffect(() => {
+    localStorage.setItem('user_settings', JSON.stringify(userData));
+    localStorage.setItem('user_inventory', JSON.stringify(userData.availableIngredients)); // Explicit save
+  }, [userData]);
+
   const handleUpdatePlan = (updatedPlan: DailyPlan) => {
+
     setPlan(updatedPlan);
     localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
   };
@@ -473,69 +614,127 @@ export default function App() {
       {/* Content Layer */}
       <div className="relative z-10 container mx-auto px-4 py-10 max-w-5xl">
 
-        {/* Header - Simplified for Dashboard */}
-        {viewMode === 'input' && (
-          <div className="text-center mb-10 space-y-3 animate-fade-in relative">
-            <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
-              <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
-              Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
-            </h1>
-            <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
-              Lịch trình tập luyện thông minh & Sáng tạo.
-            </p>
-
-            {/* API Status Badge & Online Counter - Global */}
-            <div className="flex flex-col items-center gap-3 pt-4">
-              {apiStatus.totalKeys > 0 && (
-                <ApiStatusBadge
-                  status={apiStatus}
-                  onKeyChange={() => setApiStatus(getApiStatus())}
-                />
-              )}
-              <OnlineCounter />
-            </div>
+        {/* Header - Global for both Input and Plan views */}
+        <div className="text-center mb-10 space-y-3 animate-fade-in relative transition-all duration-300">
+          <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
+            <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
           </div>
-        )}
+          <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+            Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
+          </h1>
+          <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
+            Lịch trình tập luyện thông minh & Sáng tạo.
+          </p>
 
-        {/* Global Navigation Tabs */}
-        <div className="flex justify-center mb-8 gap-4">
-          <button
-            onClick={() => setViewMode(plan ? 'plan' : 'input')}
-            className={`px-4 py-2 rounded-full flex items-center gap-2 transition-all ${['input', 'plan'].includes(viewMode) ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <Dumbbell className="w-4 h-4" />
-            Tập luyện
-          </button>
-          <button
-            onClick={() => setViewMode('history')}
-            className={`px-4 py-2 rounded-full flex items-center gap-2 transition-all ${['history', 'analysis'].includes(viewMode) ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <History className="w-4 h-4" />
-            Lịch sử
-          </button>
+          {/* API Status Badge & Online Counter - Global */}
+          <div className="flex flex-col items-center gap-3 pt-4">
+            {apiStatus.totalKeys > 0 && (
+              <ApiStatusBadge
+                status={apiStatus}
+                onKeyChange={() => setApiStatus(getApiStatus())}
+              />
+            )}
+            <OnlineCounter />
+          </div>
         </div>
 
-        {/* Main View Switch */}
         <div className="transition-all duration-500 ease-in-out">
-          {viewMode === 'plan' && plan ? (
-            <PlanDisplay
-              plan={plan}
-              onReset={handleReset}
-              onComplete={handleCompleteWorkout}
-              onUpdatePlan={handleUpdatePlan}
-              history={workoutHistory}
+          {/* Always show PlanTabs if plan is initialized (or just show them always? No, distinct mode) */}
+          {/* Wait, we want tabs visible ALWAYS now if we are in this "hybrid" mode? */}
+          {/* Actually, if NO plan exists at all, maybe we just default to Workout Input? */}
+          {/* But once a plan is partially created, we need the global tabs. */}
+          {/* Let's show tabs if plan exists OR if we are just exploring. */}
+
+          {/* If plan exists (even partial), show global tabs to navigate between W/N/H */}
+          {/* Always show PlanTabs to allow navigation between Input forms and History */}
+          <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
+            <PlanTabs
+              activeTab={viewMode as 'workout' | 'nutrition' | 'history'}
+              onTabChange={(tab) => setViewMode(tab)}
+              className="shadow-2xl"
             />
-          ) : viewMode === 'history' ? (
+          </div>
+
+          {/* Render content based on View Mode + Generation Status */}
+          {viewMode === 'workout' && (
+            plan?.workout?.isGenerated ? (
+              <PlanDisplay
+                plan={plan}
+                onReset={handleReset}
+                onComplete={handleCompleteWorkout}
+                onUpdatePlan={handleUpdatePlan}
+                history={workoutHistory}
+                userData={userData}
+              />
+            ) : (
+              <div className="max-w-2xl mx-auto space-y-4">
+                <UserForm
+                  userData={userData}
+                  setUserData={setUserData}
+                  userStats={userStats}
+                  onSubmit={handleGenerate}
+                  isLoading={loading}
+                  onSickDay={handleSickDay}
+                  history={workoutHistory}
+                  onDeleteHistory={handleDeleteHistoryItem}
+                  activeTab="workout"
+                />
+              </div>
+            )
+          )}
+
+          {viewMode === 'nutrition' && (
+            plan?.nutrition?.isGenerated ? (
+              <NutritionDisplay plan={plan} onReset={handleReset} />
+            ) : (
+              <div className="max-w-2xl mx-auto space-y-4">
+                <UserForm
+                  userData={userData}
+                  setUserData={setUserData}
+                  userStats={userStats}
+                  onSubmit={handleGenerate}
+                  isLoading={loading}
+                  onSickDay={handleSickDay}
+                  history={workoutHistory}
+                  onDeleteHistory={handleDeleteHistoryItem}
+                  activeTab="nutrition"
+                />
+              </div>
+            )
+          )}
+
+          {viewMode === 'history' && (
             <HistoryView
               history={workoutHistory}
               userData={userData}
-              onBack={() => setViewMode('input')}
               onDelete={handleDeleteHistoryItem}
             />
-          ) : (
+          )}
+
+          {/* Initial State (No Plan Yet) - This logic overlaps with above if plan is null */}
+          {/* If plan is null, the above checks `plan?.workout?.isGenerated` are false, so it renders UserForm. */}
+          {/* But currently `viewMode` defaults to 'input'. */}
+          {/* We should change default viewMode to 'workout' or similar. */}
+          {/* AND we need to render UserForm if viewMode is 'input' (legacy) */}
+
+          {viewMode === 'input' && (
             <div className="max-w-2xl mx-auto space-y-4">
+              {/* Manually show Tabs here since PlanTabs is conditional on `plan` above? */}
+              {/* Actually, if no plan used to show UserForm which had tabs. */}
+              {/* Now UserForm has NO tabs. So we must provide tabs here if we want them. */}
+              {/* BUT, if we are in 'input' mode, we usually default to 'workout'. */}
+
+              {/* Fix: Switch viewMode to 'workout' by default in INITIAL STATE? */}
+              {/* YES. see below for setting initial state change or effect */}
+
+              {/* For now, just render UserForm with workout tab if caught in 'input' mode */}
+              <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
+                <PlanTabs
+                  activeTab="workout"
+                  onTabChange={(tab) => setViewMode(tab as any)}
+                  className="shadow-2xl"
+                />
+              </div>
               <UserForm
                 userData={userData}
                 setUserData={setUserData}
@@ -543,15 +742,10 @@ export default function App() {
                 onSubmit={handleGenerate}
                 isLoading={loading}
                 onSickDay={handleSickDay}
+                history={workoutHistory}
+                onDeleteHistory={handleDeleteHistoryItem}
+                activeTab="workout"
               />
-
-              <button
-                onClick={() => setViewMode('history')}
-                className="w-full py-3 rounded-2xl font-semibold text-gray-400 bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] hover:text-white hover:shadow-lg"
-              >
-                <History className="w-5 h-5" />
-                Xem Lịch sử tập luyện
-              </button>
             </div>
           )}
         </div>

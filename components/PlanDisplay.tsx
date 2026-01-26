@@ -9,7 +9,8 @@ import { AddExerciseModal } from './AddExerciseModal';
 import { suggestNextExercises } from '../services/geminiService';
 
 
-import { Flame, Utensils, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, UtensilsCrossed, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Droplets, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Plus, Sparkles, Loader2 } from 'lucide-react';
+
 
 interface PlanDisplayProps {
   plan: DailyPlan;
@@ -184,37 +185,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   );
 };
 
-const MealItem: React.FC<{ meal: Meal }> = ({ meal }) => (
-  <div className="group relative overflow-hidden bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 cursor-pointer">
-    <div className="absolute -bottom-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity rotate-12">
-      <UtensilsCrossed className="w-24 h-24 text-white" />
-    </div>
 
-    <div className="relative z-10 flex gap-4">
-      <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-white/10 group-hover:border-emerald-500/30 transition-colors">
-        <UtensilsCrossed className="w-6 h-6 text-emerald-300" />
-      </div>
-
-      <div className="flex-1">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
-          <h4 className="font-bold text-lg text-white group-hover:text-emerald-300 transition-colors">{meal.name}</h4>
-
-          <div className="flex flex-wrap gap-2 text-xs font-bold mt-1 sm:mt-0">
-            <span className="px-2 py-1 bg-black/30 rounded text-cyan-300 border border-white/5">{meal.calories} Kcal</span>
-            <span className="px-2 py-1 bg-black/30 rounded text-emerald-300 border border-white/5">{meal.protein}g Pro</span>
-            {meal.carbs !== undefined && <span className="px-2 py-1 bg-black/30 rounded text-orange-300 border border-white/5">{meal.carbs}g Carb</span>}
-            {meal.fat !== undefined && <span className="px-2 py-1 bg-black/30 rounded text-yellow-300 border border-white/5">{meal.fat}g Fat</span>}
-            {/* Price removed as per user request */}
-          </div>
-        </div>
-
-        <p className="text-sm text-gray-400 leading-relaxed border-t border-white/5 pt-2">
-          {meal.description}
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
 
@@ -225,13 +196,25 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
-  const [manualCostConfig, setManualCostConfig] = useState<string>(''); // User enters string "50.000"
+
+
 
   // Add Exercise State
   const [generatingSection, setGeneratingSection] = useState<'morning' | 'evening' | null>(null);
 
 
-  const currentWorkout: WorkoutLevel = plan.workout.detail;
+  const currentWorkout: WorkoutLevel | undefined = plan.workout?.detail;
+
+  if (!currentWorkout) {
+    return (
+      <div className="p-8 text-center text-red-400 bg-red-900/10 rounded-xl border border-red-500/20">
+        <p>Lỗi dữ liệu: Không tìm thấy chi tiết bài tập.</p>
+        <button onClick={onReset} className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300">
+          Reset Dữ Liệu
+        </button>
+      </div>
+    );
+  }
 
   // Combine all exercises to calculate progress
   const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
@@ -320,8 +303,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
     const finalNutrition = {
       ...plan.nutrition,
-      totalCost: parseInt(manualCostConfig.replace(/\./g, '') || '0')
+      // cost handled in NutritionDisplay if editable there, but here we just pass current
     };
+
 
     onComplete(
       currentWorkout.levelName,
@@ -456,58 +440,13 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
 
 
-      {/* Top Header with Back Button */}
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={onReset}
-          className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-white/70 hover:text-white cursor-pointer"
-          title="Quay lại màn hình tạo lịch"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400">
-          {plan.date}
-        </div>
-        <div className="w-12"></div> {/* Spacer for balance */}
-      </div>
+      {/* Top Header Removed - Using App Global Header */}
 
-      <div className="text-center space-y-2 mb-6">
-        <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300">
-          Kế Hoạch Tập Luyện
-        </h2>
-        <p className="text-gray-400 text-sm max-w-md mx-auto">
-          {plan.workout.summary}
-        </p>
-      </div>
 
-      {/* TIME OPTIMIZATION CARD */}
-      {plan.schedule && (
-        <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500/20 rounded-full text-blue-300">
-              <AlarmClock className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-blue-200 uppercase tracking-wider">Thời gian tối ưu</h4>
-              <div className="flex gap-4 mt-1">
-                <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
-                  <Sun className="w-3.5 h-3.5 text-yellow-400" />
-                  <span className="text-white text-sm font-mono">{plan.schedule.suggestedWorkoutTime}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-lg border border-white/5">
-                  <MoonStar className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-white text-sm font-mono">{plan.schedule.suggestedSleepTime}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="text-xs text-gray-400 italic text-center sm:text-right max-w-xs">
-            "{plan.schedule.reasoning}"
-          </div>
-        </div>
-      )}
+      {/* TIME OPTIMIZATION CARD REMOVED */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <div className="max-w-4xl mx-auto space-y-6">
         <GlassCard
           title={`Bài Tập: ${currentWorkout.levelName}`}
           icon={<Flame className="w-6 h-6" />}
@@ -616,11 +555,20 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
             </div>
           </div>
 
-          {/* Render Morning Session */}
-          {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
+          {currentWorkout.evening && currentWorkout.evening.length > 0 ? (
+            <>
+              {/* Render Morning Session */}
+              {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
 
-          {/* Render Evening Session */}
-          {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening, 'evening')}
+              {/* Render Evening Session */}
+              {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening, 'evening')}
+            </>
+          ) : (
+            <>
+              {/* Single Session Render (No Morning/Evening Header needed, or generic header) */}
+              {renderSection("Bài Tập Trong Ngày", <Dumbbell className="w-4 h-4 text-emerald-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
+            </>
+          )}
 
           <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">
             <div className="flex gap-2 items-center text-xs text-gray-500">
@@ -667,65 +615,22 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
           </div>
         </GlassCard>
 
-        <GlassCard title="Thực Đơn Tăng Cân (Bulking)" icon={<Utensils className="w-6 h-6" />}>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
-            <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
-              <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Calories</p>
-              <p className="text-xl font-bold text-cyan-300">{plan.nutrition.totalCalories}</p>
-            </div>
-            <div className="bg-black/20 rounded-xl p-3 text-center border border-white/5">
-              <p className="text-gray-400 text-[10px] uppercase tracking-widest mb-1">Protein</p>
-              <p className="text-xl font-bold text-emerald-300">{plan.nutrition.totalProtein}g</p>
-            </div>
-            {/* New Macro Cards */}
-            <div className="bg-orange-500/10 rounded-xl p-3 text-center border border-orange-500/20">
-              <p className="text-orange-200/70 text-[10px] uppercase tracking-widest mb-1">Carbs</p>
-              <p className="text-xl font-bold text-orange-300">{plan.nutrition.totalCarbs || 0}g</p>
-            </div>
-            <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20">
-              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Fat</p>
-              <p className="text-xl font-bold text-yellow-300">{plan.nutrition.totalFat || 0}g</p>
-            </div>
-            {/* Price Card */}
-            <div className="bg-yellow-500/10 rounded-xl p-3 text-center border border-yellow-500/20 relative group">
-              <p className="text-yellow-200/70 text-[10px] uppercase tracking-widest mb-1">Tổng tiền (Tự ghi)</p>
-              <div className="flex items-center justify-center gap-1">
-                <input
-                  type="text"
-                  value={manualCostConfig}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\./g, '').replace(/\D/g, '');
-                    setManualCostConfig(formatCurrencyInput(val));
-                  }}
-                  placeholder="Nhập giá..."
-                  className="w-full bg-transparent text-center font-bold text-yellow-300 focus:outline-none placeholder-yellow-500/30"
-                />
-                <span className="text-xs text-yellow-500">đ</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="text-xs text-gray-400 italic mb-4 text-center">
-            *Thực đơn ưu tiên sử dụng nguyên liệu có sẵn trong tủ lạnh của bạn.
-          </div>
-
-          <div className="space-y-4">
-            {plan.nutrition.meals.map((meal, index) => (
-              <MealItem key={index} meal={meal} />
-            ))}
-          </div>
-        </GlassCard>
       </div>
 
-      <div className="text-center pt-8 pb-4">
+
+      <div className="text-center pt-8 border-t border-white/5">
         <button
           onClick={onReset}
-          className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer"
+          className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
         >
-          <RefreshCw className="w-4 h-4" />
-          Tạo Kế Hoạch Mới
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
+            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+            <span className="font-medium">Tạo Kế Hoạch Mới</span>
+          </div>
         </button>
       </div>
-    </div>
+    </div >
   );
 };

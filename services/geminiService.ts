@@ -5,14 +5,19 @@ import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, Fati
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
 
 const MODELS = {
-  WORKOUT: "gemini-3-flash-preview",
+  WORKOUT: "gemini-3-flash-preview", // "Model 3" / High Intelligence
   FOOD_SCAN: "gemma-3-27b-it",
   OVERVIEW: "gemini-2.5-flash",
   MENU: "gemini-2.5-flash",
 };
 
+// ... lines 30-450 ...
+
 // Track current API key index - persists across calls
 let currentKeyIndex = 0;
+// ... (rest of file)
+
+
 
 // Track rate-limited API keys (index -> timestamp when it was rate limited)
 const rateLimitedKeys: Map<number, number> = new Map();
@@ -47,11 +52,11 @@ const getCurrentApiKey = (): string | null => {
 // Set current API key by index (for manual selection from UI)
 export const setCurrentApiKey = (index: number): boolean => {
   if (index < 0 || index >= API_KEYS.length) {
-    console.error(`Invalid API key index: ${index}`);
+    console.error("Invalid API key index: " + index);
     return false;
   }
   currentKeyIndex = index;
-  console.log(`🔧 Manually switched to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+  console.log("Manually switched to API key " + (currentKeyIndex + 1) + "/" + API_KEYS.length);
   return true;
 };
 
@@ -61,14 +66,14 @@ const markRateLimitedAndRotate = (): string | null => {
 
   // Mark current key as rate limited
   rateLimitedKeys.set(currentKeyIndex, Date.now());
-  console.log(`⚠️ API key ${currentKeyIndex + 1} marked as rate limited`);
+  console.log("API key " + (currentKeyIndex + 1) + " marked as rate limited");
 
   // Find next available key that's not rate limited
   let attempts = 0;
   while (attempts < API_KEYS.length) {
     currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
     if (!rateLimitedKeys.has(currentKeyIndex)) {
-      console.log(`🔄 Switched to API key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+      console.log("Switched to API key " + (currentKeyIndex + 1) + "/" + API_KEYS.length);
       return API_KEYS[currentKeyIndex];
     }
     attempts++;
@@ -80,7 +85,7 @@ const markRateLimitedAndRotate = (): string | null => {
       .sort((a, b) => a[1] - b[1])[0][0];
     rateLimitedKeys.delete(oldestKey);
     currentKeyIndex = oldestKey;
-    console.log(`🔄 All keys rate limited, retrying oldest key ${currentKeyIndex + 1}`);
+    console.log("All keys rate limited, retrying oldest key " + (currentKeyIndex + 1));
     return API_KEYS[currentKeyIndex];
   }
 
@@ -235,15 +240,16 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     },
     workout: {
       summary: "Bạn đang Offline. Đây là lịch tập mẫu.",
-      detail: workout
+      detail: workout,
+      isGenerated: false
     },
     nutrition: {
       totalCalories: target,
       totalProtein: proteinTarget,
       totalCarbs: carbTarget, // Replaces Water
       totalFat: fatTarget, // Replaces Water
-      totalCost: 150000,
       advice: `Mục tiêu: ${isBulking ? 'Bulking (Tăng cân)' : 'Cutting (Giảm cân)'}. TDEE: ${tdee}. Macros: ${proteinTarget}g Protein, ${carbTarget}g Carbs, ${fatTarget}g Fat.`,
+      isGenerated: false,
       meals: [
         {
           name: "Bữa Sáng (07:00)",
@@ -252,7 +258,6 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           carbs: Math.round(carbTarget * 0.25),
           fat: Math.round(fatTarget * 0.25),
           description: "2 lát Bánh mì đen + 3 Lòng trắng trứng (Trứng ốp la bỏ lòng đỏ)",
-          estimatedPrice: 20000
         },
         {
           name: "Bữa Trưa (12:30)",
@@ -261,7 +266,6 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           carbs: Math.round(carbTarget * 0.35),
           fat: Math.round(fatTarget * 0.35),
           description: `${carbSource} + 200g Ức gà áp chảo + ${vegSource}`,
-          estimatedPrice: 50000
         },
         {
           name: "Bữa Tối (19:00)",
@@ -270,7 +274,6 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           carbs: Math.round(carbTarget * 0.25),
           fat: Math.round(fatTarget * 0.25),
           description: `${carbSource} + 200g Cá/Thịt nạc + ${vegSource}`,
-          estimatedPrice: 60000
         },
         {
           name: "Bữa Phụ (21:30)",
@@ -279,17 +282,103 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
           carbs: Math.round(carbTarget * 0.15),
           fat: Math.round(fatTarget * 0.15),
           description: "1 Hộp Sữa chua không đường + 1 quả Chuối",
-          estimatedPrice: 15000
         }
       ]
     }
   };
 };
 
+// --- HARDCODED GYM SCHEDULE ---
+const GYM_SCHEDULE: Record<number, any> = {
+  1: {
+    levelName: "Ngày 1: Ngực, Vai, Tay sau (Push)",
+    description: "Tập trung đẩy. Ngực, Vai trước/giữa và Tay sau.",
+    morning: [
+      { name: "Barbell Bench Press", sets: 3, reps: "8-10", primaryMuscleGroups: ["Chest - Middle", "Triceps - Lateral Head"] },
+      { name: "Incline Dumbbell Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
+      { name: "Cable Chest Fly", sets: 4, reps: "12-15", primaryMuscleGroups: ["Chest - Middle"] },
+      { name: "Cable Lateral Raise", sets: 3, reps: "15", primaryMuscleGroups: ["Side Delts"] },
+      { name: "Tricep Dips", sets: 3, reps: "10-12", primaryMuscleGroups: ["Triceps - Long Head", "Chest - Lower"] },
+      { name: "Cable Triceps Extension", sets: 3, reps: "12-15", primaryMuscleGroups: ["Triceps - Lateral Head"] }
+    ],
+    evening: []
+  },
+  2: {
+    levelName: "Ngày 2: Lưng, Tay Trước (Pull)",
+    description: "Tập trung kéo. Lưng xô, Lưng giữa và Tay trước.",
+    morning: [
+      { name: "Pull Up", sets: 3, reps: "10-12", primaryMuscleGroups: ["Lats", "Biceps"] },
+      { name: "One Arm Dumbbell Row", sets: 3, reps: "8-10", primaryMuscleGroups: ["Lats", "Upper Back"] },
+      { name: "Seated Cable Row", sets: 4, reps: "10-12", primaryMuscleGroups: ["Upper Back", "Lats"] },
+      { name: "Machine Reverse Fly", sets: 3, reps: "15-20", primaryMuscleGroups: ["Rear Delts", "Upper Back"] },
+      { name: "Bicep Curls (BB hoặc DB)", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps"] },
+      { name: "Hammer Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps", "Forearms"] }
+    ],
+    evening: []
+  },
+  3: {
+    levelName: "Ngày 3: Chân ( Tập trung Đùi trước )",
+    description: "Tập trung thân dưới, nhấn mạnh vào đùi trước (Quads).",
+    morning: [
+      { name: "Barbell Squat", sets: 3, reps: "6-8", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Dumbbell Split Squat", sets: 3, reps: "10-12", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Leg Extension", sets: 4, reps: "12-15", primaryMuscleGroups: ["Quads"] },
+      { name: "Dumbbell RDL", sets: 3, reps: "12", primaryMuscleGroups: ["Hamstrings", "Glutes"] },
+      { name: "Leg Curls", sets: 3, reps: "12-15", primaryMuscleGroups: ["Hamstrings"] },
+      { name: "Calf Raise ( Ngồi hoặc Đứng )", sets: 3, reps: "15-20", primaryMuscleGroups: ["Calves"] }
+    ],
+    evening: []
+  },
+  4: {
+    levelName: "Ngày 4: Vai, Ngực (Push)",
+    description: "Tập trung đẩy, nhấn mạnh vào Vai và Ngực trên.",
+    morning: [
+      { name: "Dumbbell Shoulder Press", sets: 4, reps: "8-10", primaryMuscleGroups: ["Front Delts", "Triceps - Long Head"] },
+      { name: "Smith Incline Chest Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
+      { name: "Flat Dumbbell Chest Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Middle"] },
+      { name: "Dumbbell Lateral Raise", sets: 3, reps: "15-20", primaryMuscleGroups: ["Side Delts"] },
+      { name: "One Arm Triceps Extension", sets: 3, reps: "12-15", primaryMuscleGroups: ["Triceps - Long Head"] }
+    ],
+    evening: []
+  },
+  5: {
+    levelName: "Ngày 5: Lưng, Tay Trước (Pull)",
+    description: "Tập trung kéo, độ dày lưng và bắp tay.",
+    morning: [
+      { name: "Chest Supported T Bar Row", sets: 3, reps: "8-10", primaryMuscleGroups: ["Upper Back", "Lats"] },
+      { name: "Cable Pullover", sets: 3, reps: "10-12", primaryMuscleGroups: ["Lats"] },
+      { name: "Iliac Pulldown", sets: 4, reps: "12-15", primaryMuscleGroups: ["Lats"] },
+      { name: "DB Shrugs", sets: 3, reps: "15", primaryMuscleGroups: ["Traps"] },
+      { name: "Preacher Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps"] }
+    ],
+    evening: []
+  },
+  6: {
+    levelName: "Ngày 6: Chân (Focus Đùi Sau)",
+    description: "Tập trung thân dưới, nhấn mạnh vào đùi sau (Hamstrings).",
+    morning: [
+      { name: "Barbell Romanian DL", sets: 3, reps: "8-10", primaryMuscleGroups: ["Hamstrings", "Glutes"] },
+      { name: "Leg Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Hamstrings"] },
+      { name: "Leg Press", sets: 4, reps: "12-15", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Leg Extension", sets: 3, reps: "15", primaryMuscleGroups: ["Quads"] },
+      { name: "Calf Raise (Đứng hoặc Ngồi)", sets: 3, reps: "10-12", primaryMuscleGroups: ["Calves"] }
+    ],
+    evening: []
+  },
+  7: {
+    levelName: "Ngày 7: Rest & Recovery",
+    description: "Nghỉ ngơi tích cực, đi bộ nhẹ nhàng để phục hồi.",
+    morning: [
+      { name: "Walking (Light Cardio)", sets: 1, reps: "60 mins", primaryMuscleGroups: ["None"] }
+    ],
+    evening: []
+  }
+};
+
 // --- SPLIT GENERATION PARTS ---
 
 const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], apiKey: string): Promise<any> => {
-  const ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  const ai = new GoogleGenAI({ apiKey });
   const model = MODELS.WORKOUT;
 
   // Determine Day Number (1-7)
@@ -300,28 +389,82 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   const currentSplitName = dayNames[currentDayNumber];
 
   let workoutInstructionBlock = "";
-  if (userData.trainingMode === 'saitama') {
+  if (userData.trainingMode === 'gym') {
+    /* 
+    // OLD AI PROMPT - BYPASSED FOR GYM MODE
     workoutInstructionBlock = `
-    ### WORKOUT MODE: SAITAMA CHALLENGE (ONE PUNCH MAN)
-    IGNORE THE DATE AND SPLIT. TODAY IS SAITAMA DAY.
-    YOU MUST GENERATE THE FOLLOWING EXERCISES:
-    1. **Push-ups**: Total 100 reps target.
-    2. **Sit-ups**: Total 100 reps target.
-    3. **Squats**: Total 100 reps target.
-    4. **Running**: 10km Run (Cardio). *IMPORTANT*: If user Intensity is 'Medium' or 'Fresh', scale this down to "60 Minutes Run/Walk (Cardio)".
-    Structure this into Morning (Upper Body focus) and Evening (Lower Body/Run focus).
-    `;
+    ### WORKOUT MODE: GYM BODYBUILDING (STRICT 6-DAY SPLIT)
+    ...
+    `; 
+    */
+
+    // DIRECTLY RETURN HARDCODED SCHEDULE
+    let schedule = GYM_SCHEDULE[currentDayNumber] || GYM_SCHEDULE[1];
+
+    // --- PERSONALIZATION LOGIC ---
+    // Make a deep copy to avoid mutating the constant
+    schedule = JSON.parse(JSON.stringify(schedule));
+
+    const health = userData.healthCondition || 'Good';
+    const intensity = userData.selectedIntensity || 'medium';
+
+    if (schedule.morning && schedule.morning.length > 0) {
+      schedule.morning = schedule.morning.map((ex: any) => {
+        let sets = ex.sets;
+        let note = "";
+
+        // 1. HEALTH CONDITION ADJUSTMENTS
+        if (health === 'Injured') {
+          sets = Math.max(2, sets - 1); // Reduce volume
+          note += " [CHẤN THƯƠNG: Tập nhẹ, focus form]";
+        } else if (health === 'Tired') {
+          sets = Math.max(2, sets - 1);
+          note += " [MỆT MỎI: Giảm volume]";
+        }
+
+        // 2. INTENSITY ADJUSTMENTS
+        if (intensity === 'hard' && health === 'Good') {
+          sets += 1; // Increase volume
+          note += " [HARDCORE: +1 Set]";
+        } else if (intensity === 'low') {
+          sets = Math.max(2, sets - 1);
+          note += " [LITE: Giảm nhẹ]";
+        }
+
+        return {
+          ...ex,
+          sets: sets,
+          notes: (ex.notes || "") + note
+        };
+      });
+    }
+
+    // Mimic the AI response structure expected by the caller or reuse partial logic
+    return {
+      workout: {
+        summary: `Hôm nay là ${schedule.levelName}. (Health: ${health}, Mode: ${intensity})`,
+        detail: schedule
+      },
+      schedule: {
+        suggestedWorkoutTime: "17:30",
+        suggestedSleepTime: "23:00",
+        reasoning: "Lịch tập cố định 6 ngày."
+      }
+    };
   } else {
     workoutInstructionBlock = `
-    ### WORKOUT SCHEDULE (STRICT 7-DAY SPLIT)
-    TODAY IS: ${currentSplitName}. FOLLOW THIS SPLIT STRICTLY:
-    - Day 1 (Mon): Push (Chest, Shoulder, Triceps)
-    - Day 2 (Tue): Pull (Back, Biceps)
-    - Day 3 (Wed): Legs (Quads, Hamstring, Calves, Glutes) + Abs
-    - Day 4 (Thu): Full Body / Arms & Abs
-    - Day 5 (Fri): Chest & Back
-    - Day 6 (Sat): Shoulder & Arms
-    - Day 7 (Sun): REST DAY (Active Recovery)
+    ### WORKOUT MODE: CALISTHENICS & STREET WORKOUT
+    TODAY IS: ${currentSplitName}. 
+    FOCUS: BODYWEIGHT MASTERY, SKILLS (Planche, Front Lever progs), and RELATIVE STRENGTH.
+    
+    Reference Split (Flexible):
+    - Day 1: Push (Push-ups, Dips, Handstand work)
+    - Day 2: Pull (Pull-ups, Rows, Front Lever work)
+    - Day 3: Legs & Core (Squats, Lunges, L-Sits)
+    - Day 4: Skills & Isometrics
+    - Day 5: Full Body Intensity
+    - Day 6: Cardio & Endurance
+    - Day 7: Active Recovery
     
     **DAILY ABS & CARDIO**: EVERY SINGLE DAY MUST include 1 Abs + 1 Cardio in Evening.
     **REST DAY RULES**: Main Activity: "Walking (Cardio)" - 60 Minutes + Light Abs.
@@ -393,14 +536,23 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   const prompt = `
     ACT AS A WORLD-CLASS PERSONAL TRAINER.
     GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
-    TRAINING MODE: ${userData.trainingMode === 'saitama' ? 'SAITAMA CHALLENGE' : 'STANDARD AI COACH'}.
+    TRAINING MODE: CALISTHENICS/STREET WORKOUT.
     
     ${workoutInstructionBlock}
 
     ### LANGUAGE & LOCALIZATION RULES
     - **VIETNAMESE REQUIRED**: Summary, Description, Reasoning MUST be in **VIETNAMESE**.
+    - **SUMMARY**: concise (max 2 sentences). NO motivational rants. NO repetition.
+    - **REASONING**: strictly technical explanation of the split.
+    - **LANGUAGE**: Vietnamese (except technical terms like "Bench Press").
+    - **SCHEDULE**: reasonable times based on user habits.
     - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press").
     - **CONCISENESS**: Keep descriptions Short & Fast.
+    
+    ### STRICT OUTPUT RULES
+    - Do NOT include long lists of quotes (e.g. "Never give up", "Stay strong").
+    - Do NOT repeat phrases.
+    - Keep it professional and direct.
 
     ### GENERAL WORKOUT RULES
     - **INTENSITY**: ${userData.selectedIntensity}.
@@ -439,7 +591,7 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
 };
 
 const generateNutritionPart = async (userData: UserInput, apiKey: string): Promise<any> => {
-  const ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  const ai = new GoogleGenAI({ apiKey });
   const model = MODELS.MENU;
 
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
@@ -460,8 +612,20 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
           totalProtein: { type: Type.NUMBER },
           totalCarbs: { type: Type.NUMBER },
           totalFat: { type: Type.NUMBER },
-          totalCost: { type: Type.NUMBER },
+          consumedIngredients: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                name: { type: Type.STRING },
+                quantity: { type: Type.NUMBER },
+                unit: { type: Type.STRING }
+              }
+            }
+          },
           advice: { type: Type.STRING },
+
           meals: {
             type: Type.ARRAY,
             items: {
@@ -473,7 +637,6 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
                 carbs: { type: Type.NUMBER },
                 fat: { type: Type.NUMBER },
                 description: { type: Type.STRING },
-                estimatedPrice: { type: Type.NUMBER }
               }
             }
           }
@@ -494,7 +657,16 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
     - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
     - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
+    - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
     - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
+    - **INVENTORY DEDUCTION**:
+      - You MUST return a 'consumedIngredients' list.
+      - Map the meals back to the user's available ingredients: ${JSON.stringify(userData.availableIngredients.map(i => ({ id: i.id, name: i.name, unit: i.unit })))}.
+      - **CRITICAL**: Return the exact 'id' of the ingredient used.
+      - Estimate how much of each available ingredient was used.
+      - If an available item was NOT used, do not include it.
+      - Example: Return [{"id": "123", "name": "Chicken", "quantity": 0.2, "unit": "kg"}]
+ 
 
     ### DATA INPUTS
     - Weight: ${userData.weight}kg, Height: ${userData.height}cm.
@@ -517,11 +689,12 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
 
 export const generateDailyPlan = async (
   userData: UserInput,
-  fullHistory: WorkoutHistoryItem[]
+  fullHistory: WorkoutHistoryItem[],
+  generationType: 'workout' | 'nutrition' | 'both' = 'both' // New parameter
 ): Promise<DailyPlan> => {
   // Optimization: Only use the last 14 days of history
   const history = fullHistory.slice(-14);
-  const apiKey = getCurrentApiKey();
+  let apiKey = getCurrentApiKey(); // Change to let
 
   if (!apiKey) {
     console.warn("No API Keys found. Using fallback plan.");
@@ -532,22 +705,39 @@ export const generateDailyPlan = async (
 
   while (retriesLeft > 0) {
     try {
-      console.log(`🚀 Generating Plan with Key Index ${currentKeyIndex}...`);
+      console.log(`🚀 Generating Plan (${generationType}) with Key Index ${currentKeyIndex}...`);
 
-      // PARALLEL GENERATION
-      const [workoutPart, nutritionPart] = await Promise.all([
-        generateWorkoutPart(userData, history, apiKey),
-        generateNutritionPart(userData, apiKey)
-      ]);
+      // ... (rest of logic uses apiKey)
 
-      // MERGE RESULTS
-      const finalPlan: DailyPlan = {
-        ...workoutPart,
-        ...nutritionPart,
-        date: getCurrentDate() // Ensure date is consistent
+      let workoutPart: any = {};
+      let nutritionPart: any = {};
+
+      if (generationType === 'workout' || generationType === 'both') {
+        workoutPart = await generateWorkoutPart(userData, history, apiKey);
+      }
+
+      if (generationType === 'nutrition' || generationType === 'both') {
+        nutritionPart = await generateNutritionPart(userData, apiKey);
+      }
+
+      // ... (rest of success logic)
+
+      const fallback = getFallbackPlan(userData);
+
+      const result: DailyPlan = {
+        ...fallback, // Start with full fallback
+        date: getCurrentDate(), // Update date
+        // Overwrite only if we generated something
+        ...(generationType === 'workout' || generationType === 'both' ? {
+          workout: { ...workoutPart.workout, isGenerated: true },
+          schedule: workoutPart.schedule // Also update schedule
+        } : {}),
+        ...(generationType === 'nutrition' || generationType === 'both' ? {
+          nutrition: { ...nutritionPart.nutrition, isGenerated: true }
+        } : {})
       };
 
-      return finalPlan;
+      return result;
 
     } catch (error) {
       console.error("Gemini API Error (Parallel):", error);
@@ -556,8 +746,7 @@ export const generateDailyPlan = async (
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected, switching to next API key...`);
-          // Note: In a real parallel scenario, we'd need to retry the specific failed part or both.
-          // For simplicity here, we retry the whole block with the new key.
+          apiKey = newKey; // Update the variable!
           retriesLeft--;
           continue;
         }
@@ -604,12 +793,12 @@ export const generateAIOverview = async (
   history: WorkoutHistoryItem[],
   userData?: UserInput
 ): Promise<AIOverview> => {
-  const apiKey = getCurrentApiKey();
+  let apiKey = getCurrentApiKey();
   if (!apiKey || history.length === 0) {
     return getFallbackAIOverview(history);
   }
 
-  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length;
   const model = MODELS.OVERVIEW;
 
@@ -696,7 +885,8 @@ OUTPUT: JSON format.
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
           console.log(`⚡ Rate limit detected on AI Overview, switching to next API key...`);
-          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
+          ai = new GoogleGenAI({ apiKey: newKey });
+          apiKey = newKey; // Also update the local tracking var if needed, mostly for consistency
           retriesLeft--;
           continue;
         }
@@ -719,7 +909,7 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
     return [];
   }
 
-  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length;
   const model = MODELS.FOOD_SCAN;
 
@@ -760,7 +950,7 @@ export const parseFridgeItems = async (text: string): Promise<{ id: string, name
       if (isRateLimitError(error) && retriesLeft > 1) {
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
-          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
+          ai = new GoogleGenAI({ apiKey: newKey });
           retriesLeft--;
           continue;
         }
@@ -782,7 +972,7 @@ export const suggestNextExercises = async (
   const apiKey = getCurrentApiKey();
   if (!apiKey) return []; // Should handle fallback but for single suggest maybe just fail
 
-  let ai = new GoogleGenAI({ apiKey, baseUrl: '/google-api' });
+  let ai = new GoogleGenAI({ apiKey });
   let retriesLeft = API_KEYS.length;
   const model = MODELS.WORKOUT; // Use same workout model
 
@@ -843,7 +1033,7 @@ export const suggestNextExercises = async (
       if (isRateLimitError(error) && retriesLeft > 1) {
         const newKey = markRateLimitedAndRotate();
         if (newKey) {
-          ai = new GoogleGenAI({ apiKey: newKey, baseUrl: '/google-api' });
+          ai = new GoogleGenAI({ apiKey: newKey });
           retriesLeft--;
           continue;
         }
