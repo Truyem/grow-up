@@ -21,7 +21,8 @@ async function discordRequest(endpoint: string, method: string = "GET", body: an
     }
     const res = await fetch(url, options);
     if (!res.ok) {
-        throw new Error(`Discord API Error: ${res.status} ${res.statusText} - ${await res.text()}`);
+        const text = await res.text();
+        throw new Error(`Discord API Error: ${res.status} ${res.statusText} - ${text}`);
     }
     return res.json();
 }
@@ -30,8 +31,12 @@ async function createDMChannel(userId: string) {
     return discordRequest("/users/@me/channels", "POST", { recipient_id: userId });
 }
 
-async function sendMessage(channelId: string, content: string) {
-    return discordRequest(`/channels/${channelId}/messages`, "POST", { content });
+async function sendMessage(channelId: string, content: string, components: any[] = []) {
+    const body: any = { content };
+    if (components.length > 0) {
+        body.components = components;
+    }
+    return discordRequest(`/channels/${channelId}/messages`, "POST", body);
 }
 
 async function getRecentMessages(channelId: string) {
@@ -47,6 +52,19 @@ export default async (req: Request, context: Context) => {
     const currentHour = vnTime.getHours();
     const currentMinute = vnTime.getMinutes();
 
+    // Button Component (Interaction Style)
+    const buttonComponent = {
+        type: 1, // Action Row
+        components: [
+            {
+                type: 2, // Button
+                style: 3, // Green Button (SUCCESS style)
+                label: "✅ Tôi đã dậy rồi!",
+                custom_id: "wake_confirm"
+            }
+        ]
+    };
+
     console.log(`Running Daily Reminder. VN Time: ${vnTime.toISOString()}. Hour: ${currentHour}, Minute: ${currentMinute}`);
 
     try {
@@ -59,7 +77,11 @@ export default async (req: Request, context: Context) => {
         if (currentHour === 5 && currentMinute < 5) {
             console.log("Triggering 5 AM valid check...");
             await store.set("confirmed", "false");
-            await sendMessage(channelId, "Chào buổi sáng! 🌅 Hãy nhắn lại gì đó để xác nhận bạn đã dậy nhé.");
+            await sendMessage(
+                channelId,
+                "Chào buổi sáng! 🌅 Hãy bấm nút dưới để xác nhận bạn đã dậy nhé.",
+                [buttonComponent]
+            );
             return new Response("Sent 5 AM greeting");
         }
 
@@ -71,41 +93,20 @@ export default async (req: Request, context: Context) => {
             return new Response("Already confirmed");
         }
 
-        // Check if user has replied since 5 AM today
+        // Check if user has replied since 5 AM today (keeping this logic as fallback)
         const messages = await getRecentMessages(channelId);
 
-        // Find start of today 5 AM in UTC equivalent (approximate is fine for relative check, 
-        // strictly we should parse msg timestamp)
-        // Let's iterate messages and check timestamps
-        const startOfToday5AM = new Date(vnTime);
-        startOfToday5AM.setHours(5, 0, 0, 0);
+        const y = vnTime.getFullYear();
+        const m = vnTime.getMonth();
+        const d = vnTime.getDate();
 
         let userReplied = false;
 
         for (const msg of messages) {
-            // Discord timestamps are ISO8601 (UTC)
             const msgTime = new Date(msg.timestamp);
-            // We need to compare this msgTime to the "Start of Today 5 AM VN" in actual time
-            // vnTime is "shifted" date object, but we need real timestamp comparison.
-            // EASIER: Just check if message time > (Now - X time) OR check if msgTime > 5 AM today (absolute)
-
-            // Re-construct 5 AM VN today in UTC
-            // Get YYYY-MM-DD from vnTime
-            const y = vnTime.getFullYear();
-            const m = vnTime.getMonth();
-            const d = vnTime.getDate();
-            // Create date object for 5 AM VN
-            // We know timezone offset for VN is +7 
-            // So 5 AM VN = 22:00 PM previous day UTC usually, but simpler to use string parsing or library if available.
-            // Since we don't have date-fns, let's trust the "vnTime" construction for "date" parts
-            // but for comparison, we need to be careful.
-
-            // Alternative: Simply check if user sent a message that is AFTER the last "bot prompt" or just "today".
-            // Let's trust that if the message timestamp (converted to VN time) is > 5:00 AM TODAY.
             const msgVnTime = new Date(msgTime.toLocaleString("en-US", { timeZone: TIMEZONE }));
 
             if (msg.author.id === USER_ID) {
-                // Check if message is from TODAY and AFTER 5 AM
                 if (msgVnTime.getDate() === d && msgVnTime.getMonth() === m && msgVnTime.getFullYear() === y) {
                     if (msgVnTime.getHours() >= 5) {
                         userReplied = true;
@@ -123,7 +124,11 @@ export default async (req: Request, context: Context) => {
 
         // If not confirmed and not 5 AM window -> SPAM
         console.log("User has not replied. SPAMMING.");
-        await sendMessage(channelId, "Dậy đi bạn ơi! ⏰ Trả lời tin nhắn này để tắt báo thức! (5 phút/lần)");
+        await sendMessage(
+            channelId,
+            "Dậy đi bạn ơi! ⏰ BẤM XÁC NHẬN NGAY! (5 phút/lần)",
+            [buttonComponent]
+        );
 
         return new Response("Spam sent");
 
