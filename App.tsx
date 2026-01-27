@@ -623,11 +623,11 @@ export default function App() {
             Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
           </h1>
           <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
-            Lịch trình tập luyện thông minh & Sáng tạo.
+            Lịch trình tập luyện thông minh.
           </p>
 
-          {/* API Status Badge & Online Counter - Global */}
-          <div className="flex flex-col items-center gap-3 pt-4">
+          {/* API Status Badge & Online Counter - Global Removed as requested */}
+          {/* <div className="flex flex-col items-center gap-3 pt-4">
             {apiStatus.totalKeys > 0 && (
               <ApiStatusBadge
                 status={apiStatus}
@@ -635,7 +635,7 @@ export default function App() {
               />
             )}
             <OnlineCounter />
-          </div>
+          </div> */}
         </div>
 
         <div className="transition-all duration-500 ease-in-out">

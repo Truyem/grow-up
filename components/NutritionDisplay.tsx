@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { DailyPlan, Meal } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets } from 'lucide-react';
+import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets, X } from 'lucide-react';
 
 interface NutritionDisplayProps {
     plan: DailyPlan;
@@ -68,10 +68,11 @@ const CircularProgress: React.FC<{
 const MealItem: React.FC<{
     meal: Meal;
     isConsumed: boolean;
-    onToggle: () => void;
-}> = ({ meal, isConsumed, onToggle }) => (
+    onToggle: (e: React.MouseEvent) => void;
+    onClick: () => void;
+}> = ({ meal, isConsumed, onToggle, onClick }) => (
     <div
-        onClick={onToggle}
+        onClick={onClick}
         className={`group relative overflow-hidden border rounded-2xl p-4 transition-all duration-300 cursor-pointer 
         ${isConsumed
                 ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
@@ -82,10 +83,12 @@ const MealItem: React.FC<{
 
         <div className="relative z-10 flex gap-4 items-center">
             {/* Checkbox / Status Icon */}
-            <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-300
+            <div
+                onClick={onToggle}
+                className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-300 z-20 hover:scale-105 active:scale-95
                 ${isConsumed
-                    ? 'bg-emerald-500 text-white border-emerald-400 scale-110'
-                    : 'bg-white/5 border-white/10 text-white/20 group-hover:border-white/30'}`}
+                        ? 'bg-emerald-500 text-white border-emerald-400 scale-110'
+                        : 'bg-white/5 border-white/10 text-white/20 group-hover:border-white/30'}`}
             >
                 {isConsumed ? <Check className="w-6 h-6 stroke-[3]" /> : <Utensils className="w-5 h-5" />}
             </div>
@@ -111,9 +114,95 @@ const MealItem: React.FC<{
     </div>
 );
 
+// --- MODAL COMPONENT ---
+const MealDetailModal: React.FC<{
+    meal: Meal;
+    isConsumed: boolean;
+    onClose: () => void;
+    onToggle: () => void;
+}> = ({ meal, isConsumed, onClose, onToggle }) => {
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-sm bg-[#1a1b1e] border border-white/10 rounded-3xl p-6 shadow-2xl animate-fade-in-up">
+
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 rounded-full bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-bold uppercase text-emerald-400 tracking-wider border border-white/5">
+                            Chi tiết bữa ăn
+                        </span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white leading-tight mb-2 pr-8">{meal.name}</h3>
+                </div>
+
+                {/* Macros Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-red-500/10 rounded-xl p-3 border border-red-500/20">
+                        <div className="text-xs text-red-300 font-medium mb-1">Calories</div>
+                        <div className="text-xl font-bold text-white">{meal.calories}</div>
+                    </div>
+                    <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20">
+                        <div className="text-xs text-blue-300 font-medium mb-1">Protein</div>
+                        <div className="text-xl font-bold text-white">{meal.protein}g</div>
+                    </div>
+                    <div className="bg-orange-500/10 rounded-xl p-3 border border-orange-500/20">
+                        <div className="text-xs text-orange-300 font-medium mb-1">Carbs</div>
+                        <div className="text-xl font-bold text-white">{meal.carbs}g</div>
+                    </div>
+                    <div className="bg-yellow-500/10 rounded-xl p-3 border border-yellow-500/20">
+                        <div className="text-xs text-yellow-300 font-medium mb-1">Fat</div>
+                        <div className="text-xl font-bold text-white">{meal.fat}g</div>
+                    </div>
+                </div>
+
+                {/* Description */}
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-6 max-h-[200px] overflow-y-auto">
+                    <p className="text-gray-300 leading-relaxed text-sm">
+                        {meal.description}
+                    </p>
+                </div>
+
+                {/* Action Button */}
+                <button
+                    onClick={() => {
+                        onToggle();
+                        onClose();
+                    }}
+                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95
+                        ${isConsumed
+                            ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
+                            : 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600'
+                        }`}
+                >
+                    {isConsumed ? (
+                        <>
+                            <X className="w-5 h-5" /> Hủy hoàn thành
+                        </>
+                    ) : (
+                        <>
+                            <Check className="w-5 h-5" /> Đánh dấu đã ăn
+                        </>
+                    )}
+                </button>
+
+            </div>
+        </div>
+    );
+};
+
 export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset }) => {
-    // State to track consumed meal names (assuming names are unique for simplicity, ideally use ID)
+    // State to track consumed meal names
     const [consumedMealNames, setConsumedMealNames] = useState<string[]>([]);
+
+    // State for modal
+    const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
 
     const toggleMeal = (mealName: string) => {
         setConsumedMealNames(prev =>
@@ -140,6 +229,15 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
     return (
         <div className="space-y-8 animate-fade-in relative pt-20 pb-10">
+            {selectedMeal && (
+                <MealDetailModal
+                    meal={selectedMeal}
+                    isConsumed={consumedMealNames.includes(selectedMeal.name)}
+                    onClose={() => setSelectedMeal(null)}
+                    onToggle={() => toggleMeal(selectedMeal.name)}
+                />
+            )}
+
             {/* Header Section */}
             <div className="text-center space-y-2">
                 <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
@@ -208,7 +306,11 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                             key={index}
                             meal={meal}
                             isConsumed={consumedMealNames.includes(meal.name)}
-                            onToggle={() => toggleMeal(meal.name)}
+                            onToggle={(e) => {
+                                e.stopPropagation();
+                                toggleMeal(meal.name);
+                            }}
+                            onClick={() => setSelectedMeal(meal)}
                         />
                     ))}
                 </div>
@@ -217,7 +319,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             {/* Footer Actions */}
             <div className="text-center pt-8 border-t border-white/5">
                 <p className="text-xs text-gray-500 mb-4 italic">
-                    *Mẹo: Chạm vào món ăn để đánh dấu đã ăn
+                    *Mẹo: Chạm vào món ăn để xem chi tiết
                 </p>
                 <button
                     onClick={onReset}

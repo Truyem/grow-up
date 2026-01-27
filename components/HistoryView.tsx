@@ -184,7 +184,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             <span className="text-2xl font-bold text-white">{stats.totalExercises}</span>
             <span className="text-[10px] text-blue-300 uppercase tracking-wider">Bài tập</span>
           </div>
-          <div className="bg-orange-900/20 border border-orange-500/20 rounded-2xl p-4 flex flex-col justify-center items-center shadow-lg col-span-2 md:col-span-1">
+          <div className="bg-orange-900/20 border border-orange-500/20 rounded-2xl p-4 flex flex-col justify-center items-center shadow-lg md:col-span-1">
             <Flame className="w-6 h-6 text-orange-400 mb-2" />
             <span className="text-2xl font-bold text-white">{stats.streak}</span>
             <span className="text-[10px] text-orange-300 uppercase tracking-wider">Ngày Streak</span>
