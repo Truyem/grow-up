@@ -31,7 +31,7 @@ export default async (req: Request, context: Context) => {
 
     // 4. Verify Signature
     // verifyKey expects strict match. 
-    const isValid = verifyKey(body, signature, timestamp, publicKey);
+    const isValid = await verifyKey(body, signature, timestamp, publicKey);
 
     if (!isValid) {
         console.error("[Interaction] Signature Verification FAILED");
