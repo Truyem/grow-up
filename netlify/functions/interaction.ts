@@ -7,38 +7,46 @@ const HARDCODED_PUBLIC_KEY = "2d5d49896f6caf63fedd377ceb2c34da16b292dc7d3f3abd7d
 const BLOB_STORE_NAME = "discord-reminder";
 
 export default async (req: Request, context: Context) => {
-    // Prefer Environment Variable, fallback to hardcoded
-    const publicKey = process.env.DISCORD_PUBLIC_KEY || HARDCODED_PUBLIC_KEY;
+    // 1. Get Public Key & Sanitize
+    let publicKey = process.env.DISCORD_PUBLIC_KEY || HARDCODED_PUBLIC_KEY;
+    publicKey = publicKey.trim(); // CRITICAL: Remove accidental copy-paste whitespace
 
-    // 1. Get Headers & Body
+    // 2. Get Headers & Body
     const signature = req.headers.get("X-Signature-Ed25519");
     const timestamp = req.headers.get("X-Signature-Timestamp");
     const body = await req.text();
 
-    console.log(`[Interaction] Request received. Method: ${req.method}. Body Length: ${body.length}`);
+    console.log(`[Interaction] Request received.`);
+    console.log(`- Method: ${req.method}`);
+    console.log(`- Body Length: ${body.length}`);
+    console.log(`- Signature: ${signature ? "Present" : "Missing"}`);
+    console.log(`- Timestamp: ${timestamp ? "Present" : "Missing"}`);
+    console.log(`- PublicKey (first 10 chars): ${publicKey.substring(0, 10)}...`);
 
-    // 2. Validate existence of headers (Browser vs Discord check)
+    // 3. Validate Headers
     if (!signature || !timestamp) {
         console.warn("[Interaction] Missing Discord Headers (Likely browser access)");
         return new Response("Missing or Invalid Discord Headers", { status: 401 });
     }
 
-    // 3. Verify Signature
+    // 4. Verify Signature
+    // verifyKey expects strict match. 
     const isValid = verifyKey(body, signature, timestamp, publicKey);
 
     if (!isValid) {
         console.error("[Interaction] Signature Verification FAILED");
-        console.error(`- PublicKey Used: ${publicKey.substring(0, 10)}...`);
-        console.error(`- Signature: ${signature}`);
-        console.error(`- Timestamp: ${timestamp}`);
+        console.error("Possible causes: Wrong Public Key, Body Tampering, or Encoding Issue.");
+        // We return 401 so Discord knows we rejected it (but we know why)
         return new Response("Bad Request Signature", { status: 401 });
     }
 
-    // 4. Parse Body (Safe now)
+    console.log("[Interaction] Signature Verified Successfully!");
+
+    // 5. Parse Body
     const interaction = JSON.parse(body);
     console.log(`[Interaction] Type: ${interaction.type}`);
 
-    // 5. Handle PING (Verification)
+    // 6. Handle PING (Verification)
     if (interaction.type === InteractionType.PING) {
         console.log("[Interaction] PING received. Replying PONG.");
         return new Response(JSON.stringify({
@@ -49,12 +57,10 @@ export default async (req: Request, context: Context) => {
         });
     }
 
-    // 6. Handle Button Click
+    // 7. Handle Button Click
     if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
         if (interaction.data.custom_id === "wake_confirm") {
-            console.log("[Interaction] 'wake_confirm' button clicked.");
             const store = getStore(BLOB_STORE_NAME);
-
             await store.set("confirmed", "true");
 
             return new Response(JSON.stringify({
