@@ -47,9 +47,11 @@ const INITIAL_USER_DATA: UserInput = {
   healthCondition: HealthCondition.Good, // Default Health
   soreMuscles: [MuscleGroup.None],
   selectedIntensity: Intensity.Medium,
-  nutritionGoal: 'cutting',
-  trainingMode: 'calis',
+  nutritionGoal: 'bulking',
+  trainingMode: 'gym',
   useCreatine: false, // Default false
+  useOnlyAvailableIngredients: false, // New field 
+  allowExtraVeggies: true, // Default to true for health
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
   consumedFood: []
@@ -313,6 +315,8 @@ export default function App() {
       nutritionGoal: userData.nutritionGoal,
       trainingMode: userData.trainingMode,
       useCreatine: userData.useCreatine,
+      useOnlyAvailableIngredients: userData.useOnlyAvailableIngredients,
+      allowExtraVeggies: userData.allowExtraVeggies,
       equipment: userData.equipment,
       availableIngredients: userData.availableIngredients
       // consumedFood is NOT saved - it resets daily

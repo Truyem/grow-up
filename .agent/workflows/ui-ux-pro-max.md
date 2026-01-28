@@ -229,3 +229,23 @@ Before delivering UI code, verify these items:
 - [ ] Form inputs have labels
 - [ ] Color is not the only indicator
 - [ ] `prefers-reduced-motion` respected
+
+---
+
+## Step 4: Automated Design Review
+
+After implementation, verify the design using the **Web Design Guidelines** skill.
+
+1.  **Read the guidelines**:
+    ```bash
+    # Fetch latest rules
+    read_url_content https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md
+    ```
+
+2.  **Review Code**:
+    Check your implemented files against the rules found in the URL above. Focus on:
+    - Layout stability
+    - Interaction states
+    - Accessibility
+    - Visual consistency
+

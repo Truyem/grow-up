@@ -649,14 +649,20 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     ACT AS A NUTRITIONIST.
     GENERATE A 1-DAY MEAL PLAN.
     
+    ### INVENTORY & INGREDIENT RULES
+    - **AVAILABLE INGREDIENTS**: ${JSON.stringify(userData.availableIngredients.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })))}.
+    - **STRICT MODE**: ${userData.useOnlyAvailableIngredients ? "YES (MANDATORY)" : "NO"}.
+    - **RULE if STRICT MODE is YES**: You MUST ONLY usage ingredients listed above. Do NOT suggest rice, bread, or staples if they are not in the list.
+    - **EXTRA VEGETABLES RULE**: ${userData.allowExtraVeggies ? "ALLOWED (Add common healthy vegetables if needed)" : "FORBIDDEN (Only usage what's in the list)"}.
+    - **RULE if STRICT MODE is NO**: Prioritize using available items but you can add missing essentials.
+
     ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal.
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${goalText}.
-    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.join(', ')}.
+    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.filter(i => i.category === 'veg').map(i => i.name).join(', ')}.
     - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
     - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
-    - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
     - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
     - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
     - **INVENTORY DEDUCTION**:

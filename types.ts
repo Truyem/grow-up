@@ -69,6 +69,8 @@ export interface UserInput {
   nutritionGoal: NutritionGoal;
   trainingMode: TrainingMode;
   useCreatine: boolean; // New field
+  useOnlyAvailableIngredients: boolean; // New field
+  allowExtraVeggies: boolean; // New field
   equipment: string[];
   availableIngredients: Ingredient[];
   consumedFood: string[];
