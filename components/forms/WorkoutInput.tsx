@@ -53,7 +53,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
         <div className="space-y-6 animate-fade-in">
             {/* TRAINING MODE SELECTION */}
             <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6 text-cyan-400" />}>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                     <button
                         onClick={() => setUserData({ ...userData, trainingMode: 'calis' })}
                         className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'calis'
@@ -63,8 +63,8 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                     >
                         <BrainCircuit className="w-8 h-8 flex-shrink-0" />
                         <div className="text-center relative z-10">
-                            <div className="font-bold text-sm">Calisthenics (Street Workout)</div>
-                            <div className="text-[10px] opacity-70">Bodyweight & Skills Focus</div>
+                            <div className="font-bold text-sm">Calisthenics</div>
+                            <div className="text-[10px] opacity-70">Street Workout</div>
                         </div>
                     </button>
 
@@ -77,11 +77,28 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                     >
                         <Dumbbell className="w-8 h-8 flex-shrink-0" />
                         <div className="text-center relative z-10">
-                            <div className="font-bold text-sm">Gym (Bodybuilding)</div>
-                            <div className="text-[10px] opacity-70">Lịch tập Gym chuẩn (6 Days)</div>
+                            <div className="font-bold text-sm">Gym</div>
+                            <div className="text-[10px] opacity-70">Bodybuilding</div>
                         </div>
                         {userData.trainingMode === 'gym' && (
                             <div className="absolute inset-0 bg-purple-500/10 animate-pulse" />
+                        )}
+                    </button>
+
+                    <button
+                        onClick={() => setUserData({ ...userData, trainingMode: 'home' })}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'home'
+                            ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
+                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                            }`}
+                    >
+                        <Activity className="w-8 h-8 flex-shrink-0" />
+                        <div className="text-center relative z-10">
+                            <div className="font-bold text-sm">Home</div>
+                            <div className="text-[10px] opacity-70">Gym + Calis</div>
+                        </div>
+                        {userData.trainingMode === 'home' && (
+                            <div className="absolute inset-0 bg-orange-500/10 animate-pulse" />
                         )}
                     </button>
                 </div>
@@ -230,8 +247,8 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                 </div>
             </GlassCard>
 
-            {/* Equipment Management - Visible only for Calisthenics */}
-            {userData.trainingMode === 'calis' && (
+            {/* Equipment Management - Visible for Calisthenics and Home Workout */}
+            {(userData.trainingMode === 'calis' || userData.trainingMode === 'home') && (
                 <GlassCard title="Dụng cụ tập luyện" icon={<Dumbbell className="w-6 h-6 text-cyan-400" />}>
                     <div className="space-y-4">
                         <p className="text-xs text-gray-400 -mt-2">Hệ thống sẽ mặc định bạn chỉ có 1 quả tạ (1 tay) trừ khi bạn ghi rõ "2x" hoặc "đôi".</p>

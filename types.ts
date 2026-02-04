@@ -57,7 +57,7 @@ export enum HealthCondition {
 
 export type NutritionGoal = 'bulking' | 'cutting';
 
-export type TrainingMode = 'calis' | 'gym';
+export type TrainingMode = 'calis' | 'gym' | 'home';
 
 export interface UserInput {
   weight: number;

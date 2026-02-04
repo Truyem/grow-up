@@ -375,6 +375,96 @@ const GYM_SCHEDULE: Record<number, any> = {
   }
 };
 
+// --- HARDCODED HOME WORKOUT SCHEDULE (Gym + Calis Hybrid) ---
+const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
+  1: {
+    levelName: "Ngày 1: Push Day (Ngực, Vai, Tay sau)",
+    description: "Đẩy tại nhà - kết hợp tạ đơn và bodyweight.",
+    morning: [
+      { name: "Push-up (Wide Grip)", sets: 4, reps: "12-15", equipment: "None", primaryMuscleGroups: ["Chest - Middle", "Triceps"] },
+      { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Triceps - Long Head"] },
+      { name: "Pike Push-up", sets: 3, reps: "10-12", equipment: "None", primaryMuscleGroups: ["Front Delts", "Triceps"] },
+      { name: "Dumbbell Shoulder Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Front Delts", "Side Delts"] },
+      { name: "Dumbbell Lateral Raise", sets: 3, reps: "15-20", equipment: "Tạ đơn", primaryMuscleGroups: ["Side Delts"] },
+      { name: "Diamond Push-up", sets: 3, reps: "10-12", equipment: "None", primaryMuscleGroups: ["Triceps - Lateral Head", "Chest - Middle"] }
+    ],
+    evening: []
+  },
+  2: {
+    levelName: "Ngày 2: Pull Day (Lưng, Tay Trước)",
+    description: "Kéo tại nhà - bodyweight và tạ đơn.",
+    morning: [
+      { name: "Pull-up (Hoặc Inverted Row)", sets: 4, reps: "8-12", equipment: "Xà đơn/Bàn", primaryMuscleGroups: ["Lats", "Biceps"] },
+      { name: "Dumbbell Bent Over Row", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Upper Back", "Lats"] },
+      { name: "Dumbbell Rear Delt Fly", sets: 3, reps: "15-20", equipment: "Tạ đơn", primaryMuscleGroups: ["Rear Delts", "Upper Back"] },
+      { name: "Chin-up (Hoặc Curl)", sets: 3, reps: "8-10", equipment: "Xà đơn/Tạ đơn", primaryMuscleGroups: ["Biceps", "Lats"] },
+      { name: "Dumbbell Bicep Curl", sets: 3, reps: "12-15", equipment: "Tạ đơn", primaryMuscleGroups: ["Biceps"] },
+      { name: "Hammer Curl", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Biceps", "Forearms"] }
+    ],
+    evening: []
+  },
+  3: {
+    levelName: "Ngày 3: Legs Day (Chân + Core)",
+    description: "Chân và core - bodyweight và tạ đơn.",
+    morning: [
+      { name: "Goblet Squat", sets: 4, reps: "12-15", equipment: "Tạ đơn", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Dumbbell Romanian Deadlift", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Hamstrings", "Glutes"] },
+      { name: "Bulgarian Split Squat", sets: 3, reps: "10/leg", equipment: "Ghế/Tạ đơn", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Calf Raise (Single Leg)", sets: 3, reps: "15-20", equipment: "None", primaryMuscleGroups: ["Calves"] },
+      { name: "Plank", sets: 3, reps: "45-60s", equipment: "None", primaryMuscleGroups: ["Core", "Abs - Upper"] },
+      { name: "Bicycle Crunch", sets: 3, reps: "20", equipment: "None", primaryMuscleGroups: ["Abs - Lower", "Obliques"] }
+    ],
+    evening: []
+  },
+  4: {
+    levelName: "Ngày 4: Upper Body (Full)",
+    description: "Toàn thân trên - cường độ trung bình.",
+    morning: [
+      { name: "Incline Push-up (Chân cao)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
+      { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Triceps"] },
+      { name: "Dumbbell Row (Single Arm)", sets: 3, reps: "10-12/arm", equipment: "Tạ đơn", primaryMuscleGroups: ["Lats", "Upper Back"] },
+      { name: "Arnold Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Front Delts", "Side Delts"] },
+      { name: "Dumbbell Skull Crusher", sets: 3, reps: "12-15", equipment: "Tạ đơn", primaryMuscleGroups: ["Triceps - Long Head"] },
+      { name: "Concentration Curl", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Biceps"] }
+    ],
+    evening: []
+  },
+  5: {
+    levelName: "Ngày 5: Lower Body + Cardio",
+    description: "Chân + cardio nhẹ.",
+    morning: [
+      { name: "Jump Squat", sets: 3, reps: "15", equipment: "None", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Dumbbell Sumo Squat", sets: 3, reps: "12-15", equipment: "Tạ đơn", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Glute Bridge (Single Leg)", sets: 3, reps: "12/leg", equipment: "None", primaryMuscleGroups: ["Glutes", "Hamstrings"] },
+      { name: "Dumbbell Step Up", sets: 3, reps: "10/leg", equipment: "Ghế/Tạ đơn", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Mountain Climber", sets: 3, reps: "30s", equipment: "None", primaryMuscleGroups: ["Core", "Cardio"] },
+      { name: "Burpees", sets: 3, reps: "10", equipment: "None", primaryMuscleGroups: ["Full Body", "Cardio"] }
+    ],
+    evening: []
+  },
+  6: {
+    levelName: "Ngày 6: Full Body Circuit",
+    description: "Circuit training - toàn thân, cường độ cao.",
+    morning: [
+      { name: "Dumbbell Thruster", sets: 3, reps: "12", equipment: "Tạ đơn", primaryMuscleGroups: ["Quads", "Front Delts"] },
+      { name: "Push-up to Renegade Row", sets: 3, reps: "8/arm", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Lats"] },
+      { name: "Dumbbell Swing", sets: 3, reps: "15", equipment: "Tạ đơn", primaryMuscleGroups: ["Glutes", "Hamstrings"] },
+      { name: "Dips (Ghế/Sàn)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Triceps", "Chest - Lower"] },
+      { name: "Plank to Push-up", sets: 3, reps: "10", equipment: "None", primaryMuscleGroups: ["Core", "Triceps"] },
+      { name: "Jumping Jacks", sets: 3, reps: "50", equipment: "None", primaryMuscleGroups: ["Cardio", "Full Body"] }
+    ],
+    evening: []
+  },
+  7: {
+    levelName: "Ngày 7: Rest & Recovery",
+    description: "Nghỉ ngơi tích cực, đi bộ nhẹ nhàng.",
+    morning: [
+      { name: "Walking (Light Cardio)", sets: 1, reps: "45-60 mins", primaryMuscleGroups: ["None"] }
+    ],
+    evening: []
+  }
+};
+
 // --- SPLIT GENERATION PARTS ---
 
 const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], apiKey: string): Promise<any> => {
@@ -439,7 +529,6 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
       });
     }
 
-    // Mimic the AI response structure expected by the caller or reuse partial logic
     return {
       workout: {
         summary: `Hôm nay là ${schedule.levelName}. (Health: ${health}, Mode: ${intensity})`,
@@ -451,6 +540,33 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
         reasoning: "Lịch tập cố định 6 ngày."
       }
     };
+  } else if (userData.trainingMode === 'home') {
+    // HOME WORKOUT MODE - AI Generated (Gym + Calis Hybrid)
+    workoutInstructionBlock = `
+    ### WORKOUT MODE: HOME WORKOUT (GYM + CALISTHENICS HYBRID)
+    TODAY IS: ${currentSplitName}.
+    FOCUS: Target the SAME MUSCLE GROUPS as traditional gym workouts, but using HOME EQUIPMENT and BODYWEIGHT.
+    
+    **GOAL**: Create a gym-quality workout at home. Each exercise should target specific muscle groups like gym machines do.
+    
+    **STRICT 6-DAY SPLIT (FOLLOW GYM MUSCLE TARGETING)**:
+    - Day 1: PUSH (Chest - Upper/Middle/Lower, Front Delts, Side Delts, Triceps) - Like Bench Press, Shoulder Press
+    - Day 2: PULL (Lats, Upper Back, Rear Delts, Biceps, Traps) - Like Cable Rows, Pull-downs
+    - Day 3: LEGS + CORE (Quads, Hamstrings, Glutes, Calves, Abs) - Like Leg Press, Leg Curls
+    - Day 4: UPPER BODY (Mix of Push/Pull - Chest, Back, Arms) - Hypertrophy focus
+    - Day 5: LOWER BODY + CARDIO (Legs + Light Cardio) - Endurance focus
+    - Day 6: FULL BODY CIRCUIT (All muscle groups, high intensity)
+    - Day 7: REST & RECOVERY (Walking, Light stretching)
+    
+    **EXERCISE SELECTION RULES**:
+    - Use bodyweight exercises that MIMIC gym movements (e.g., Push-ups instead of Bench Press)
+    - Use dumbbells if available for isolation exercises
+    - Include compound movements that hit multiple muscle groups
+    - Each muscle group should get DIRECT stimulus like in gym
+    
+    **DAILY ABS & CARDIO**: Include 1 Abs + 1 Cardio in Evening if Day 1-6.
+    **REST DAY RULES**: Main Activity: "Walking (Cardio)" - 45-60 Minutes.
+    `;
   } else {
     workoutInstructionBlock = `
     ### WORKOUT MODE: CALISTHENICS & STREET WORKOUT
@@ -536,7 +652,7 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   const prompt = `
     ACT AS A WORLD-CLASS PERSONAL TRAINER.
     GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
-    TRAINING MODE: CALISTHENICS/STREET WORKOUT.
+    TRAINING MODE: ${userData.trainingMode === 'home' ? 'HOME WORKOUT (GYM + CALIS HYBRID)' : 'CALISTHENICS/STREET WORKOUT'}.
     
     ${workoutInstructionBlock}
 
