@@ -138,6 +138,7 @@ export default function App() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Debug version to ensure HMR works
   useEffect(() => {
@@ -839,6 +840,59 @@ export default function App() {
     }
   };
 
+  // Refresh workout history from server
+  const handleRefreshHistory = async () => {
+    if (!session?.user) return;
+
+    setIsRefreshing(true);
+    try {
+      const { data: logs, error } = await supabase
+        .from('workout_logs')
+        .select('id, data, timestamp')
+        .eq('user_id', session.user.id)
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error("Refresh failed:", error);
+        setToastMessage("Không thể làm mới lịch sử");
+        return;
+      }
+
+      if (logs) {
+        const serverHistory = logs.map(l => ({
+          ...(l.data as WorkoutHistoryItem),
+          id: l.id
+        }));
+
+        // Deduplicate by date (keep the one with most exercises)
+        const uniqueHistoryMap = new Map<string, WorkoutHistoryItem>();
+        serverHistory.forEach(item => {
+          if (uniqueHistoryMap.has(item.date)) {
+            const existing = uniqueHistoryMap.get(item.date)!;
+            const existingCount = existing.completedExercises?.length || 0;
+            const newCount = item.completedExercises?.length || 0;
+            if (newCount > existingCount || (newCount === existingCount && item.timestamp > existing.timestamp)) {
+              uniqueHistoryMap.set(item.date, item);
+            }
+          } else {
+            uniqueHistoryMap.set(item.date, item);
+          }
+        });
+
+        const finalHistory = Array.from(uniqueHistoryMap.values())
+          .sort((a, b) => b.timestamp - a.timestamp);
+
+        setWorkoutHistory(finalHistory);
+        setToastMessage("Đã làm mới lịch sử thành công!");
+      }
+    } catch (err) {
+      console.error("Refresh error:", err);
+      setToastMessage("Có lỗi xảy ra khi làm mới");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Handle sick day - maintain streak without breaking it
   const handleSickDay = async () => {
     const todayDate = new Date().toDateString();
@@ -1011,6 +1065,8 @@ export default function App() {
                       onDeleteHistory={handleDeleteHistoryItem}
                       activeTab="workout"
                       onStartTracking={handleStartTracking}
+                      onRefreshHistory={handleRefreshHistory}
+                      isRefreshing={isRefreshing}
                     />
                   </div>
                 )
@@ -1037,6 +1093,8 @@ export default function App() {
                       onDeleteHistory={handleDeleteHistoryItem}
                       activeTab="nutrition"
                       onStartTracking={handleStartTracking}
+                      onRefreshHistory={handleRefreshHistory}
+                      isRefreshing={isRefreshing}
                     />
                   </div>
                 )
@@ -1047,6 +1105,8 @@ export default function App() {
                   history={workoutHistory}
                   userData={userData}
                   onDelete={handleDeleteHistoryItem}
+                  onRefresh={handleRefreshHistory}
+                  isRefreshing={isRefreshing}
                 />
               )}
             </div>

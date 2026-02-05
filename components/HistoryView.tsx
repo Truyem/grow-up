@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { WorkoutHistoryItem, MuscleGroup, UserInput, AIOverview } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList } from 'lucide-react';
+import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from 'recharts';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
@@ -11,6 +11,8 @@ interface HistoryViewProps {
   history: WorkoutHistoryItem[];
   onDelete: (timestamp: number) => void;
   userData?: UserInput; // Needed for context
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const formatCurrency = (amount?: number) => {
@@ -28,7 +30,7 @@ const MUSCLE_COLORS: Record<string, string> = {
   'Cardio': '#06b6d4',
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing }) => {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
@@ -335,9 +337,21 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
 
       {/* --- HISTORY LIST (Accordion) --- */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
-          <LayoutList className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-bold text-white">Nhật ký chi tiết</h3>
+        <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <LayoutList className="w-5 h-5 text-purple-400" />
+            <h3 className="text-lg font-bold text-white">Nhật ký chi tiết</h3>
+          </div>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              title="Làm mới"
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+          )}
         </div>
 
         {history.length === 0 ? (

@@ -18,6 +18,8 @@ interface UserFormProps {
   onDeleteHistory: (timestamp: number) => void;
   activeTab: 'workout' | 'nutrition' | 'history'; // New prop
   onStartTracking?: () => void;
+  onRefreshHistory?: () => void;
+  isRefreshing?: boolean;
 }
 
 type TabType = 'workout' | 'nutrition' | 'history';
@@ -25,7 +27,7 @@ type TabType = 'workout' | 'nutrition' | 'history';
 export const UserForm: React.FC<UserFormProps> = ({
   userData, setUserData, userStats, onSubmit, isLoading, onSickDay,
   history, onDeleteHistory,
-  activeTab, onStartTracking
+  activeTab, onStartTracking, onRefreshHistory, isRefreshing
 }) => {
   const [currentDate, setCurrentDate] = useState('');
   // const [activeTab, setActiveTab] = useState<TabType>('workout'); // Removed internal state
@@ -209,6 +211,8 @@ export const UserForm: React.FC<UserFormProps> = ({
             history={history}
             onDelete={onDeleteHistory}
             userData={userData}
+            onRefresh={onRefreshHistory}
+            isRefreshing={isRefreshing}
           />
         )}
       </div>
