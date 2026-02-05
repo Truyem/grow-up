@@ -379,9 +379,7 @@ const LocketCameraModal: React.FC<{
 
             {/* Header */}
             <div className="absolute top-4 left-0 w-full px-4 flex justify-between items-center z-50 pointer-events-none">
-                <button onClick={onClose} className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md pointer-events-auto">
-                    <X className="w-6 h-6" />
-                </button>
+                <div className="w-12" />
                 {/* Recording Timer */}
                 {isRecording && (
                     <div className="px-4 py-2 rounded-full bg-red-500/80 text-white font-bold flex items-center gap-2 animate-pulse">
@@ -493,6 +491,13 @@ const LocketCameraModal: React.FC<{
                             {flashOn ? <Zap className="w-6 h-6 fill-current" /> : <ZapOff className="w-6 h-6" />}
                         </button>
                     </div>
+
+                    <button
+                        onClick={onClose}
+                        className="text-white/50 hover:text-white transition-colors text-sm font-medium py-2"
+                    >
+                        Đóng Camera
+                    </button>
                 </div>
             </div>
         </div>,
@@ -645,7 +650,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                     <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
 
-                        <div className="relative z-10 flex flex-wrap justify-center gap-8 md:gap-12">
+                        <div className="relative z-10 grid grid-cols-2 gap-8 md:gap-12 justify-items-center">
                             <CircularProgress
                                 value={consumed.calories}
                                 max={plan.nutrition.totalCalories}

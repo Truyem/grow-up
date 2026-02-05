@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserInput, UserStats, Intensity, WorkoutHistoryItem } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Ruler, Weight, Activity, Flame, Dumbbell, Utensils, History } from 'lucide-react';
+import { Calendar, Ruler, Weight, Activity, Flame, Dumbbell, Utensils, History, Loader2, ChevronRight, Camera } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
 import { NutritionInput } from './forms/NutritionInput';
 import { HistoryView } from './HistoryView';
@@ -147,39 +147,60 @@ export const UserForm: React.FC<UserFormProps> = ({
           </div>
         )}
 
+        {/* Custom Nutrition Options Redesign */}
         {activeTab === 'nutrition' && (
           <div className="space-y-6">
             <NutritionInput
               userData={userData}
               setUserData={setUserData}
             />
-            <button
-              onClick={() => onSubmit('nutrition')}
-              disabled={isLoading}
-              className="group relative w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 cursor-pointer shadow-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400/50 hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] border text-white hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:grayscale component-shadow"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2 relative z-10">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Đang khởi tạo AI...
-                </span>
-              ) : (
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  <Utensils className="w-6 h-6" />
-                  Tạo Kế Hoạch Dinh Dưỡng
-                </span>
-              )}
-            </button>
 
-            <button
-              onClick={onStartTracking}
-              className="w-full py-3 rounded-xl font-medium text-emerald-400 hover:text-emerald-300 hover:bg-white/5 transition-colors border border-transparent hover:border-emerald-500/20"
-            >
-              Tự check Calo (Không tạo thực đơn)
-            </button>
+            <div className="grid grid-cols-1 gap-4 mt-2">
+              {/* Option 1: AI Plan (Primary) */}
+              <button
+                onClick={() => onSubmit('nutrition')}
+                disabled={isLoading}
+                className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-5 text-left transition-all hover:border-emerald-500/50 hover:from-emerald-500/20 hover:to-teal-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] active:scale-[0.98]"
+              >
+                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all group-hover:bg-emerald-500/20" />
+
+                <div className="relative z-10 flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform duration-300">
+                    {isLoading ? <Loader2 className="animate-spin h-6 w-6 text-white" /> : <Utensils className="h-6 w-6 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-white group-hover:text-emerald-50 transition-colors">
+                      Tạo Kế Hoạch AI
+                    </h3>
+                    <p className="text-sm font-medium text-emerald-200/60 group-hover:text-emerald-200/80 leading-snug">
+                      AI tự động thiết kế thực đơn phù hợp với bạn
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-emerald-500/50 transition-all group-hover:translate-x-1 group-hover:text-emerald-400" />
+                </div>
+              </button>
+
+              {/* Option 2: Quick Check (Secondary) */}
+              <button
+                onClick={onStartTracking}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition-all hover:border-white/20 hover:bg-white/10 active:scale-[0.98]"
+              >
+                <div className="relative z-10 flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-800/50 border border-white/5 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-all duration-300">
+                    <Camera className="h-6 w-6 text-gray-400 group-hover:text-emerald-400 transition-colors" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-200 group-hover:text-white transition-colors">
+                      Tự Check Calo
+                    </h3>
+                    <p className="text-sm font-medium text-gray-500 group-hover:text-gray-400 leading-snug">
+                      Chụp ảnh kiểm tra nhanh, không tạo thực đơn
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-gray-600 transition-all group-hover:translate-x-1 group-hover:text-gray-400" />
+                </div>
+              </button>
+            </div>
           </div>
         )}
 
