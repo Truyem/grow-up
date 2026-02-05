@@ -28,7 +28,7 @@ import { Session } from '@supabase/supabase-js';
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus, getBasicNutritionPlan } from './services/geminiService';
-import { Sparkles, History, Dumbbell, Utensils } from 'lucide-react';
+import { Sparkles, History, Dumbbell, Utensils, Settings } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
 
@@ -943,9 +943,13 @@ export default function App() {
               <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
                 Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
               </h1>
-              <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
-                Xin chào, <span className="text-cyan-400 font-semibold">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
-              </p>
+              <button
+                onClick={() => setViewMode('settings')}
+                className="text-lg text-gray-300 font-light max-w-lg mx-auto hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 justify-center"
+              >
+                Xin chào, <span className="text-cyan-400 font-semibold group-hover:text-cyan-300">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
+                <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+              </button>
 
               {/* API Status Badge & Online Counter - Global Removed as requested */}
               {/* <div className="flex flex-col items-center gap-3 pt-4">
