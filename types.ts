@@ -158,6 +158,7 @@ export interface DailyPlan {
 }
 
 export interface WorkoutHistoryItem {
+  id?: string; // Supabase UUID
   date: string;
   timestamp: number;
   levelSelected: string;

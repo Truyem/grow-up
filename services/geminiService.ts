@@ -293,87 +293,83 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
 };
 
 // --- HARDCODED GYM SCHEDULE ---
+// --- HARDCODED GYM SCHEDULE (4 Days/Week - High Intensity) ---
 const GYM_SCHEDULE: Record<number, any> = {
   1: {
-    levelName: "Ngày 1: Ngực, Vai, Tay sau (Push)",
-    description: "Tập trung đẩy. Ngực, Vai trước/giữa và Tay sau.",
+    levelName: "Ngày 1: Upper Body Strength (Ngực/Lưng)",
+    description: "Tập trung sức mạnh thân trên. Volume cao.",
     morning: [
-      { name: "Barbell Bench Press", sets: 3, reps: "8-10", primaryMuscleGroups: ["Chest - Middle", "Triceps - Lateral Head"] },
-      { name: "Incline Dumbbell Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
-      { name: "Cable Chest Fly", sets: 4, reps: "12-15", primaryMuscleGroups: ["Chest - Middle"] },
-      { name: "Cable Lateral Raise", sets: 3, reps: "15", primaryMuscleGroups: ["Side Delts"] },
-      { name: "Tricep Dips", sets: 3, reps: "10-12", primaryMuscleGroups: ["Triceps - Long Head", "Chest - Lower"] },
-      { name: "Cable Triceps Extension", sets: 3, reps: "12-15", primaryMuscleGroups: ["Triceps - Lateral Head"] }
+      { name: "Barbell Bench Press", sets: 4, reps: "8-10", primaryMuscleGroups: ["Chest - Middle", "Triceps"], notes: "Tăng tạ mỗi set" },
+      { name: "Bent Over Barbell Row", sets: 4, reps: "10-12", primaryMuscleGroups: ["Lats", "Upper Back"], notes: "Giữ lưng thẳng" },
+      { name: "Incline Dumbbell Press", sets: 4, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
+      { name: "Lat Pulldown (Wide Grip)", sets: 4, reps: "12-15", primaryMuscleGroups: ["Lats"] },
+      { name: "Dumbbell Lateral Raise", sets: 4, reps: "15-20", primaryMuscleGroups: ["Side Delts"], notes: "Dropset set cuối" },
+      { name: "Face Pulls", sets: 4, reps: "15-20", primaryMuscleGroups: ["Rear Delts", "Traps"] }
     ],
     evening: []
   },
   2: {
-    levelName: "Ngày 2: Lưng, Tay Trước (Pull)",
-    description: "Tập trung kéo. Lưng xô, Lưng giữa và Tay trước.",
+    levelName: "Ngày 2: Lower Body (Quad Focus)",
+    description: "Chân nặng, tập trung đùi trước và bắp chân.",
     morning: [
-      { name: "Pull Up", sets: 3, reps: "10-12", primaryMuscleGroups: ["Lats", "Biceps"] },
-      { name: "One Arm Dumbbell Row", sets: 3, reps: "8-10", primaryMuscleGroups: ["Lats", "Upper Back"] },
-      { name: "Seated Cable Row", sets: 4, reps: "10-12", primaryMuscleGroups: ["Upper Back", "Lats"] },
-      { name: "Machine Reverse Fly", sets: 3, reps: "15-20", primaryMuscleGroups: ["Rear Delts", "Upper Back"] },
-      { name: "Bicep Curls (BB hoặc DB)", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps"] },
-      { name: "Hammer Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps", "Forearms"] }
+      { name: "Barbell Squat", sets: 4, reps: "6-8", primaryMuscleGroups: ["Quads", "Glutes"], notes: "Xuống sâu qua đầu gối" },
+      { name: "Leg Press", sets: 4, reps: "12-15", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Bulgarian Split Squat", sets: 3, reps: "12/leg", primaryMuscleGroups: ["Quads", "Glutes"] },
+      { name: "Leg Extension", sets: 4, reps: "15-20", primaryMuscleGroups: ["Quads"], notes: "Giữ 1s ở điểm cao nhất" },
+      { name: "Calf Raise (Standing)", sets: 5, reps: "15-20", primaryMuscleGroups: ["Calves"] },
+      { name: "Plank", sets: 3, reps: "60-90s", primaryMuscleGroups: ["Core"] }
     ],
     evening: []
   },
   3: {
-    levelName: "Ngày 3: Chân ( Tập trung Đùi trước )",
-    description: "Tập trung thân dưới, nhấn mạnh vào đùi trước (Quads).",
+    levelName: "Ngày 3: Active Rest (Nghỉ ngơi)",
+    description: "Nghỉ ngơi hoặc Cardio nhẹ để phục hồi cho ngày mai.",
     morning: [
-      { name: "Barbell Squat", sets: 3, reps: "6-8", primaryMuscleGroups: ["Quads", "Glutes"] },
-      { name: "Dumbbell Split Squat", sets: 3, reps: "10-12", primaryMuscleGroups: ["Quads", "Glutes"] },
-      { name: "Leg Extension", sets: 4, reps: "12-15", primaryMuscleGroups: ["Quads"] },
-      { name: "Dumbbell RDL", sets: 3, reps: "12", primaryMuscleGroups: ["Hamstrings", "Glutes"] },
-      { name: "Leg Curls", sets: 3, reps: "12-15", primaryMuscleGroups: ["Hamstrings"] },
-      { name: "Calf Raise ( Ngồi hoặc Đứng )", sets: 3, reps: "15-20", primaryMuscleGroups: ["Calves"] }
+      { name: "Walking / Light Cardio", sets: 1, reps: "30-45 mins", primaryMuscleGroups: ["Cardio"] },
+      { name: "Stretching / Rolling", sets: 1, reps: "15 mins", primaryMuscleGroups: ["Full Body"] }
     ],
     evening: []
   },
   4: {
-    levelName: "Ngày 4: Vai, Ngực (Push)",
-    description: "Tập trung đẩy, nhấn mạnh vào Vai và Ngực trên.",
+    levelName: "Ngày 4: Upper Body Hypertrophy (Vai/Tay)",
+    description: "Tập trung độ lớn cơ bắp. Vai và Tay.",
     morning: [
-      { name: "Dumbbell Shoulder Press", sets: 4, reps: "8-10", primaryMuscleGroups: ["Front Delts", "Triceps - Long Head"] },
-      { name: "Smith Incline Chest Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
-      { name: "Flat Dumbbell Chest Press", sets: 3, reps: "10-12", primaryMuscleGroups: ["Chest - Middle"] },
-      { name: "Dumbbell Lateral Raise", sets: 3, reps: "15-20", primaryMuscleGroups: ["Side Delts"] },
-      { name: "One Arm Triceps Extension", sets: 3, reps: "12-15", primaryMuscleGroups: ["Triceps - Long Head"] }
+      { name: "Seated Dumbbell Shoulder Press", sets: 4, reps: "10-12", primaryMuscleGroups: ["Front Delts", "Triceps"] },
+      { name: "Cable Lateral Raise", sets: 4, reps: "15-20", primaryMuscleGroups: ["Side Delts"] },
+      { name: "Dumbbell Shrugs", sets: 4, reps: "15", primaryMuscleGroups: ["Traps"] },
+      { name: "Barbell Curl (EZ Bar)", sets: 4, reps: "10-12", primaryMuscleGroups: ["Biceps"] },
+      { name: "Skull Crushers", sets: 4, reps: "10-12", primaryMuscleGroups: ["Triceps - Long Head"] },
+      { name: "Hammer Curls", sets: 3, reps: "12-15", primaryMuscleGroups: ["Forearms", "Biceps"] },
+      { name: "Tricep Pushdown", sets: 3, reps: "15-20", primaryMuscleGroups: ["Triceps - Lateral Head"] }
     ],
     evening: []
   },
   5: {
-    levelName: "Ngày 5: Lưng, Tay Trước (Pull)",
-    description: "Tập trung kéo, độ dày lưng và bắp tay.",
+    levelName: "Ngày 5: Lower Body (Hamstring/Glute Focus)",
+    description: "Chân sau và Mông. Chuỗi xích sau (Posterior Chain).",
     morning: [
-      { name: "Chest Supported T Bar Row", sets: 3, reps: "8-10", primaryMuscleGroups: ["Upper Back", "Lats"] },
-      { name: "Cable Pullover", sets: 3, reps: "10-12", primaryMuscleGroups: ["Lats"] },
-      { name: "Iliac Pulldown", sets: 4, reps: "12-15", primaryMuscleGroups: ["Lats"] },
-      { name: "DB Shrugs", sets: 3, reps: "15", primaryMuscleGroups: ["Traps"] },
-      { name: "Preacher Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Biceps"] }
+      { name: "Romanian Deadlift", sets: 4, reps: "8-10", primaryMuscleGroups: ["Hamstrings", "Glutes", "Lower Back"] },
+      { name: "Hip Thrust", sets: 4, reps: "10-12", primaryMuscleGroups: ["Glutes"], notes: "Giữ 2s ở đỉnh" },
+      { name: "Lying Leg Curls", sets: 4, reps: "12-15", primaryMuscleGroups: ["Hamstrings"] },
+      { name: "Dumbbell Lunges (Walking)", sets: 3, reps: "12/leg", primaryMuscleGroups: ["Glutes", "Quads"] },
+      { name: "Seated Calf Raise", sets: 4, reps: "15-20", primaryMuscleGroups: ["Calves"] },
+      { name: "Hanging Leg Raise", sets: 3, reps: "15-20", primaryMuscleGroups: ["Abs - Lower"] }
     ],
     evening: []
   },
   6: {
-    levelName: "Ngày 6: Chân (Focus Đùi Sau)",
-    description: "Tập trung thân dưới, nhấn mạnh vào đùi sau (Hamstrings).",
+    levelName: "Ngày 6: Rest & Recovery",
+    description: "Nghỉ ngơi hoàn toàn.",
     morning: [
-      { name: "Barbell Romanian DL", sets: 3, reps: "8-10", primaryMuscleGroups: ["Hamstrings", "Glutes"] },
-      { name: "Leg Curls", sets: 3, reps: "10-12", primaryMuscleGroups: ["Hamstrings"] },
-      { name: "Leg Press", sets: 4, reps: "12-15", primaryMuscleGroups: ["Quads", "Glutes"] },
-      { name: "Leg Extension", sets: 3, reps: "15", primaryMuscleGroups: ["Quads"] },
-      { name: "Calf Raise (Đứng hoặc Ngồi)", sets: 3, reps: "10-12", primaryMuscleGroups: ["Calves"] }
+      { name: "Walking (Optional)", sets: 1, reps: "30 mins", primaryMuscleGroups: ["Cardio"] }
     ],
     evening: []
   },
   7: {
     levelName: "Ngày 7: Rest & Recovery",
-    description: "Nghỉ ngơi tích cực, đi bộ nhẹ nhàng để phục hồi.",
+    description: "Nghỉ ngơi hoàn toàn.",
     morning: [
-      { name: "Walking (Light Cardio)", sets: 1, reps: "60 mins", primaryMuscleGroups: ["None"] }
+      { name: "Walking (Optional)", sets: 1, reps: "30 mins", primaryMuscleGroups: ["Cardio"] }
     ],
     evening: []
   }

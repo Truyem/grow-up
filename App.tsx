@@ -18,6 +18,11 @@ import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
+import { AuthPage } from './components/AuthPage';
+import { AccountSettings } from './components/AccountSettings';
+
+import { supabase } from './services/supabase';
+import { Session } from '@supabase/supabase-js';
 
 
 import { Toast } from './components/ui/Toast';
@@ -63,7 +68,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
 
 
 // Helper to match the date format used in service
@@ -71,6 +76,52 @@ const getTodayString = () => {
   const now = new Date();
   const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   return `${days[now.getDay()]}, ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+};
+
+// Calculate Streak based on Workout History (Weekly >= 4 sessions)
+const calculateWeeklyStreak = (history: WorkoutHistoryItem[]) => {
+  if (!history || history.length === 0) return 0;
+
+  // Group by week (Monday start)
+  const weeks: Record<string, number> = {};
+  history.forEach(item => {
+    const d = new Date(item.timestamp);
+    const day = d.getDay() || 7; // 1=Mon, 7=Sun
+    d.setHours(0, 0, 0, 0);
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - day + 1);
+    const weekKey = monday.toISOString().split('T')[0];
+    weeks[weekKey] = (weeks[weekKey] || 0) + 1;
+  });
+
+  const today = new Date();
+  const currentDay = today.getDay() || 7;
+  const currentMonday = new Date(today);
+  currentMonday.setDate(today.getDate() - currentDay + 1);
+  currentMonday.setHours(0, 0, 0, 0);
+
+  let streak = 0;
+  let checkDate = new Date(currentMonday);
+
+  // Limit iterations to prevent infinite loops (e.g. max 52 weeks)
+  for (let i = 0; i < 100; i++) {
+    const weekKey = checkDate.toISOString().split('T')[0];
+    const count = weeks[weekKey] || 0;
+
+    if (count >= 4) {
+      streak++;
+    } else {
+      // If it's the CURRENT week, we don't break yet, just exclude it if incomplete
+      if (checkDate.getTime() === currentMonday.getTime()) {
+        // Continue to check previous week
+      } else {
+        // Past week failed -> Streak broken
+        break;
+      }
+    }
+    checkDate.setDate(checkDate.getDate() - 7);
+  }
+  return streak;
 };
 
 export default function App() {
@@ -85,11 +136,13 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => getApiStatus());
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
   // Debug version to ensure HMR works
   useEffect(() => {
-    console.log("App Version: 3-Tab Navigation Update");
+    console.log("App Version: Supabase Integration");
   }, []);
-
 
   // Update API status periodically
   useEffect(() => {
@@ -98,33 +151,188 @@ export default function App() {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-  // Auto-save on page unload/visibility change to prevent data loss
+
+  // Check Auth Session & Handle URL Errors
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Force sync save of current state to localStorage
-      const currentProgress = localStorage.getItem('workout_progress');
-      const currentPlan = localStorage.getItem('daily_plan_cache');
+    // Check for errors in URL (e.g., OTP expired)
+    const hash = window.location.hash;
+    if (hash && hash.includes('error_code=otp_expired')) {
+      setToastMessage('Link xác thực đã hết hạn hoặc không hợp lệ. Vui lòng thử lại.');
+      // Clear hash to prevent repeated errors
+      window.history.replaceState(null, '', window.location.pathname);
+    }
 
-      // Data is already being saved by PlanDisplay component, but we ensure it's synced
-      if (currentProgress && currentPlan) {
-        console.log('Auto-saving progress before page unload...');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsAuthChecking(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Sync Data with Supabase on Login
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const syncData = async () => {
+      try {
+        setLoading(true);
+        const { user } = session;
+
+        // 1. Check Profile & Settings
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.settings) {
+          // Load settings from server
+          setUserData(prev => ({ ...prev, ...profile.settings }));
+        } else if (!profileError || profileError.code === 'PGRST116') {
+          // No profile or empty settings -> Migration from LocalStorage?
+          // If we have local settings, upload them.
+          const localSettings = localStorage.getItem('user_settings');
+          if (localSettings) {
+            const parsed = JSON.parse(localSettings);
+            // Upload to Supabase
+            await supabase.from('profiles').upsert({
+              id: user.id,
+              email: user.email,
+              settings: parsed,
+              updated_at: new Date().toISOString()
+            });
+            setUserData(prev => ({ ...prev, ...parsed }));
+            console.log("Migrated local settings to Supabase");
+          }
+        }
+
+        // 2. Load Workout History
+        const { data: logs, error: logsError } = await supabase
+          .from('workout_logs')
+          .select('id, data, timestamp') // Select ID
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+
+        if (logs) {
+          let serverHistory = logs.map(l => ({
+            ...(l.data as WorkoutHistoryItem),
+            id: l.id // Attach the database ID
+          }));
+
+          // 3. Local Storage Migration (Check & Upload missing)
+          const localHistJson = localStorage.getItem('gym_history');
+          if (localHistJson) {
+            try {
+              const localHist: WorkoutHistoryItem[] = JSON.parse(localHistJson);
+              const serverTimestamps = new Set(serverHistory.map(s => s.timestamp));
+
+              // Identify items that are on local but NOT on server (by timestamp)
+              const missingOnServer = localHist.filter(l => !serverTimestamps.has(l.timestamp));
+
+              if (missingOnServer.length > 0) {
+                console.log(`Found ${missingOnServer.length} local items to migrate.`);
+                const rowsToInsert = missingOnServer.map(item => {
+                  const d = new Date(item.timestamp);
+                  const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  return {
+                    user_id: user.id,
+                    date: localDateStr,
+                    timestamp: item.timestamp,
+                    data: item
+                  };
+                });
+
+                // Upload missing items
+                const { data: inserted, error: migErr } = await supabase.from('workout_logs')
+                  .insert(rowsToInsert)
+                  .select('id, data, timestamp');
+
+                if (!migErr && inserted) {
+                  console.log("Migration successful.");
+                  // Add new server items to our list
+                  const newItems = inserted.map(l => ({
+                    ...(l.data as WorkoutHistoryItem),
+                    id: l.id
+                  }));
+                  serverHistory = [...serverHistory, ...newItems];
+                } else {
+                  console.error("Migration failed:", migErr);
+                }
+              }
+
+              // Clear Local Storage after attempt (Success or partial) to enforce Server Source of Truth
+              // User requirement: "check if any stored on local, delete all and upload all to server"
+              localStorage.removeItem('gym_history');
+              console.log("Local history cleared.");
+
+            } catch (e) {
+              console.error("Local history parse error:", e);
+            }
+          }
+
+          // Deduplicate Combined History (Server + Newly Migrated)
+          const uniqueHistoryMap = new Map<string, WorkoutHistoryItem>();
+          serverHistory.forEach(item => {
+            // Priority: Keep item with ID (should be all now), or later timestamp
+            if (uniqueHistoryMap.has(item.date)) {
+              const existing = uniqueHistoryMap.get(item.date)!;
+              const existingCount = existing.completedExercises?.length || 0;
+              const newCount = item.completedExercises?.length || 0;
+              // Resolution: Prefer existing server record unless new one has significantly more data. 
+              // Actually, simplest is to just keep what we have. If timestamp differs -> different item.
+              // IF existing has same date but different timestamp -> Keep BOTH?
+              // User said: "duplicate date different ID still up" -> Allow multiples per day?
+              // BUT existing dedupe logic enforces 1 per day.
+              // Let's STICK to the existing dedupe logic for now to stay consistent with UI.
+              if (newCount > existingCount || (newCount === existingCount && item.timestamp > existing.timestamp)) {
+                uniqueHistoryMap.set(item.date, item);
+              }
+            } else {
+              uniqueHistoryMap.set(item.date, item);
+            }
+          });
+
+          const finalHistory = Array.from(uniqueHistoryMap.values())
+            .sort((a, b) => b.timestamp - a.timestamp);
+
+          setWorkoutHistory(finalHistory);
+        }
+
+      } catch (err) {
+        console.error("Sync error:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        // When tab becomes hidden, ensure data is persisted
-        console.log('Tab hidden - data auto-saved via localStorage');
-      }
-    };
+    syncData();
+  }, [session]);
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  // Recalculate Streak when workoutHistory changes
+  useEffect(() => {
+    const newStreak = calculateWeeklyStreak(workoutHistory);
+    if (newStreak !== userStats.streak) {
+      setUserStats(prev => ({ ...prev, streak: newStreak }));
+      // Optional: Save to local storage for persistence if needed, 
+      // though it is derivative data now.
+      const updatedStats = { ...userStats, streak: newStreak };
+      localStorage.setItem('user_stats', JSON.stringify(updatedStats));
+    }
+  }, [workoutHistory]);
 
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+
+  // Auto-save on page unload/visibility change to prevent data loss - REDUNDANT NOW with Supabase saves? 
+  // We will keep it for cached plan (still local for now)
+  useEffect(() => {
+    const handleBeforeUnload = () => { /* ... */ };
+    // ... Simplified
   }, []);
 
   // Load local history, cached plan, stats and auto-complete logic
@@ -154,17 +362,11 @@ export default function App() {
     }
 
 
-    // 1. Load History
-    let currentHistory: WorkoutHistoryItem[] = [];
-    const savedHistory = localStorage.getItem('gym_history');
-    if (savedHistory) {
-      try {
-        currentHistory = JSON.parse(savedHistory);
-        setWorkoutHistory(currentHistory);
-      } catch (e) {
-        console.error("Failed to load history", e);
-      }
-    }
+
+    // 1. Load History (Supabase handled above, but keeping local cache load if not auth? No, strict auth)
+    // If not logged in, we shouldn't show data. 
+    // The previous useEffect handles loading data when session exists.
+
 
 
     // 2a. Load Expenses
@@ -175,7 +377,7 @@ export default function App() {
       } catch (e) { console.error("Failed to load expenses", e); }
     }
 
-    // 2. Load Stats & Handle Streak Logic
+    // 2. Load Stats
     const savedStatsStr = localStorage.getItem('user_stats');
     let currentStats = INITIAL_STATS;
 
@@ -184,28 +386,8 @@ export default function App() {
         currentStats = JSON.parse(savedStatsStr);
       } catch (e) { console.error("Failed stats load", e); }
     }
+    setUserStats(currentStats);
 
-    const todayDate = new Date().toDateString(); // "Mon Sep 28 2025" format for streak logic
-    if (currentStats.lastLoginDate !== todayDate) {
-      // Check if last login was yesterday to increment streak
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      if (currentStats.lastLoginDate === yesterday.toDateString()) {
-        currentStats.streak += 1;
-      } else if (currentStats.lastLoginDate && currentStats.lastLoginDate !== todayDate) {
-        // Break streak if gap > 1 day
-        currentStats.streak = 1;
-      } else if (!currentStats.lastLoginDate) {
-        currentStats.streak = 1;
-      }
-
-      currentStats.lastLoginDate = todayDate;
-      setUserStats(currentStats);
-      localStorage.setItem('user_stats', JSON.stringify(currentStats));
-    } else {
-      setUserStats(currentStats);
-    }
 
 
     // 3. Check for Cached Plan and Progress
@@ -223,6 +405,12 @@ export default function App() {
 
           // Clear consumed food for the new day
           setUserData(prev => ({ ...prev, consumedFood: [] }));
+
+          let currentHistory: WorkoutHistoryItem[] = [];
+          try {
+            const localHist = localStorage.getItem('gym_history');
+            if (localHist) currentHistory = JSON.parse(localHist);
+          } catch (e) { }
 
           // Check if this date already exists in history to prevent duplicates
           const alreadyExists = currentHistory.some(h => h.date === cachedPlan.date);
@@ -304,42 +492,50 @@ export default function App() {
     }
   }, []);
 
-  // Save user settings whenever userData changes (exclude consumedFood as it resets daily)
+  // Save user settings whenever userData changes
   useEffect(() => {
-    const settingsToSave = {
-      weight: userData.weight,
-      height: userData.height,
-      fatigue: userData.fatigue,
-      soreMuscles: userData.soreMuscles,
-      selectedIntensity: userData.selectedIntensity,
-      nutritionGoal: userData.nutritionGoal,
-      trainingMode: userData.trainingMode,
-      useCreatine: userData.useCreatine,
-      useOnlyAvailableIngredients: userData.useOnlyAvailableIngredients,
-      allowExtraVeggies: userData.allowExtraVeggies,
-      equipment: userData.equipment,
-      availableIngredients: userData.availableIngredients
-      // consumedFood is NOT saved - it resets daily
-    };
-    localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
-  }, [userData]);
+    // Local backup
+    localStorage.setItem('user_settings', JSON.stringify(userData));
+    localStorage.setItem('user_inventory', JSON.stringify(userData.availableIngredients));
+
+    // Supabase Sync
+    if (session?.user) {
+      const settingsToSave = {
+        ...userData,
+        // ensure we save inventory too
+        availableIngredients: userData.availableIngredients
+      };
+
+      // Debounce this? For now direct save
+      supabase.from('profiles').update({
+        settings: settingsToSave,
+        updated_at: new Date().toISOString()
+      }).eq('id', session.user.id).then(({ error }) => {
+        if (error) console.error("Failed to save settings to Supabase", error);
+      });
+    }
+  }, [userData, session]);
 
   // Save Expenses
   useEffect(() => {
     localStorage.setItem('user_expenses', JSON.stringify(expenses));
   }, [expenses]);
 
-  const handleGenerate = async (type: 'workout' | 'nutrition' | 'history') => {
-    // If history tab, just switch view
+  const handleGenerate = async (type: ViewMode) => {
+    // If history or settings tab, just switch view
     if (type === 'history') {
       setViewMode('history');
+      return;
+    }
+    if (type === 'settings') {
+      setViewMode('settings');
       return;
     }
 
     setLoading(true);
 
     // Generate ONLY the requested part
-    // Type cast is safe because we check for 'history' above
+    // Type cast is safe because we check for 'history' and 'settings' above
     const generationType = type as 'workout' | 'nutrition';
 
     // Pass workout history to the service
@@ -556,18 +752,72 @@ export default function App() {
 
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
-    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
+    // localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
+
+    // Save to Supabase
+    // Save to Supabase
+    if (session?.user) {
+      // Use LOCAL time date for the DB Key (YYYY-MM-DD)
+      const d = new Date(itemToSave.timestamp);
+      const localDateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      // CHECK BEFORE INSERT: Do we already have a log for this day?
+      const { data: existingData } = await supabase.from('workout_logs')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('date', localDateKey)
+        .maybeSingle();
+
+      if (existingData) {
+        // Update existing
+        await supabase.from('workout_logs').update({
+          timestamp: itemToSave.timestamp,
+          data: itemToSave
+        }).eq('id', existingData.id);
+      } else {
+        // Insert new
+        await supabase.from('workout_logs').insert({
+          user_id: session.user.id,
+          date: localDateKey,
+          timestamp: itemToSave.timestamp,
+          data: itemToSave
+        });
+      }
+    }
   };
 
   const handleDeleteHistoryItem = async (timestamp: number) => {
-    // Logic moved to HistoryView for custom modal. Here we just delete.
+    // Optimistic Update
+    const itemToDelete = workoutHistory.find(item => item.timestamp === timestamp);
     const updatedHistory = workoutHistory.filter(item => item.timestamp !== timestamp);
     setWorkoutHistory(updatedHistory);
-    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
+    // localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
+
+    if (session?.user) {
+      // 1. Delete by ID if we have it (Specific row optimization)
+      if (itemToDelete?.id) {
+        console.log("Deleting by ID:", itemToDelete.id);
+        await supabase.from('workout_logs')
+          .delete()
+          .eq('id', itemToDelete.id)
+          .eq('user_id', session.user.id);
+      }
+
+      // 2. Delete by Timestamp (Cleanup Duplicates)
+      // This is critical because we have duplicate rows with different IDs but SAME timestamp.
+      // We must delete ALL rows with this timestamp to ensure the entry is truly gone.
+      console.log("Deleting by Timestamp:", timestamp);
+      const { error: tsError } = await supabase.from('workout_logs')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('timestamp', timestamp); // Targets the top-level BIGINT timestamp column
+
+      if (tsError) console.error("Supabase delete failed (Timestamp):", tsError);
+    }
   };
 
   // Handle sick day - maintain streak without breaking it
-  const handleSickDay = () => {
+  const handleSickDay = async () => {
     const todayDate = new Date().toDateString();
     const updatedStats = {
       ...userStats,
@@ -593,17 +843,33 @@ export default function App() {
     if (!alreadySickToday) {
       const newHistory = [sickDayEntry, ...workoutHistory];
       setWorkoutHistory(newHistory);
-      localStorage.setItem('gym_history', JSON.stringify(newHistory));
+      // localStorage.setItem('gym_history', JSON.stringify(newHistory));
+
+      if (session?.user) {
+        // IDEMPOTENT SAVE: Check if entry exists for this date/user
+        const dateStr = new Date(sickDayEntry.timestamp).toISOString().split('T')[0];
+        // Only insert if NOT exists (though logic above checks locally, let's be safe)
+        const { data: existing } = await supabase.from('workout_logs')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('date', dateStr)
+          .single();
+
+        if (!existing) {
+          await supabase.from('workout_logs').insert({
+            user_id: session.user.id,
+            date: dateStr,
+            timestamp: sickDayEntry.timestamp,
+            data: sickDayEntry
+          });
+        }
+      }
     }
 
     setToastMessage(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
   };
 
-  // Save user data changes
-  useEffect(() => {
-    localStorage.setItem('user_settings', JSON.stringify(userData));
-    localStorage.setItem('user_inventory', JSON.stringify(userData.availableIngredients)); // Explicit save
-  }, [userData]);
+
 
   const handleUpdatePlan = (updatedPlan: DailyPlan) => {
 
@@ -615,46 +881,51 @@ export default function App() {
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
 
       {/* Loading Animation Overlay */}
-      {loading && <LoadingAnimation />}
+      {(loading || isAuthChecking) && <LoadingAnimation />}
+
+      {!isAuthChecking && !session ? (
+        <AuthPage />
+      ) : (
+        <>
 
 
 
-      {/* Optimized Background Layer */}
-      <div className="fixed inset-0 z-0 overflow-hidden">
-        {/* Mobile Background */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
-          style={{ backgroundImage: `url(${wallpaperMb})` }}
-        />
-        {/* Desktop Background */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
-          style={{ backgroundImage: `url(${wallpaper})` }}
-        />
-        {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          {/* Optimized Background Layer */}
+          <div className="fixed inset-0 z-0 overflow-hidden">
+            {/* Mobile Background */}
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
+              style={{ backgroundImage: `url(${wallpaperMb})` }}
+            />
+            {/* Desktop Background */}
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
+              style={{ backgroundImage: `url(${wallpaper})` }}
+            />
+            {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
-        {/* Gradient overlay for better text readability at the bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent" />
-      </div>
-
-      {/* Content Layer */}
-      <div className="relative z-10 container mx-auto px-4 py-10 max-w-5xl">
-
-        {/* Header - Global for both Input and Plan views */}
-        <div className="text-center mb-10 space-y-3 animate-fade-in relative transition-all duration-300">
-          <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
-            <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
+            {/* Gradient overlay for better text readability at the bottom */}
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
-            Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
-          </h1>
-          <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
-            Lịch trình tập luyện thông minh.
-          </p>
 
-          {/* API Status Badge & Online Counter - Global Removed as requested */}
-          {/* <div className="flex flex-col items-center gap-3 pt-4">
+          {/* Content Layer */}
+          <div className="relative z-10 container mx-auto px-4 py-10 max-w-5xl">
+
+            {/* Header - Global for both Input and Plan views */}
+            <div className="text-center mb-10 space-y-3 animate-fade-in relative transition-all duration-300">
+              <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
+                <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+                Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
+              </h1>
+              <p className="text-lg text-gray-300 font-light max-w-lg mx-auto">
+                Xin chào, <span className="text-cyan-400 font-semibold">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
+              </p>
+
+              {/* API Status Badge & Online Counter - Global Removed as requested */}
+              {/* <div className="flex flex-col items-center gap-3 pt-4">
             {apiStatus.totalKeys > 0 && (
               <ApiStatusBadge
                 status={apiStatus}
@@ -663,90 +934,97 @@ export default function App() {
             )}
             <OnlineCounter />
           </div> */}
-        </div>
+            </div>
 
-        <div className="transition-all duration-500 ease-in-out">
-          {/* Always show PlanTabs if plan is initialized (or just show them always? No, distinct mode) */}
-          {/* Wait, we want tabs visible ALWAYS now if we are in this "hybrid" mode? */}
-          {/* Actually, if NO plan exists at all, maybe we just default to Workout Input? */}
-          {/* But once a plan is partially created, we need the global tabs. */}
-          {/* Let's show tabs if plan exists OR if we are just exploring. */}
+            <div className="transition-all duration-500 ease-in-out">
+              {/* Always show PlanTabs if plan is initialized (or just show them always? No, distinct mode) */}
+              {/* Wait, we want tabs visible ALWAYS now if we are in this "hybrid" mode? */}
+              {/* Actually, if NO plan exists at all, maybe we just default to Workout Input? */}
+              {/* But once a plan is partially created, we need the global tabs. */}
+              {/* Let's show tabs if plan exists OR if we are just exploring. */}
 
-          {/* If plan exists (even partial), show global tabs to navigate between W/N/H */}
-          {/* Always show PlanTabs to allow navigation between Input forms and History */}
-          <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
-            <PlanTabs
-              activeTab={viewMode as 'workout' | 'nutrition' | 'history'}
-              onTabChange={(tab) => setViewMode(tab)}
-              className="shadow-2xl"
-            />
+              {/* If plan exists (even partial), show global tabs to navigate between W/N/H */}
+              {/* Always show PlanTabs to allow navigation between Input forms and History */}
+              <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
+                <PlanTabs
+                  activeTab={viewMode}
+                  onTabChange={(tab) => setViewMode(tab)}
+                  className="shadow-2xl"
+                />
+              </div>
+
+              {/* Render content based on View Mode + Generation Status */}
+              {viewMode === 'settings' && session?.user ? (
+                <AccountSettings
+                  user={session.user}
+                  onLogout={() => supabase.auth.signOut()}
+                />
+              ) : null}
+
+              {viewMode === 'workout' && (
+                plan?.workout?.isGenerated ? (
+                  <PlanDisplay
+                    plan={plan}
+                    onReset={handleReset}
+                    onComplete={handleCompleteWorkout}
+                    onUpdatePlan={handleUpdatePlan}
+                    history={workoutHistory}
+                    userData={userData}
+                  />
+                ) : (
+                  <div className="max-w-2xl mx-auto space-y-4">
+                    <UserForm
+                      userData={userData}
+                      setUserData={setUserData}
+                      userStats={userStats}
+                      onSubmit={handleGenerate}
+                      isLoading={loading}
+                      onSickDay={handleSickDay}
+                      history={workoutHistory}
+                      onDeleteHistory={handleDeleteHistoryItem}
+                      activeTab="workout"
+                      onStartTracking={handleStartTracking}
+                    />
+                  </div>
+                )
+              )}
+
+              {viewMode === 'nutrition' && (
+                plan?.nutrition?.isGenerated ? (
+                  <NutritionDisplay
+                    plan={plan}
+                    onReset={handleReset}
+                    onUpdatePlan={handleUpdatePlan}
+                  />
+                ) : (
+                  <div className="max-w-2xl mx-auto space-y-4">
+                    <UserForm
+                      userData={userData}
+                      setUserData={setUserData}
+                      userStats={userStats}
+                      onSubmit={handleGenerate}
+                      isLoading={loading}
+                      onSickDay={handleSickDay}
+                      history={workoutHistory}
+                      onDeleteHistory={handleDeleteHistoryItem}
+                      activeTab="nutrition"
+                      onStartTracking={handleStartTracking}
+                    />
+                  </div>
+                )
+              )}
+
+              {viewMode === 'history' && (
+                <HistoryView
+                  history={workoutHistory}
+                  userData={userData}
+                  onDelete={handleDeleteHistoryItem}
+                />
+              )}
+            </div>
           </div>
-
-          {/* Render content based on View Mode + Generation Status */}
-          {viewMode === 'workout' && (
-            plan?.workout?.isGenerated ? (
-              <PlanDisplay
-                plan={plan}
-                onReset={handleReset}
-                onComplete={handleCompleteWorkout}
-                onUpdatePlan={handleUpdatePlan}
-                history={workoutHistory}
-                userData={userData}
-              />
-            ) : (
-              <div className="max-w-2xl mx-auto space-y-4">
-                <UserForm
-                  userData={userData}
-                  setUserData={setUserData}
-                  userStats={userStats}
-                  onSubmit={handleGenerate}
-                  isLoading={loading}
-                  onSickDay={handleSickDay}
-                  history={workoutHistory}
-                  onDeleteHistory={handleDeleteHistoryItem}
-                  activeTab="workout"
-                  onStartTracking={handleStartTracking}
-                />
-              </div>
-            )
-          )}
-
-          {viewMode === 'nutrition' && (
-            plan?.nutrition?.isGenerated ? (
-              <NutritionDisplay
-                plan={plan}
-                onReset={handleReset}
-                onUpdatePlan={handleUpdatePlan}
-              />
-            ) : (
-              <div className="max-w-2xl mx-auto space-y-4">
-                <UserForm
-                  userData={userData}
-                  setUserData={setUserData}
-                  userStats={userStats}
-                  onSubmit={handleGenerate}
-                  isLoading={loading}
-                  onSickDay={handleSickDay}
-                  history={workoutHistory}
-                  onDeleteHistory={handleDeleteHistoryItem}
-                  activeTab="nutrition"
-                  onStartTracking={handleStartTracking}
-                />
-              </div>
-            )
-          )}
-
-          {viewMode === 'history' && (
-            <HistoryView
-              history={workoutHistory}
-              userData={userData}
-              onDelete={handleDeleteHistoryItem}
-            />
-          )}
-
-
-        </div>
-      </div>
+        </>
+      )}
 
       <div className="mt-20 text-center text-xs text-gray-600">
         <p>© 2025 Vũ Đình Trung. All rights reserved.</p>
@@ -760,6 +1038,7 @@ export default function App() {
         type="success"
         duration={6000}
       />
+
     </div>
   );
 }
