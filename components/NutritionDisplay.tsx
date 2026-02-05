@@ -211,10 +211,21 @@ const LocketCameraModal: React.FC<{
     React.useEffect(() => {
         const startCamera = async () => {
             try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', aspectRatio: 1 },
-                    audio: true // Enable audio for video recording
-                });
+                // Try with audio first for video recording
+                let mediaStream: MediaStream;
+                try {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', aspectRatio: 1 },
+                        audio: true
+                    });
+                } catch (audioErr) {
+                    // Fallback to video only if audio fails
+                    console.warn("Audio not available, falling back to video only:", audioErr);
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', aspectRatio: 1 },
+                        audio: false
+                    });
+                }
                 setStream(mediaStream);
                 if (videoRef.current) {
                     videoRef.current.srcObject = mediaStream;
