@@ -362,13 +362,12 @@ const LocketCameraModal: React.FC<{
     };
 
     // Calculate progress ring
-    const viewfinderSize = 'min(90vw, 500px)';
     const ringRadius = 180;
     const ringCircumference = 2 * Math.PI * ringRadius;
     const ringOffset = ringCircumference * (1 - recordingProgress);
 
-    return (
-        <div className="fixed inset-0 z-[100] bg-transparent flex flex-col items-center justify-start pt-16 animate-fade-in">
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center pt-10 pb-10 animate-fade-in overflow-hidden touch-none">
             {/* Hidden Input */}
             <input
                 type="file"
@@ -379,121 +378,125 @@ const LocketCameraModal: React.FC<{
             />
 
             {/* Header */}
-            <div className="absolute top-4 w-full px-4 flex justify-between items-center z-20">
-                <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md">
+            <div className="absolute top-4 left-0 w-full px-4 flex justify-between items-center z-50 pointer-events-none">
+                <button onClick={onClose} className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md pointer-events-auto">
                     <X className="w-6 h-6" />
                 </button>
                 {/* Recording Timer */}
                 {isRecording && (
-                    <div className="px-4 py-2 rounded-full bg-red-500/80 text-white font-bold flex items-center gap-2">
-                        <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                    <div className="px-4 py-2 rounded-full bg-red-500/80 text-white font-bold flex items-center gap-2 animate-pulse">
+                        <div className="w-3 h-3 bg-white rounded-full" />
                         {Math.ceil(RECORDING_DURATION - recordingProgress * RECORDING_DURATION)}s
                     </div>
                 )}
-                <div className="w-10" />
+                <div className="w-12" />
             </div>
 
-            {/* Viewfinder with Progress Border */}
-            <div className="relative mx-auto" style={{ width: viewfinderSize, height: viewfinderSize }}>
-                {/* Camera Viewfinder */}
-                <div
-                    className="w-full h-full rounded-[2.5rem] overflow-hidden shadow-2xl relative"
-                    style={{
-                        border: captureMode === 'video' && isRecording
-                            ? '6px solid transparent'
-                            : '6px solid rgba(255,255,255,0.3)',
-                        background: captureMode === 'video' && isRecording
-                            ? `linear-gradient(#000, #000) padding-box, conic-gradient(from 0deg, #ef4444 ${recordingProgress * 100}%, rgba(255,255,255,0.3) ${recordingProgress * 100}%) border-box`
-                            : 'none'
-                    }}
-                >
-                    <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                    />
+            {/* Center Content Wrapper */}
+            <div className="relative w-full h-full flex flex-col items-center justify-center max-w-lg mx-auto">
 
-                    {/* Corner Accents */}
-                    <div className="absolute top-6 left-6 w-10 h-10 border-t-[6px] border-l-[6px] border-white/40 rounded-tl-2xl pointer-events-none" />
-                    <div className="absolute top-6 right-6 w-10 h-10 border-t-[6px] border-r-[6px] border-white/40 rounded-tr-2xl pointer-events-none" />
-                    <div className="absolute bottom-6 left-6 w-10 h-10 border-b-[6px] border-l-[6px] border-white/40 rounded-bl-2xl pointer-events-none" />
-                    <div className="absolute bottom-6 right-6 w-10 h-10 border-b-[6px] border-r-[6px] border-white/40 rounded-br-2xl pointer-events-none" />
+                {/* Viewfinder with Progress Border */}
+                <div
+                    className="relative w-full max-w-[90vw] aspect-square flex-shrink-0 mb-6"
+                    style={{ maxHeight: '60vh' }}
+                >
+                    <div
+                        className="w-full h-full rounded-[2rem] overflow-hidden shadow-2xl relative bg-zinc-900"
+                        style={{
+                            border: captureMode === 'video' && isRecording
+                                ? '6px solid transparent'
+                                : '6px solid rgba(255,255,255,0.3)',
+                            background: captureMode === 'video' && isRecording
+                                ? `linear-gradient(#000, #000) padding-box, conic-gradient(from 0deg, #ef4444 ${recordingProgress * 100}%, rgba(255,255,255,0.3) ${recordingProgress * 100}%) border-box`
+                                : 'none'
+                        }}
+                    >
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                        />
+
+                        {/* Corner Accents */}
+                        <div className="absolute top-6 left-6 w-10 h-10 border-t-[6px] border-l-[6px] border-white/40 rounded-tl-2xl pointer-events-none" />
+                        <div className="absolute top-6 right-6 w-10 h-10 border-t-[6px] border-r-[6px] border-white/40 rounded-tr-2xl pointer-events-none" />
+                        <div className="absolute bottom-6 left-6 w-10 h-10 border-b-[6px] border-l-[6px] border-white/40 rounded-bl-2xl pointer-events-none" />
+                        <div className="absolute bottom-6 right-6 w-10 h-10 border-b-[6px] border-r-[6px] border-white/40 rounded-br-2xl pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Controls Container */}
+                <div className="w-full px-6 flex flex-col items-center gap-6 mt-auto pb-8">
+                    {/* Mode Selection */}
+                    <div className="flex justify-center gap-4 bg-black/40 p-1.5 rounded-full backdrop-blur-md">
+                        <button
+                            onClick={() => !isRecording && setCaptureMode('photo')}
+                            disabled={isRecording}
+                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${captureMode === 'photo'
+                                ? 'bg-white text-black shadow-lg'
+                                : 'text-white/70 hover:text-white'
+                                }`}
+                        >
+                            Ảnh
+                        </button>
+                        <button
+                            onClick={() => !isRecording && setCaptureMode('video')}
+                            disabled={isRecording}
+                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${captureMode === 'video'
+                                ? 'bg-red-500 text-white shadow-lg'
+                                : 'text-white/70 hover:text-white'
+                                }`}
+                        >
+                            Video
+                        </button>
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    <div className="w-full flex justify-between items-center max-w-[350px]">
+                        {/* Upload Button */}
+                        <button
+                            onClick={handleUploadClick}
+                            disabled={isRecording}
+                            className={`p-4 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 transition-all active:scale-95 ${isRecording ? 'invisible' : ''}`}
+                        >
+                            <ImageIcon className="w-6 h-6" />
+                        </button>
+
+                        {/* Capture/Record Button */}
+                        <button
+                            onClick={handleCaptureClick}
+                            className={`w-20 h-20 rounded-full border-[6px] flex items-center justify-center transition-all active:scale-95 hover:scale-105 shadow-xl ${captureMode === 'video'
+                                ? isRecording
+                                    ? 'border-red-500 bg-red-500/20'
+                                    : 'border-white/50 bg-white/10'
+                                : 'border-white bg-white/20'
+                                }`}
+                        >
+                            {captureMode === 'video' ? (
+                                <div className={`w-full h-full rounded-full flex items-center justify-center transition-all ${isRecording ? 'scale-50' : 'scale-100'}`}>
+                                    <div className={`shadow-lg bg-red-500 transition-all ${isRecording ? 'w-10 h-10 rounded-md' : 'w-16 h-16 rounded-full'}`} />
+                                </div>
+                            ) : (
+                                <div className="w-16 h-16 bg-white rounded-full border-4 border-transparent shadow-lg" />
+                            )}
+                        </button>
+
+                        {/* Flash Button */}
+                        <button
+                            onClick={toggleFlash}
+                            disabled={isRecording}
+                            className={`p-4 rounded-full backdrop-blur-md border border-white/10 transition-all active:scale-95 ${flashOn ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20' : 'bg-white/10 text-white hover:bg-white/20'
+                                } ${isRecording ? 'invisible' : ''}`}
+                        >
+                            {flashOn ? <Zap className="w-6 h-6 fill-current" /> : <ZapOff className="w-6 h-6" />}
+                        </button>
+                    </div>
                 </div>
             </div>
-
-            {/* Mode Selection Buttons */}
-            <div className="mt-4 flex justify-center gap-3">
-                <button
-                    onClick={() => !isRecording && setCaptureMode('photo')}
-                    disabled={isRecording}
-                    className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'photo'
-                        ? 'bg-white/20 border-white text-white'
-                        : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
-                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title="Chụp ảnh"
-                >
-                    <Camera className="w-5 h-5" />
-                    <span className="text-sm font-medium">Ảnh</span>
-                </button>
-                <button
-                    onClick={() => !isRecording && setCaptureMode('video')}
-                    disabled={isRecording}
-                    className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'video'
-                        ? 'bg-red-500/30 border-red-400 text-white'
-                        : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
-                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title="Quay video 30s"
-                >
-                    <Video className="w-5 h-5" />
-                    <span className="text-sm font-medium">Video</span>
-                </button>
-            </div>
-
-            {/* Controls */}
-            <div className="mt-8 w-full max-w-[320px] flex justify-between items-center px-6">
-                {/* Upload Button */}
-                <button
-                    onClick={handleUploadClick}
-                    disabled={isRecording}
-                    className={`p-4 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 hover:bg-black/60 transition-all active:scale-95 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <ImageIcon className="w-6 h-6" />
-                </button>
-
-                {/* Capture/Record Button */}
-                <button
-                    onClick={handleCaptureClick}
-                    className={`w-20 h-20 rounded-full border-[6px] flex items-center justify-center transition-all active:scale-95 hover:scale-105 backdrop-blur-sm ${captureMode === 'video'
-                        ? isRecording
-                            ? 'border-red-500 bg-red-500/20'
-                            : 'border-red-400/80'
-                        : 'border-white/80'
-                        }`}
-                >
-                    {captureMode === 'video' ? (
-                        isRecording ? (
-                            <div className="w-8 h-8 bg-red-500 rounded-md" /> // Stop icon
-                        ) : (
-                            <div className="w-16 h-16 bg-red-500 rounded-full" /> // Record icon
-                        )
-                    ) : (
-                        <div className="w-16 h-16 bg-white rounded-full border-4 border-transparent" />
-                    )}
-                </button>
-
-                {/* Flash Button */}
-                <button
-                    onClick={toggleFlash}
-                    disabled={isRecording}
-                    className={`p-4 rounded-full backdrop-blur-md border border-white/20 transition-all active:scale-95 ${flashOn ? 'bg-yellow-500/80 text-white border-yellow-400' : 'bg-black/40 text-white hover:bg-black/60'
-                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    {flashOn ? <Zap className="w-6 h-6 fill-current" /> : <ZapOff className="w-6 h-6" />}
-                </button>
-            </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
