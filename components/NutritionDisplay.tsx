@@ -368,7 +368,7 @@ const LocketCameraModal: React.FC<{
     const ringOffset = ringCircumference * (1 - recordingProgress);
 
     return (
-        <div className="fixed inset-0 z-[100] bg-transparent flex flex-col items-center justify-start pt-32 animate-fade-in">
+        <div className="fixed inset-0 z-[100] bg-transparent flex flex-col items-center justify-start pt-16 animate-fade-in">
             {/* Hidden Input */}
             <input
                 type="file"
