@@ -63,7 +63,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'input' | 'workout' | 'nutrition' | 'history';
+type ViewMode = 'workout' | 'nutrition' | 'history';
 
 
 // Helper to match the date format used in service
@@ -286,7 +286,7 @@ export default function App() {
           localStorage.removeItem('workout_progress');
 
           // Stay on input mode to create TODAY's plan
-          setViewMode('input');
+          setViewMode('workout');
 
         } else {
           // If plan is for TODAY, load it normally
@@ -715,43 +715,7 @@ export default function App() {
             />
           )}
 
-          {/* Initial State (No Plan Yet) - This logic overlaps with above if plan is null */}
-          {/* If plan is null, the above checks `plan?.workout?.isGenerated` are false, so it renders UserForm. */}
-          {/* But currently `viewMode` defaults to 'input'. */}
-          {/* We should change default viewMode to 'workout' or similar. */}
-          {/* AND we need to render UserForm if viewMode is 'input' (legacy) */}
 
-          {viewMode === 'input' && (
-            <div className="max-w-2xl mx-auto space-y-4">
-              {/* Manually show Tabs here since PlanTabs is conditional on `plan` above? */}
-              {/* Actually, if no plan used to show UserForm which had tabs. */}
-              {/* Now UserForm has NO tabs. So we must provide tabs here if we want them. */}
-              {/* BUT, if we are in 'input' mode, we usually default to 'workout'. */}
-
-              {/* Fix: Switch viewMode to 'workout' by default in INITIAL STATE? */}
-              {/* YES. see below for setting initial state change or effect */}
-
-              {/* For now, just render UserForm with workout tab if caught in 'input' mode */}
-              <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
-                <PlanTabs
-                  activeTab="workout"
-                  onTabChange={(tab) => setViewMode(tab as any)}
-                  className="shadow-2xl"
-                />
-              </div>
-              <UserForm
-                userData={userData}
-                setUserData={setUserData}
-                userStats={userStats}
-                onSubmit={handleGenerate}
-                isLoading={loading}
-                onSickDay={handleSickDay}
-                history={workoutHistory}
-                onDeleteHistory={handleDeleteHistoryItem}
-                activeTab="workout"
-              />
-            </div>
-          )}
         </div>
       </div>
 
