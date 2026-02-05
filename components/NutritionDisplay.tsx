@@ -219,9 +219,9 @@ const LocketCameraModal: React.FC<{
                 if (videoRef.current) {
                     videoRef.current.srcObject = mediaStream;
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Camera access error:", err);
-                alert("Không thể truy cập camera.");
+                alert(`Không thể truy cập camera.\n\nLỗi: ${err?.name}: ${err?.message}`);
                 onClose();
             }
         };
@@ -418,8 +418,8 @@ const LocketCameraModal: React.FC<{
                     onClick={() => !isRecording && setCaptureMode('photo')}
                     disabled={isRecording}
                     className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'photo'
-                            ? 'bg-white/20 border-white text-white'
-                            : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
+                        ? 'bg-white/20 border-white text-white'
+                        : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
                         } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
                     title="Chụp ảnh"
                 >
@@ -430,8 +430,8 @@ const LocketCameraModal: React.FC<{
                     onClick={() => !isRecording && setCaptureMode('video')}
                     disabled={isRecording}
                     className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'video'
-                            ? 'bg-red-500/30 border-red-400 text-white'
-                            : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
+                        ? 'bg-red-500/30 border-red-400 text-white'
+                        : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
                         } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
                     title="Quay video 30s"
                 >
