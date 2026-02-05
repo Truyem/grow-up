@@ -17,6 +17,7 @@ interface UserFormProps {
   history: WorkoutHistoryItem[];
   onDeleteHistory: (timestamp: number) => void;
   activeTab: 'workout' | 'nutrition' | 'history'; // New prop
+  onStartTracking?: () => void;
 }
 
 type TabType = 'workout' | 'nutrition' | 'history';
@@ -24,7 +25,7 @@ type TabType = 'workout' | 'nutrition' | 'history';
 export const UserForm: React.FC<UserFormProps> = ({
   userData, setUserData, userStats, onSubmit, isLoading, onSickDay,
   history, onDeleteHistory,
-  activeTab // Receive activeTab as prop
+  activeTab, onStartTracking
 }) => {
   const [currentDate, setCurrentDate] = useState('');
   // const [activeTab, setActiveTab] = useState<TabType>('workout'); // Removed internal state
@@ -171,6 +172,13 @@ export const UserForm: React.FC<UserFormProps> = ({
                   Tạo Kế Hoạch Dinh Dưỡng
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={onStartTracking}
+              className="w-full py-3 rounded-xl font-medium text-emerald-400 hover:text-emerald-300 hover:bg-white/5 transition-colors border border-transparent hover:border-emerald-500/20"
+            >
+              Tự check Calo (Không tạo thực đơn)
             </button>
           </div>
         )}

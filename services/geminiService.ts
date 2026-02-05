@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
@@ -9,7 +9,11 @@ const MODELS = {
   FOOD_SCAN: "gemma-3-27b-it",
   OVERVIEW: "gemini-2.5-flash",
   MENU: "gemini-2.5-flash",
+  VISION: "gemini-1.5-flash",
+  FOOD_RECOGNITION: "gemini-2.5-flash-lite", // User requested "Gemini 2.5 Flash-Lite"
+  MACRO_CALC: "gemini-2.5-flash", // User requested "gemini-2.5-flash"
 };
+
 
 // ... lines 30-450 ...
 
@@ -1164,4 +1168,149 @@ export const suggestNextExercises = async (
     }
   }
   return [];
+};
+
+export const getBasicNutritionPlan = (userData: UserInput): DailyPlan => {
+  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+
+  const isBulking = userData.nutritionGoal === 'bulking';
+  const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0));
+  const fatTarget = Math.round(userData.weight * 0.9);
+
+  const caloriesFromProtein = proteinTarget * 4;
+  const caloriesFromFat = fatTarget * 9;
+  const remainingCalories = target - caloriesFromProtein - caloriesFromFat;
+  const carbTarget = Math.max(0, Math.round(remainingCalories / 4));
+
+  return {
+    date: getCurrentDate(),
+    schedule: {
+      suggestedWorkoutTime: "17:30",
+      suggestedSleepTime: "23:00",
+      reasoning: "Chế độ theo dõi thủ công."
+    },
+    workout: {
+      summary: "Chưa có lịch tập.",
+      detail: { levelName: "N/A", description: "N/A", morning: [], evening: [] },
+      isGenerated: false
+    },
+    nutrition: {
+      totalCalories: target,
+      totalProtein: proteinTarget,
+      totalCarbs: carbTarget,
+      totalFat: fatTarget,
+      advice: `Mục tiêu: ${isBulking ? 'Bulking' : 'Cutting'}. TDEE: ${tdee}. Theo dõi calories hàng ngày.`,
+      isGenerated: true, // Mark as true so NutritionDisplay renders
+      meals: [] // Empty meals to start
+    }
+  };
+};
+
+export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = false): Promise<Meal> => {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey) throw new Error("No API Key available");
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  // STEP 1: RECOGNIZE FOOD (Vision -> Text)
+  // Model: Gemini 2.5 Flash-Lite
+  const recognitionModel = MODELS.FOOD_RECOGNITION;
+
+  const recognitionPrompt = isVideo
+    ? `
+      Analyze this video of food and describe what you see in detail in Vietnamese.
+      - Identify all food items visible.
+      - Estimate portion sizes (e.g., 1 bowl, 200g, 1 piece).
+      - List visible ingredients.
+      Return ONLY the description. No intro/outro.
+    `
+    : `
+      Analyze this image and describe the food in detail in Vietnamese.
+      - Identify the main dish name.
+      - Estimate portion size (e.g., 1 bowl, 200g, 1 piece).
+      - List visible ingredients.
+      Return ONLY the description. No intro/outro.
+    `;
+
+  // Detect and remove data URL prefix, extract mimeType
+  let cleanBase64 = base64Image;
+  let mimeType = "image/jpeg"; // Default for images
+
+  // Check for data URL format and extract mimeType
+  const dataUrlMatch = base64Image.match(/^data:([^;]+);base64,/);
+  if (dataUrlMatch) {
+    mimeType = dataUrlMatch[1]; // e.g., "video/webm" or "image/jpeg"
+    cleanBase64 = base64Image.replace(/^data:[^;]+;base64,/, "");
+  } else if (isVideo) {
+    mimeType = "video/webm";
+  }
+
+  console.log(`Analyzing food with mimeType: ${mimeType}, isVideo: ${isVideo}`);
+
+  let foodDescription = "";
+  try {
+    const response = await ai.models.generateContent({
+      model: recognitionModel,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: recognitionPrompt },
+            { inlineData: { mimeType: mimeType, data: cleanBase64 } }
+          ]
+        }
+      ],
+    });
+    foodDescription = response.text || "";
+    if (!foodDescription) throw new Error("Empty recognition response");
+    console.log("Food Recognition Result:", foodDescription);
+  } catch (error) {
+    console.error("Recognition Error:", error);
+    throw error;
+  }
+
+  // STEP 2: CALCULATE MACROS (Text -> JSON)
+  // Model: Gemini 2.5 Flash
+  const macroModel = MODELS.MACRO_CALC;
+
+  const macroSchema = {
+    type: Type.OBJECT,
+    properties: {
+      name: { type: Type.STRING },
+      calories: { type: Type.NUMBER },
+      protein: { type: Type.NUMBER },
+      carbs: { type: Type.NUMBER },
+      fat: { type: Type.NUMBER },
+      description: { type: Type.STRING },
+    }
+  };
+
+  const macroPrompt = `
+    ACT AS A NUTRITIONIST.
+    Based on this food description: "${foodDescription}"
+    
+    Estimate nutritional content.
+    Return the result in JSON format.
+    
+    RULES:
+    - Name: Standard Vietnamese name.
+    - Calories: Estimated total.
+    - Macros: Protein, Carbs, Fat in grams.
+    - Description: Use the input description but refine it to be short and clear.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: macroModel,
+      contents: macroPrompt,
+      config: { responseMimeType: "application/json", responseSchema: macroSchema },
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("Empty macro response");
+    return cleanAndParseJSON(jsonText, "FoodAnalysis");
+  } catch (error) {
+    console.error("Macro Calc Error:", error);
+    throw error;
+  }
 };

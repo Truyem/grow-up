@@ -22,7 +22,7 @@ import { HistoryView } from './components/HistoryView';
 
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
-import { generateDailyPlan, getApiStatus, ApiStatus } from './services/geminiService';
+import { generateDailyPlan, getApiStatus, ApiStatus, getBasicNutritionPlan } from './services/geminiService';
 import { Sparkles, History, Dumbbell, Utensils } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
@@ -463,6 +463,29 @@ export default function App() {
     setViewMode('workout');
   };
 
+  const handleStartTracking = () => {
+    const basicPlan = getBasicNutritionPlan(userData);
+
+    // Merge with existing workout if available?
+    // Since specific request for nutrition tracking substitute, we just set nutrition part.
+    // But we need a complete Plan object.
+    // getBasicNutritionPlan returns a full structure (with empty workout).
+
+    let finalPlan = basicPlan;
+    if (plan) {
+      finalPlan = {
+        ...plan,
+        nutrition: basicPlan.nutrition
+      };
+    }
+
+    setPlan(finalPlan);
+    setViewMode('nutrition');
+
+    // Save cache
+    localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
+  };
+
   const handleCompleteWorkout = async (
     levelSelected: string,
     summary: string,
@@ -682,6 +705,7 @@ export default function App() {
                   history={workoutHistory}
                   onDeleteHistory={handleDeleteHistoryItem}
                   activeTab="workout"
+                  onStartTracking={handleStartTracking}
                 />
               </div>
             )
@@ -689,7 +713,11 @@ export default function App() {
 
           {viewMode === 'nutrition' && (
             plan?.nutrition?.isGenerated ? (
-              <NutritionDisplay plan={plan} onReset={handleReset} />
+              <NutritionDisplay
+                plan={plan}
+                onReset={handleReset}
+                onUpdatePlan={handleUpdatePlan}
+              />
             ) : (
               <div className="max-w-2xl mx-auto space-y-4">
                 <UserForm
@@ -702,6 +730,7 @@ export default function App() {
                   history={workoutHistory}
                   onDeleteHistory={handleDeleteHistoryItem}
                   activeTab="nutrition"
+                  onStartTracking={handleStartTracking}
                 />
               </div>
             )

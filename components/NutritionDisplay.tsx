@@ -1,12 +1,15 @@
 
 import React, { useState, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { DailyPlan, Meal } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets, X } from 'lucide-react';
+import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
+import { analyzeFoodImage } from '../services/geminiService';
 
 interface NutritionDisplayProps {
     plan: DailyPlan;
     onReset: () => void;
+    onUpdatePlan: (plan: DailyPlan) => void;
 }
 
 // --- MICRO COMPONENTS ---
@@ -70,7 +73,9 @@ const MealItem: React.FC<{
     isConsumed: boolean;
     onToggle: (e: React.MouseEvent) => void;
     onClick: () => void;
-}> = ({ meal, isConsumed, onToggle, onClick }) => (
+    onDelete?: (e: React.MouseEvent) => void;
+    canDelete?: boolean;
+}> = ({ meal, isConsumed, onToggle, onClick, onDelete, canDelete }) => (
     <div
         onClick={onClick}
         className={`group relative overflow-hidden border rounded-2xl p-4 transition-all duration-300 cursor-pointer 
@@ -110,6 +115,17 @@ const MealItem: React.FC<{
                     {meal.description}
                 </p>
             </div>
+
+            {/* Delete Button */}
+            {canDelete && onDelete && (
+                <button
+                    onClick={onDelete}
+                    className="flex-shrink-0 p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all z-20 hover:scale-105 active:scale-95"
+                    title="Xoá món ăn"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
         </div>
     </div>
 );
@@ -121,9 +137,9 @@ const MealDetailModal: React.FC<{
     onClose: () => void;
     onToggle: () => void;
 }> = ({ meal, isConsumed, onClose, onToggle }) => {
-    return (
+    return ReactDOM.createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
             <div className="relative w-full max-w-sm bg-[#1a1b1e] border border-white/10 rounded-3xl p-6 shadow-2xl animate-fade-in-up">
 
                 <button
@@ -169,40 +185,317 @@ const MealDetailModal: React.FC<{
                     </p>
                 </div>
 
-                {/* Action Button */}
-                <button
-                    onClick={() => {
-                        onToggle();
-                        onClose();
+            </div>
+        </div>,
+        document.body
+    );
+};
+
+const LocketCameraModal: React.FC<{
+    onCapture: (base64: string, isVideo?: boolean) => void;
+    onClose: () => void;
+}> = ({ onCapture, onClose }) => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [captureMode, setCaptureMode] = useState<'photo' | 'video'>('photo');
+
+    // Video recording states
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingProgress, setRecordingProgress] = useState(0);
+    const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+    const chunksRef = React.useRef<Blob[]>([]);
+    const progressIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    const RECORDING_DURATION = 30; // 30 seconds
+
+    React.useEffect(() => {
+        const startCamera = async () => {
+            try {
+                const mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', aspectRatio: 1 },
+                    audio: true // Enable audio for video recording
+                });
+                setStream(mediaStream);
+                if (videoRef.current) {
+                    videoRef.current.srcObject = mediaStream;
+                }
+            } catch (err) {
+                console.error("Camera access error:", err);
+                alert("Không thể truy cập camera.");
+                onClose();
+            }
+        };
+        startCamera();
+
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+            }
+        };
+    }, []);
+
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [flashOn, setFlashOn] = useState(false);
+
+    const toggleFlash = async () => {
+        setFlashOn(!flashOn);
+        if (stream) {
+            const track = stream.getVideoTracks()[0];
+            const capabilities = (track.getCapabilities && track.getCapabilities()) as any;
+            if (capabilities && 'torch' in capabilities) {
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ torch: !flashOn } as any]
+                    });
+                } catch (e) {
+                    console.error("Flash toggle failed", e);
+                }
+            }
+        }
+    };
+
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                onCapture(base64);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const capturePhoto = () => {
+        if (!videoRef.current) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0);
+            const base64 = canvas.toDataURL('image/jpeg', 0.8);
+            onCapture(base64, false);
+        }
+    };
+
+    const startRecording = () => {
+        if (!stream) return;
+
+        chunksRef.current = [];
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorderRef.current = mediaRecorder;
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                chunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                onCapture(base64, true);
+            };
+            reader.readAsDataURL(blob);
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        setRecordingProgress(0);
+
+        // Progress animation
+        const startTime = Date.now();
+        progressIntervalRef.current = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const progress = Math.min(elapsed / RECORDING_DURATION, 1);
+            setRecordingProgress(progress);
+
+            if (progress >= 1) {
+                stopRecording();
+            }
+        }, 50);
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            setRecordingProgress(0);
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
+            }
+        }
+    };
+
+    const handleCaptureClick = () => {
+        if (captureMode === 'photo') {
+            capturePhoto();
+        } else {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+    };
+
+    // Calculate progress ring
+    const viewfinderSize = 'min(90vw, 500px)';
+    const ringRadius = 180;
+    const ringCircumference = 2 * Math.PI * ringRadius;
+    const ringOffset = ringCircumference * (1 - recordingProgress);
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-transparent flex flex-col items-center justify-start pt-32 animate-fade-in">
+            {/* Hidden Input */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+            />
+
+            {/* Header */}
+            <div className="absolute top-4 w-full px-4 flex justify-between items-center z-20">
+                <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md">
+                    <X className="w-6 h-6" />
+                </button>
+                {/* Recording Timer */}
+                {isRecording && (
+                    <div className="px-4 py-2 rounded-full bg-red-500/80 text-white font-bold flex items-center gap-2">
+                        <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                        {Math.ceil(RECORDING_DURATION - recordingProgress * RECORDING_DURATION)}s
+                    </div>
+                )}
+                <div className="w-10" />
+            </div>
+
+            {/* Viewfinder with Progress Border */}
+            <div className="relative mx-auto" style={{ width: viewfinderSize, height: viewfinderSize }}>
+                {/* Camera Viewfinder */}
+                <div
+                    className="w-full h-full rounded-[2.5rem] overflow-hidden shadow-2xl relative"
+                    style={{
+                        border: captureMode === 'video' && isRecording
+                            ? '6px solid transparent'
+                            : '6px solid rgba(255,255,255,0.3)',
+                        background: captureMode === 'video' && isRecording
+                            ? `linear-gradient(#000, #000) padding-box, conic-gradient(from 0deg, #ef4444 ${recordingProgress * 100}%, rgba(255,255,255,0.3) ${recordingProgress * 100}%) border-box`
+                            : 'none'
                     }}
-                    className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95
-                        ${isConsumed
-                            ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
-                            : 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600'
+                >
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                    />
+
+                    {/* Corner Accents */}
+                    <div className="absolute top-6 left-6 w-10 h-10 border-t-[6px] border-l-[6px] border-white/40 rounded-tl-2xl pointer-events-none" />
+                    <div className="absolute top-6 right-6 w-10 h-10 border-t-[6px] border-r-[6px] border-white/40 rounded-tr-2xl pointer-events-none" />
+                    <div className="absolute bottom-6 left-6 w-10 h-10 border-b-[6px] border-l-[6px] border-white/40 rounded-bl-2xl pointer-events-none" />
+                    <div className="absolute bottom-6 right-6 w-10 h-10 border-b-[6px] border-r-[6px] border-white/40 rounded-br-2xl pointer-events-none" />
+                </div>
+            </div>
+
+            {/* Mode Selection Buttons */}
+            <div className="mt-4 flex justify-center gap-3">
+                <button
+                    onClick={() => !isRecording && setCaptureMode('photo')}
+                    disabled={isRecording}
+                    className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'photo'
+                            ? 'bg-white/20 border-white text-white'
+                            : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
+                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Chụp ảnh"
+                >
+                    <Camera className="w-5 h-5" />
+                    <span className="text-sm font-medium">Ảnh</span>
+                </button>
+                <button
+                    onClick={() => !isRecording && setCaptureMode('video')}
+                    disabled={isRecording}
+                    className={`px-5 py-2.5 rounded-2xl backdrop-blur-md border-2 transition-all active:scale-95 flex items-center justify-center gap-2 ${captureMode === 'video'
+                            ? 'bg-red-500/30 border-red-400 text-white'
+                            : 'bg-black/40 border-white/30 text-white/60 hover:bg-black/60 hover:text-white'
+                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Quay video 30s"
+                >
+                    <Video className="w-5 h-5" />
+                    <span className="text-sm font-medium">Video</span>
+                </button>
+            </div>
+
+            {/* Controls */}
+            <div className="mt-8 w-full max-w-[320px] flex justify-between items-center px-6">
+                {/* Upload Button */}
+                <button
+                    onClick={handleUploadClick}
+                    disabled={isRecording}
+                    className={`p-4 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/20 hover:bg-black/60 transition-all active:scale-95 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    <ImageIcon className="w-6 h-6" />
+                </button>
+
+                {/* Capture/Record Button */}
+                <button
+                    onClick={handleCaptureClick}
+                    className={`w-20 h-20 rounded-full border-[6px] flex items-center justify-center transition-all active:scale-95 hover:scale-105 backdrop-blur-sm ${captureMode === 'video'
+                        ? isRecording
+                            ? 'border-red-500 bg-red-500/20'
+                            : 'border-red-400/80'
+                        : 'border-white/80'
                         }`}
                 >
-                    {isConsumed ? (
-                        <>
-                            <X className="w-5 h-5" /> Hủy hoàn thành
-                        </>
+                    {captureMode === 'video' ? (
+                        isRecording ? (
+                            <div className="w-8 h-8 bg-red-500 rounded-md" /> // Stop icon
+                        ) : (
+                            <div className="w-16 h-16 bg-red-500 rounded-full" /> // Record icon
+                        )
                     ) : (
-                        <>
-                            <Check className="w-5 h-5" /> Đánh dấu đã ăn
-                        </>
+                        <div className="w-16 h-16 bg-white rounded-full border-4 border-transparent" />
                     )}
                 </button>
 
+                {/* Flash Button */}
+                <button
+                    onClick={toggleFlash}
+                    disabled={isRecording}
+                    className={`p-4 rounded-full backdrop-blur-md border border-white/20 transition-all active:scale-95 ${flashOn ? 'bg-yellow-500/80 text-white border-yellow-400' : 'bg-black/40 text-white hover:bg-black/60'
+                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {flashOn ? <Zap className="w-6 h-6 fill-current" /> : <ZapOff className="w-6 h-6" />}
+                </button>
             </div>
         </div>
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset }) => {
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan }) => {
     // State to track consumed meal names
     const [consumedMealNames, setConsumedMealNames] = useState<string[]>([]);
 
     // State for modal
     const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
+
+    // Cleanup stream in case component unmounts while camera is open (though handled in modal)
 
     const toggleMeal = (mealName: string) => {
         setConsumedMealNames(prev =>
@@ -210,6 +503,59 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                 ? prev.filter(n => n !== mealName)
                 : [...prev, mealName]
         );
+    };
+
+    // Delete meal function - only for meals added via camera (with timestamp)
+    const deleteMeal = (mealName: string) => {
+        const updatedPlan = { ...plan };
+        updatedPlan.nutrition.meals = updatedPlan.nutrition.meals.filter(
+            meal => meal.name !== mealName
+        );
+        onUpdatePlan(updatedPlan);
+        // Also remove from consumed list
+        setConsumedMealNames(prev => prev.filter(n => n !== mealName));
+    };
+
+    // Check if meal can be deleted (added via camera - has timestamp format)
+    const canDeleteMeal = (mealName: string): boolean => {
+        // Meals added via camera have format "Name (HH:MM)"
+        return /\(\d{2}:\d{2}\)$/.test(mealName);
+    };
+
+    const handleCameraCapture = async (base64: string, isVideo: boolean = false) => {
+        setShowCamera(false);
+        setIsScanning(true);
+        try {
+            const analyzedMeal = await analyzeFoodImage(base64, isVideo);
+
+            // Create new meal with unique name if needed (append time?)
+            const now = new Date();
+            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const newMeal: Meal = {
+                ...analyzedMeal,
+                name: `${analyzedMeal.name} (${timeString})` // Ensure uniqueness
+            };
+
+            // Update Plan
+            const updatedPlan = { ...plan };
+            if (!updatedPlan.nutrition.meals) updatedPlan.nutrition.meals = [];
+
+            updatedPlan.nutrition.meals.push(newMeal);
+            onUpdatePlan(updatedPlan);
+
+            // Auto-mark as consumed
+            toggleMeal(newMeal.name);
+
+            // Show details
+            setSelectedMeal(newMeal);
+
+        } catch (error) {
+            console.error("Analysis failed", error);
+            alert("Không thể phân tích ảnh hoặc Gemini bị lỗi. Vui lòng thử lại.");
+        } finally {
+            setIsScanning(false);
+        }
     };
 
     // Calculate consumed totals
@@ -238,100 +584,140 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                 />
             )}
 
-            {/* Header Section */}
-            <div className="text-center space-y-2">
-                <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
-                    Dinh Dưỡng Hôm Nay
-                </h2>
-                <p className="text-gray-400 text-sm">
-                    Theo dõi lượng Macro đã tiêu thụ của bạn
-                </p>
-            </div>
-
-            {/* Macro Visualization Ring Section */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-
-                <div className="relative z-10 flex flex-wrap justify-center gap-8 md:gap-12">
-                    <CircularProgress
-                        value={consumed.calories}
-                        max={plan.nutrition.totalCalories}
-                        color="#ef4444" // Red for Calories/Energy
-                        label="Calories"
-                        unit="kcal"
-                        icon={<Flame className="w-5 h-5 text-red-400" />}
-                    />
-                    <CircularProgress
-                        value={consumed.protein}
-                        max={plan.nutrition.totalProtein}
-                        color="#3b82f6" // Blue for Protein
-                        label="Protein"
-                        unit="g"
-                        icon={<Beef className="w-5 h-5 text-blue-400" />}
-                    />
-                    <CircularProgress
-                        value={consumed.carbs}
-                        max={plan.nutrition.totalCarbs || 0}
-                        color="#f59e0b" // Orange for Carbs
-                        label="Carbs"
-                        unit="g"
-                        icon={<Wheat className="w-5 h-5 text-orange-400" />}
-                    />
-                    <CircularProgress
-                        value={consumed.fat}
-                        max={plan.nutrition.totalFat || 0}
-                        color="#eab308" // Yellow for Fat
-                        label="Fat"
-                        unit="g"
-                        icon={<Droplets className="w-5 h-5 text-yellow-400" />}
-                    />
-                </div>
-            </div>
-
-            {/* Plan Details & Meals */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between px-2">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Utensils className="w-5 h-5 text-emerald-400" />
-                        Thực Đơn
-                    </h3>
-                    <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                        {consumedMealNames.length}/{plan.nutrition.meals.length} Hoàn thành
+            {showCamera ? (
+                <LocketCameraModal
+                    onCapture={handleCameraCapture}
+                    onClose={() => setShowCamera(false)}
+                />
+            ) : (
+                <>
+                    {/* Header Section */}
+                    <div className="text-center space-y-2">
+                        <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                            Dinh Dưỡng Hôm Nay
+                        </h2>
+                        <p className="text-gray-400 text-sm">
+                            Theo dõi lượng Macro đã tiêu thụ của bạn
+                        </p>
                     </div>
-                </div>
 
-                <div className="grid gap-3">
-                    {plan.nutrition.meals.map((meal, index) => (
-                        <MealItem
-                            key={index}
-                            meal={meal}
-                            isConsumed={consumedMealNames.includes(meal.name)}
-                            onToggle={(e) => {
-                                e.stopPropagation();
-                                toggleMeal(meal.name);
-                            }}
-                            onClick={() => setSelectedMeal(meal)}
-                        />
-                    ))}
-                </div>
-            </div>
+                    {/* Scan Food Action */}
+                    <div className="flex justify-center">
+                        <button
+                            onClick={() => setShowCamera(true)}
+                            disabled={isScanning}
+                            className="group relative flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all w-full max-w-sm"
+                        >
+                            <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
 
-            {/* Footer Actions */}
-            <div className="text-center pt-8 border-t border-white/5">
-                <p className="text-xs text-gray-500 mb-4 italic">
-                    *Mẹo: Chạm vào món ăn để xem chi tiết
-                </p>
-                <button
-                    onClick={onReset}
-                    className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
-                >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
-                        <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                        <span className="font-medium">Tạo Kế Hoạch Mới</span>
+                            <div className={`p-3 rounded-xl bg-emerald-500/20 text-emerald-400 ${isScanning ? 'animate-spin' : ''}`}>
+                                {isScanning ? <Loader2 className="w-6 h-6" /> : <Camera className="w-6 h-6" />}
+                            </div>
+
+                            <div className="text-left">
+                                <div className="font-bold text-emerald-300 text-lg">
+                                    {isScanning ? "Đang phân tích..." : "Check Calo Từ Ảnh"}
+                                </div>
+                                <div className="text-xs text-emerald-400/60 font-medium uppercase tracking-wide">
+                                    {isScanning ? "AI đang nhìn món ăn của bạn..." : "Chụp ảnh món ăn để thêm vào nhật ký"}
+                                </div>
+                            </div>
+
+                            {!isScanning && <ScanLine className="absolute right-6 w-6 h-6 text-emerald-500/40" />}
+                        </button>
                     </div>
-                </button>
-            </div>
+
+                    {/* Macro Visualization Ring Section */}
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+
+                        <div className="relative z-10 flex flex-wrap justify-center gap-8 md:gap-12">
+                            <CircularProgress
+                                value={consumed.calories}
+                                max={plan.nutrition.totalCalories}
+                                color="#ef4444" // Red for Calories/Energy
+                                label="Calories"
+                                unit="kcal"
+                                icon={<Flame className="w-5 h-5 text-red-400" />}
+                            />
+                            <CircularProgress
+                                value={consumed.protein}
+                                max={plan.nutrition.totalProtein}
+                                color="#3b82f6" // Blue for Protein
+                                label="Protein"
+                                unit="g"
+                                icon={<Beef className="w-5 h-5 text-blue-400" />}
+                            />
+                            <CircularProgress
+                                value={consumed.carbs}
+                                max={plan.nutrition.totalCarbs || 0}
+                                color="#f59e0b" // Orange for Carbs
+                                label="Carbs"
+                                unit="g"
+                                icon={<Wheat className="w-5 h-5 text-orange-400" />}
+                            />
+                            <CircularProgress
+                                value={consumed.fat}
+                                max={plan.nutrition.totalFat || 0}
+                                color="#eab308" // Yellow for Fat
+                                label="Fat"
+                                unit="g"
+                                icon={<Droplets className="w-5 h-5 text-yellow-400" />}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Plan Details & Meals */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Utensils className="w-5 h-5 text-emerald-400" />
+                                Thực Đơn
+                            </h3>
+                            <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                {consumedMealNames.length}/{plan.nutrition.meals.length} Hoàn thành
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                            {plan.nutrition.meals.map((meal, index) => (
+                                <MealItem
+                                    key={index}
+                                    meal={meal}
+                                    isConsumed={consumedMealNames.includes(meal.name)}
+                                    onToggle={(e) => {
+                                        e.stopPropagation();
+                                        toggleMeal(meal.name);
+                                    }}
+                                    onClick={() => setSelectedMeal(meal)}
+                                    canDelete={canDeleteMeal(meal.name)}
+                                    onDelete={(e) => {
+                                        e.stopPropagation();
+                                        deleteMeal(meal.name);
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="text-center pt-8 border-t border-white/5">
+                        <p className="text-xs text-gray-500 mb-4 italic">
+                            *Mẹo: Chạm vào món ăn để xem chi tiết
+                        </p>
+                        <button
+                            onClick={onReset}
+                            className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
+                                <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                                <span className="font-medium">Tạo Kế Hoạch Mới</span>
+                            </div>
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
