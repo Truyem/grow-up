@@ -13,7 +13,7 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
@@ -682,6 +682,29 @@ export default function App() {
     localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
   };
 
+  // Handle adding suggested ingredient to fridge
+  const handleAddSuggestedIngredient = (ingredient: Ingredient) => {
+    setUserData(prev => ({
+      ...prev,
+      availableIngredients: [
+        ...(prev.availableIngredients || []),
+        { ...ingredient, id: ingredient.id || Date.now().toString() }
+      ]
+    }));
+
+    // Remove from suggested list in plan
+    if (plan?.nutrition?.suggestedIngredients) {
+      const updatedPlan = { ...plan };
+      updatedPlan.nutrition.suggestedIngredients = updatedPlan.nutrition.suggestedIngredients.filter(
+        i => i.id !== ingredient.id
+      );
+      setPlan(updatedPlan);
+      localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+    }
+
+    setToastMessage(`Đã thêm "${ingredient.name}" vào tủ lạnh!`);
+  };
+
   const handleCompleteWorkout = async (
     levelSelected: string,
     summary: string,
@@ -995,6 +1018,7 @@ export default function App() {
                     plan={plan}
                     onReset={handleReset}
                     onUpdatePlan={handleUpdatePlan}
+                    onAddSuggestedIngredient={handleAddSuggestedIngredient}
                   />
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-4">

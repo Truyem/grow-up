@@ -1,15 +1,16 @@
 
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { DailyPlan, Meal } from '../types';
+import { DailyPlan, Meal, Ingredient } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
-import { analyzeFoodImage } from '../services/geminiService';
+import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 
 interface NutritionDisplayProps {
     plan: DailyPlan;
     onReset: () => void;
     onUpdatePlan: (plan: DailyPlan) => void;
+    onAddSuggestedIngredient?: (ingredient: Ingredient) => void;
 }
 
 // --- MICRO COMPONENTS ---
@@ -505,7 +506,7 @@ const LocketCameraModal: React.FC<{
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan }) => {
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onAddSuggestedIngredient }) => {
     // State to track consumed meal names
     const [consumedMealNames, setConsumedMealNames] = useState<string[]>([]);
 
@@ -513,6 +514,11 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
     const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
+
+    // State for manual food input
+    const [showManualInput, setShowManualInput] = useState(false);
+    const [manualFoodText, setManualFoodText] = useState('');
+    const [isAnalyzingManual, setIsAnalyzingManual] = useState(false);
 
     // Cleanup stream in case component unmounts while camera is open (though handled in modal)
 
@@ -592,6 +598,51 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
         }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
     }, [plan.nutrition.meals, consumedMealNames]);
 
+    // Handle manual food text analysis
+    const handleManualFoodAnalysis = async () => {
+        if (!manualFoodText.trim()) return;
+
+        setIsAnalyzingManual(true);
+        try {
+            const analyzedMeal = await analyzeFoodText(manualFoodText);
+
+            // Create new meal with unique name (append time)
+            const now = new Date();
+            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const newMeal: Meal = {
+                ...analyzedMeal,
+                name: `${analyzedMeal.name} (${timeString})`
+            };
+
+            // Update Plan
+            const updatedPlan = { ...plan };
+            updatedPlan.nutrition.meals = [...updatedPlan.nutrition.meals, newMeal];
+
+            // Update totals
+            updatedPlan.nutrition.totalCalories += newMeal.calories || 0;
+            updatedPlan.nutrition.totalProtein += newMeal.protein || 0;
+            updatedPlan.nutrition.totalCarbs += newMeal.carbs || 0;
+            updatedPlan.nutrition.totalFat += newMeal.fat || 0;
+
+            onUpdatePlan(updatedPlan);
+
+            // Auto-mark as consumed and show details
+            toggleMeal(newMeal.name);
+            setSelectedMeal(newMeal);
+
+            // Reset input
+            setManualFoodText('');
+            setShowManualInput(false);
+
+        } catch (error) {
+            console.error("Manual food analysis failed", error);
+            alert("Không thể phân tích. Vui lòng thử lại.");
+        } finally {
+            setIsAnalyzingManual(false);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-fade-in relative pt-20 pb-10">
             {selectedMeal && (
@@ -620,30 +671,74 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                         </p>
                     </div>
 
-                    {/* Scan Food Action */}
-                    <div className="flex justify-center">
-                        <button
-                            onClick={() => setShowCamera(true)}
-                            disabled={isScanning}
-                            className="group relative flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all w-full max-w-sm"
-                        >
-                            <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                            <div className={`p-3 rounded-xl bg-emerald-500/20 text-emerald-400 ${isScanning ? 'animate-spin' : ''}`}>
-                                {isScanning ? <Loader2 className="w-6 h-6" /> : <Camera className="w-6 h-6" />}
-                            </div>
-
-                            <div className="text-left">
-                                <div className="font-bold text-emerald-300 text-lg">
-                                    {isScanning ? "Đang phân tích..." : "Check Calo Từ Ảnh"}
+                    {/* Food Action Buttons */}
+                    <div className="flex flex-col gap-3">
+                        <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
+                            {/* Camera Button */}
+                            <button
+                                onClick={() => setShowCamera(true)}
+                                disabled={isScanning}
+                                className="group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all"
+                            >
+                                <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className={`p-3 rounded-xl bg-emerald-500/20 text-emerald-400 ${isScanning ? 'animate-spin' : ''}`}>
+                                    {isScanning ? <Loader2 className="w-6 h-6" /> : <Camera className="w-6 h-6" />}
                                 </div>
-                                <div className="text-xs text-emerald-400/60 font-medium uppercase tracking-wide">
-                                    {isScanning ? "AI đang nhìn món ăn của bạn..." : "Chụp ảnh món ăn để thêm vào nhật ký"}
+                                <div className="text-center relative z-10">
+                                    <div className="font-bold text-emerald-300">Chụp Ảnh</div>
+                                    <div className="text-xs text-emerald-400/60">Quét món ăn</div>
                                 </div>
-                            </div>
+                            </button>
 
-                            {!isScanning && <ScanLine className="absolute right-6 w-6 h-6 text-emerald-500/40" />}
-                        </button>
+                            {/* Manual Input Button */}
+                            <button
+                                onClick={() => setShowManualInput(!showManualInput)}
+                                className={`group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 border ${showManualInput ? 'border-amber-400' : 'border-amber-500/30'} rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all`}
+                            >
+                                <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400">
+                                    <Utensils className="w-6 h-6" />
+                                </div>
+                                <div className="text-center relative z-10">
+                                    <div className="font-bold text-amber-300">Nhập Tay</div>
+                                    <div className="text-xs text-amber-400/60">Gõ tên món</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* Manual Food Input Form */}
+                        {showManualInput && (
+                            <div className="max-w-lg mx-auto w-full animate-fade-in">
+                                <div className="flex gap-2 p-3 bg-white/5 border border-amber-500/30 rounded-2xl backdrop-blur-md">
+                                    <input
+                                        type="text"
+                                        value={manualFoodText}
+                                        onChange={(e) => setManualFoodText(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleManualFoodAnalysis()}
+                                        placeholder="VD: 1 tô phở bò, 2 quả trứng chiên..."
+                                        className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 outline-none"
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleManualFoodAnalysis}
+                                        disabled={isAnalyzingManual || !manualFoodText.trim()}
+                                        className="px-4 py-2 bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                                    >
+                                        {isAnalyzingManual ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span>Đang tính...</span>
+                                            </>
+                                        ) : (
+                                            <span>+ Thêm</span>
+                                        )}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1 text-center">
+                                    AI sẽ tự động tính calo & macros cho món ăn của bạn
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Macro Visualization Ring Section */}
@@ -718,6 +813,61 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                             ))}
                         </div>
                     </div>
+
+                    {/* Suggested Food Items Section */}
+                    {plan.nutrition.suggestedIngredients && plan.nutrition.suggestedIngredients.length > 0 && onAddSuggestedIngredient && (
+                        <div className="space-y-4 pt-6 border-t border-white/5">
+                            <div className="flex items-center justify-between px-2">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Zap className="w-5 h-5 text-amber-400" />
+                                    Gợi Ý Thêm Nguyên Liệu
+                                </h3>
+                                <div className="text-xs text-gray-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                                    AI Suggest
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-gray-400 px-2">
+                                Dựa trên mục tiêu dinh dưỡng, AI gợi ý thêm các nguyên liệu sau để bù đắp macros còn thiếu:
+                            </p>
+
+                            <div className="grid gap-2">
+                                {plan.nutrition.suggestedIngredients.map((ingredient, index) => (
+                                    <div
+                                        key={ingredient.id || index}
+                                        className="group relative overflow-hidden p-3 rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5 hover:from-amber-500/10 hover:to-orange-500/10 transition-all duration-300"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                                    {ingredient.category === 'protein' && <Beef className="w-5 h-5 text-red-400" />}
+                                                    {ingredient.category === 'carb' && <Wheat className="w-5 h-5 text-orange-400" />}
+                                                    {ingredient.category === 'fat' && <Droplets className="w-5 h-5 text-yellow-400" />}
+                                                    {ingredient.category === 'veg' && <Utensils className="w-5 h-5 text-emerald-400" />}
+                                                    {(!ingredient.category || ingredient.category === 'other') && <Utensils className="w-5 h-5 text-gray-400" />}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-white">{ingredient.name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-amber-400">{ingredient.quantity} {ingredient.unit}</span>
+                                                        {(ingredient as any).reason && (
+                                                            <span className="text-xs text-gray-500">• {(ingredient as any).reason}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => onAddSuggestedIngredient(ingredient)}
+                                                className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-medium hover:bg-amber-500/30 transition-all active:scale-95 border border-amber-500/30"
+                                            >
+                                                + Thêm
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Footer Actions */}
                     <div className="text-center pt-8 border-t border-white/5">

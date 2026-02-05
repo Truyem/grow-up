@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, Ingredient } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
@@ -12,6 +12,7 @@ const MODELS = {
   VISION: "gemini-1.5-flash",
   FOOD_RECOGNITION: "gemini-2.5-flash-lite", // User requested "Gemini 2.5 Flash-Lite"
   MACRO_CALC: "gemini-2.5-flash", // User requested "gemini-2.5-flash"
+  FOOD_SUGGEST: "gemini-2.5-flash", // Gợi ý thức ăn bổ sung khi tạo plan
 };
 
 
@@ -840,6 +841,34 @@ export const generateDailyPlan = async (
 
       if (generationType === 'nutrition' || generationType === 'both') {
         nutritionPart = await generateNutritionPart(userData, apiKey);
+
+        // Automatically suggest additional food items based on remaining macros
+        try {
+          const { target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+          const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0;
+          const proteinTarget = Math.round(userData.weight * proteinMultiplier);
+          const fatTarget = Math.round(userData.weight * 0.9);
+          const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
+          const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
+
+          const targetMacros = {
+            calories: target,
+            protein: proteinTarget,
+            carbs: carbTarget,
+            fat: fatTarget
+          };
+
+          const meals = nutritionPart?.nutrition?.meals || [];
+          const suggestions = await suggestFoodItems(userData, meals, targetMacros);
+
+          if (suggestions && suggestions.length > 0) {
+            nutritionPart.nutrition.suggestedIngredients = suggestions;
+            console.log(`✅ Added ${suggestions.length} food suggestions`);
+          }
+        } catch (suggestError) {
+          console.warn("Could not generate food suggestions:", suggestError);
+          // Continue without suggestions - not critical
+        }
       }
 
       // ... (rest of success logic)
@@ -1309,4 +1338,181 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
     console.error("Macro Calc Error:", error);
     throw error;
   }
+};
+
+// --- ANALYZE FOOD TEXT (Manual Input) ---
+// Phân tích đồ ăn từ text nhập tay, tính calo/macros
+export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey) {
+    throw new Error("No API Key for food analysis");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const model = MODELS.FOOD_SUGGEST; // gemini-2.5-flash
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      name: { type: Type.STRING },
+      calories: { type: Type.NUMBER },
+      protein: { type: Type.NUMBER },
+      carbs: { type: Type.NUMBER },
+      fat: { type: Type.NUMBER },
+      description: { type: Type.STRING }
+    }
+  };
+
+  const prompt = `
+    ACT AS A NUTRITIONIST.
+    Analyze this food item/meal: "${foodText}"
+    
+    Estimate nutritional content accurately.
+    Return the result in JSON format.
+    
+    RULES:
+    - Name: Standard Vietnamese name for the food (e.g., "Phở bò", "Cơm sườn")
+    - Calories: Estimated total calories (number only)
+    - Protein: Grams of protein (number only)
+    - Carbs: Grams of carbs (number only)  
+    - Fat: Grams of fat (number only)
+    - Description: Short Vietnamese description (e.g., "1 tô lớn với thịt bò tái")
+    
+    Be accurate with Vietnamese portion sizes and common ingredients.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: { responseMimeType: "application/json", responseSchema: schema },
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("Empty food analysis response");
+
+    const result = cleanAndParseJSON(jsonText, "FoodTextAnalysis");
+    console.log("Analyzed food text:", result);
+    return result;
+  } catch (error) {
+    console.error("Food Text Analysis Error:", error);
+    throw error;
+  }
+};
+
+// --- SUGGEST FOOD ITEMS ---
+// Gợi ý thức ăn bổ sung khi tạo nutrition plan
+export const suggestFoodItems = async (
+  userData: UserInput,
+  currentMeals: Meal[],
+  targetMacros: { calories: number; protein: number; carbs: number; fat: number }
+): Promise<Ingredient[]> => {
+  const apiKey = getCurrentApiKey();
+  if (!apiKey) {
+    console.warn("No API Key for food suggestion");
+    return [];
+  }
+
+  let ai = new GoogleGenAI({ apiKey });
+  let retriesLeft = API_KEYS.length;
+  const model = MODELS.FOOD_SUGGEST;
+
+  // Calculate current macros from meals
+  const currentMacros = currentMeals.reduce(
+    (acc, meal) => ({
+      calories: acc.calories + (meal.calories || 0),
+      protein: acc.protein + (meal.protein || 0),
+      carbs: acc.carbs + (meal.carbs || 0),
+      fat: acc.fat + (meal.fat || 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  // Calculate remaining macros needed
+  const remainingMacros = {
+    calories: Math.max(0, targetMacros.calories - currentMacros.calories),
+    protein: Math.max(0, targetMacros.protein - currentMacros.protein),
+    carbs: Math.max(0, targetMacros.carbs - currentMacros.carbs),
+    fat: Math.max(0, targetMacros.fat - currentMacros.fat),
+  };
+
+  const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
+  const existingIngredients = userData.availableIngredients.map(i => i.name).join(', ');
+
+  const schema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        id: { type: Type.STRING },
+        name: { type: Type.STRING },
+        quantity: { type: Type.NUMBER },
+        unit: { type: Type.STRING },
+        category: { type: Type.STRING },
+        reason: { type: Type.STRING }, // Lý do gợi ý
+      }
+    }
+  };
+
+  const prompt = `
+    ACT AS A NUTRITIONIST.
+    SUGGEST 3-5 FOOD ITEMS to help user reach their nutrition goals.
+
+    ### USER CONTEXT
+    - Goal: ${goalText}
+    - Current Weight: ${userData.weight}kg
+    - Available Ingredients: ${existingIngredients || "Không có"}
+    
+    ### MACROS ANALYSIS
+    - Target: ${targetMacros.calories} kcal, ${targetMacros.protein}g Protein, ${targetMacros.carbs}g Carbs, ${targetMacros.fat}g Fat
+    - Current (from meals): ${currentMacros.calories} kcal, ${currentMacros.protein}g Protein, ${currentMacros.carbs}g Carbs, ${currentMacros.fat}g Fat
+    - REMAINING NEEDED: ${remainingMacros.calories} kcal, ${remainingMacros.protein}g Protein, ${remainingMacros.carbs}g Carbs, ${remainingMacros.fat}g Fat
+
+    ### TASK
+    Suggest 3-5 food items that:
+    1. Help fill the REMAINING macros gap
+    2. Are practical and easy to find in Vietnam
+    3. Are NOT already in the available ingredients list
+    4. Match the user's goal (high protein for bulking, low calorie density for cutting)
+
+    ### OUTPUT FORMAT
+    Return JSON Array of ingredients. Each item must have:
+    - id: Random short string
+    - name: Vietnamese food name (e.g., "Ức gà", "Trứng", "Cơm gạo lứt")
+    - quantity: Suggested quantity (number)
+    - unit: Unit (e.g., "g", "quả", "hộp")
+    - category: One of "protein", "carb", "fat", "veg", "other"
+    - reason: SHORT Vietnamese explanation why this food is suggested (max 10 words)
+
+    RESPOND ONLY WITH JSON ARRAY. NO MARKDOWN.
+  `;
+
+  while (retriesLeft > 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema: schema },
+      });
+
+      const jsonText = response.text;
+      if (!jsonText) throw new Error("Empty suggestion response");
+
+      const suggestions = cleanAndParseJSON(jsonText, "FoodSuggest");
+      console.log("Food Suggestions:", suggestions);
+      return suggestions;
+    } catch (error) {
+      console.error("Food Suggest Error:", error);
+      if (isRateLimitError(error) && retriesLeft > 1) {
+        const newKey = markRateLimitedAndRotate();
+        if (newKey) {
+          ai = new GoogleGenAI({ apiKey: newKey });
+          retriesLeft--;
+          continue;
+        }
+      }
+      return [];
+    }
+  }
+  return [];
 };

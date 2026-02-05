@@ -153,6 +153,7 @@ export interface DailyPlan {
     meals: Meal[];
     advice: string;
     isGenerated?: boolean; // New flag
+    suggestedIngredients?: Ingredient[]; // Gợi ý thức ăn bổ sung từ AI
   };
 
 }
