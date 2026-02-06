@@ -53,6 +53,27 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             outDir: 'dist',
+            // Optimize chunk splitting for better caching
+            rollupOptions: {
+                output: {
+                    manualChunks: {
+                        // Core React runtime - rarely changes
+                        'react-vendor': ['react', 'react-dom'],
+                        // Heavy charting library - lazy loaded
+                        'recharts': ['recharts'],
+                        // Supabase client
+                        'supabase': ['@supabase/supabase-js'],
+                    },
+                },
+            },
+            // Minification settings
+            minify: 'esbuild',
+            // Generate source maps for debugging (optional, can remove in prod)
+            sourcemap: false,
+            // Split CSS into chunks
+            cssCodeSplit: true,
+            // Reduce chunk size warnings threshold
+            chunkSizeWarningLimit: 500,
         },
     };
 });
