@@ -7,11 +7,17 @@
   <meta name="description"
     content="Grow Up - Ứng dụng lập kế hoạch tập luyện và dinh dưỡng hàng ngày. Theo dõi tiến độ, tạo workout plan AI-powered." />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <title>Grow Up | Daily Planner</title>
 
-  <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💪</text></svg>">
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/webp" href="/icons/icon-96.webp" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.webp" />
 
   <!-- DNS Prefetch & Preconnect for faster external resources -->
   <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
@@ -21,6 +27,17 @@
 <body>
   <div id="root"></div>
   <script type="module" src="./index.tsx"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
 </body>
 
 </html>
