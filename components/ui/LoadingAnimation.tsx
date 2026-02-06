@@ -46,15 +46,15 @@ export const LoadingAnimation: React.FC = () => {
 
                 {/* Ultra-thin Progress Line */}
                 <div className="w-32 h-[1px] bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading" />
+                    <div className="h-full w-8 bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading will-change-transform" />
                 </div>
             </div>
 
             <style>{`
                 @keyframes progress-loading {
-                    0% { transform: translateX(-100%); width: 20%; }
-                    50% { width: 60%; }
-                    100% { transform: translateX(100%); width: 20%; }
+                    0% { transform: translateX(-100%); opacity: 0.5; }
+                    50% { transform: translateX(200%); opacity: 1; }
+                    100% { transform: translateX(400%); opacity: 0.5; }
                 }
                 @keyframes fade-in-up {
                     0% { opacity: 0; transform: translateY(5px); }

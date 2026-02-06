@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 
 // Suppress Recharts defaultProps warning
 const originalConsoleError = console.error;
@@ -18,8 +18,10 @@ import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
-import { AuthPage } from './components/AuthPage';
-import { AccountSettings } from './components/AccountSettings';
+
+// Lazy load heavy auth components - only needed when user is not logged in or accessing settings
+const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const AccountSettings = lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
 
 import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -961,7 +963,9 @@ export default function App() {
       {(loading || isAuthChecking) && <LoadingAnimation />}
 
       {!isAuthChecking && !session ? (
-        <AuthPage />
+        <Suspense fallback={<LoadingAnimation />}>
+          <AuthPage />
+        </Suspense>
       ) : (
         <>
 
@@ -1036,10 +1040,12 @@ export default function App() {
 
               {/* Render content based on View Mode + Generation Status */}
               {viewMode === 'settings' && session?.user ? (
-                <AccountSettings
-                  user={session.user}
-                  onLogout={() => supabase.auth.signOut()}
-                />
+                <Suspense fallback={<LoadingAnimation />}>
+                  <AccountSettings
+                    user={session.user}
+                    onLogout={() => supabase.auth.signOut()}
+                  />
+                </Suspense>
               ) : null}
 
               {viewMode === 'workout' && (
