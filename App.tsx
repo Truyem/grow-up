@@ -182,8 +182,13 @@ export default function App() {
     if (!session?.user) return;
 
     const syncData = async () => {
-      try {
-        setLoading(true);
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Sync timeout")), 15000)
+      );
+
+      // The actual sync logic wrapped in a promise
+      const performSync = async () => {
         const { user } = session;
 
         // 1. Check Profile & Settings
@@ -305,9 +310,15 @@ export default function App() {
 
           setWorkoutHistory(finalHistory);
         }
+      };
 
+      try {
+        setLoading(true);
+        // Race the sync against the timeout
+        await Promise.race([performSync(), timeoutPromise]);
       } catch (err) {
-        console.error("Sync error:", err);
+        console.error("Sync error or timeout:", err);
+        setToastMessage("Đồng bộ dữ liệu chậm. Đang vào chế độ offline...");
       } finally {
         setLoading(false);
       }
