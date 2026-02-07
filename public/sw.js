@@ -1,4 +1,4 @@
-const CACHE_NAME = 'growup-v2';
+const CACHE_NAME = 'growup-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -10,7 +10,6 @@ const EXCLUDED_ORIGINS = [
   'supabase.co'
 ];
 
-// Install event - cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -20,7 +19,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -34,53 +32,51 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. Skip non-GET requests
   if (event.request.method !== 'GET') return;
+  if (EXCLUDED_ORIGINS.some(origin => url.hostname.includes(origin))) return;
 
-  // 2. Skip excluded origins (API calls)
-  if (EXCLUDED_ORIGINS.some(origin => url.hostname.includes(origin))) {
-    return;
-  }
-
-  // 3. Navigation Request (HTML) - Network First, allow offline fallback
+  // Navigation (HTML): Stale-While-Revalidate
+  // 1. Return from cache immediately (FAST)
+  // 2. Fetch from network to update cache for NEXT time
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
-        })
-        .catch(() => {
-          return caches.match('/index.html') || caches.match('/');
-        })
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match('/index.html');
+
+        // Background update
+        const networkFetch = fetch(event.request).then((res) => {
+          // Only cache valid responses
+          if (res.status === 200) {
+            cache.put(event.request, res.clone());
+          }
+          return res;
+        }).catch(() => {
+          // Network failure - just ignore, we served cache
+        });
+
+        // Return cache if available, else wait for network
+        return cachedResponse || networkFetch;
+      })
     );
     return;
   }
 
-  // 4. Static Assets (Images, JS, CSS) - Stale-While-Revalidate
-  // This allows fast load from cache while updating in background
+  // Static Assets: Cache First / Stale-While-Revalidate
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
-      const cachedResponse = await cache.match(event.request);
+      const cached = await cache.match(event.request);
 
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Validation: Only cache valid 200 responses
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          cache.put(event.request, networkResponse.clone());
+      const fetched = fetch(event.request).then((res) => {
+        if (res.status === 200 && res.type === 'basic') {
+          cache.put(event.request, res.clone());
         }
-        return networkResponse;
-      }).catch(err => {
-        // Network failed, nothing to do if we have cache
-        console.log('Network fetch failed for', event.request.url);
-      });
+        return res;
+      }).catch(() => { }); // Ignore network errors if we have cache
 
-      return cachedResponse || fetchPromise;
+      return cached || fetched;
     })
   );
 });
