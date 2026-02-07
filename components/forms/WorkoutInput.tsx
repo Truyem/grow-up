@@ -52,94 +52,98 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
     return (
         <div className="space-y-6 animate-fade-in">
             {/* TRAINING MODE SELECTION */}
-            <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6 text-cyan-400" />}>
-                <div className="grid grid-cols-3 gap-3">
-                    <button
-                        onClick={() => setUserData({ ...userData, trainingMode: 'calis' })}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'calis'
-                            ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                            }`}
-                    >
-                        <BrainCircuit className="w-8 h-8 flex-shrink-0" />
-                        <div className="text-center relative z-10">
-                            <div className="font-bold text-sm">Calisthenics</div>
-                            <div className="text-[10px] opacity-70">Street Workout</div>
-                        </div>
-                    </button>
+            <div id="tour-training-mode">
+                <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6 text-cyan-400" />}>
+                    <div className="grid grid-cols-3 gap-3">
+                        <button
+                            onClick={() => setUserData({ ...userData, trainingMode: 'calis' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'calis'
+                                ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                                }`}
+                        >
+                            <BrainCircuit className="w-8 h-8 flex-shrink-0" />
+                            <div className="text-center relative z-10">
+                                <div className="font-bold text-sm">Calisthenics</div>
+                                <div className="text-[10px] opacity-70">Street Workout</div>
+                            </div>
+                        </button>
 
-                    <button
-                        onClick={() => setUserData({ ...userData, trainingMode: 'gym' })}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'gym'
-                            ? 'bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                            }`}
-                    >
-                        <Dumbbell className="w-8 h-8 flex-shrink-0" />
-                        <div className="text-center relative z-10">
-                            <div className="font-bold text-sm">Gym</div>
-                            <div className="text-[10px] opacity-70">Bodybuilding</div>
-                        </div>
-                        {userData.trainingMode === 'gym' && (
-                            <div className="absolute inset-0 bg-purple-500/10 animate-pulse" />
-                        )}
-                    </button>
+                        <button
+                            onClick={() => setUserData({ ...userData, trainingMode: 'gym' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'gym'
+                                ? 'bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                                }`}
+                        >
+                            <Dumbbell className="w-8 h-8 flex-shrink-0" />
+                            <div className="text-center relative z-10">
+                                <div className="font-bold text-sm">Gym</div>
+                                <div className="text-[10px] opacity-70">Bodybuilding</div>
+                            </div>
+                            {userData.trainingMode === 'gym' && (
+                                <div className="absolute inset-0 bg-purple-500/10 animate-pulse" />
+                            )}
+                        </button>
 
-                    <button
-                        onClick={() => setUserData({ ...userData, trainingMode: 'home' })}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'home'
-                            ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                            }`}
-                    >
-                        <Activity className="w-8 h-8 flex-shrink-0" />
-                        <div className="text-center relative z-10">
-                            <div className="font-bold text-sm">Home</div>
-                            <div className="text-[10px] opacity-70">Gym + Calis</div>
-                        </div>
-                        {userData.trainingMode === 'home' && (
-                            <div className="absolute inset-0 bg-orange-500/10 animate-pulse" />
-                        )}
-                    </button>
-                </div>
-            </GlassCard>
+                        <button
+                            onClick={() => setUserData({ ...userData, trainingMode: 'home' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'home'
+                                ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
+                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                                }`}
+                        >
+                            <Activity className="w-8 h-8 flex-shrink-0" />
+                            <div className="text-center relative z-10">
+                                <div className="font-bold text-sm">Home</div>
+                                <div className="text-[10px] opacity-70">Gym + Calis</div>
+                            </div>
+                            {userData.trainingMode === 'home' && (
+                                <div className="absolute inset-0 bg-orange-500/10 animate-pulse" />
+                            )}
+                        </button>
+                    </div>
+                </GlassCard>
+            </div>
 
             {/* Intensity Selection */}
-            <GlassCard title="Cường độ tập luyện" icon={<BatteryCharging className="w-6 h-6 text-cyan-400" />}>
-                <div className="grid grid-cols-1 gap-3">
-                    <button
-                        onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
-                        className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Medium
-                            ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                            }`}
-                    >
-                        <BatteryCharging className="w-6 h-6 flex-shrink-0" />
-                        <div className="text-left">
-                            <div className="font-bold">Vừa sức (Normal)</div>
-                            <div className="text-xs opacity-70">Tăng cơ (Hypertrophy), tiêu chuẩn.</div>
-                        </div>
-                    </button>
+            <div id="tour-input-intensity">
+                <GlassCard title="Cường độ tập luyện" icon={<BatteryCharging className="w-6 h-6 text-cyan-400" />}>
+                    <div className="grid grid-cols-1 gap-3">
+                        <button
+                            onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
+                            className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Medium
+                                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                                }`}
+                        >
+                            <BatteryCharging className="w-6 h-6 flex-shrink-0" />
+                            <div className="text-left">
+                                <div className="font-bold">Vừa sức (Normal)</div>
+                                <div className="text-xs opacity-70">Tăng cơ (Hypertrophy), tiêu chuẩn.</div>
+                            </div>
+                        </button>
 
-                    <button
-                        onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
-                        className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Hard
-                            ? 'bg-red-500/20 border-red-500 text-red-300'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                            }`}
-                    >
-                        <BatteryFull className="w-6 h-6 flex-shrink-0" />
-                        <div className="text-left">
-                            <div className="font-bold">Thử thách (Hard)</div>
-                            <div className="text-xs opacity-70">Cường độ cao, Overload, đẩy giới hạn.</div>
-                        </div>
-                    </button>
-                </div>
-            </GlassCard>
+                        <button
+                            onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
+                            className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Hard
+                                ? 'bg-red-500/20 border-red-500 text-red-300'
+                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                                }`}
+                        >
+                            <BatteryFull className="w-6 h-6 flex-shrink-0" />
+                            <div className="text-left">
+                                <div className="font-bold">Thử thách (Hard)</div>
+                                <div className="text-xs opacity-70">Cường độ cao, Overload, đẩy giới hạn.</div>
+                            </div>
+                        </button>
+                    </div>
+                </GlassCard>
+            </div>
 
             {/* Health Status */}
             <GlassCard title="Tình trạng sức khỏe" icon={<Activity className="w-6 h-6 text-cyan-400" />}>
-                <div className="mb-4">
+                <div id="tour-input-fatigue" className="mb-4">
                     <label className="block text-sm text-gray-300 mb-2">Mức độ mệt mỏi</label>
                     <div className="flex gap-2">
                         {Object.values(FatigueLevel).map((level) => (
@@ -167,7 +171,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                 </button>
 
                 {/* Muscle Group Selection */}
-                <div>
+                <div id="tour-input-muscle">
                     <label className="block text-sm text-gray-300 mb-2">Nhóm cơ đang đau (Để tránh tập nặng)</label>
 
                     {/* None Option */}

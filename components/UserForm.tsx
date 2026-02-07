@@ -52,7 +52,7 @@ export const UserForm: React.FC<UserFormProps> = ({
 
 
       {/* --- STREAK CARD --- */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4">
+      <div id="tour-streak" className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4">
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
@@ -79,54 +79,57 @@ export const UserForm: React.FC<UserFormProps> = ({
       {/* --- COMMON INFO (Visible only on Workout/Nutrition Tabs) --- */}
       {/* Hide Body Profile on History Tab to save space */}
       {activeTab !== 'history' && (
-        <GlassCard title="Hồ sơ cơ thể" icon={<Ruler className="w-6 h-6" />}>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Cân nặng (kg)</label>
-              <div className="relative">
-                <Weight className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={weightInput}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setWeightInput(val);
-                    const parsed = parseFloat(val.replace(',', '.'));
-                    if (!isNaN(parsed)) {
-                      setUserData(prev => ({ ...prev, weight: parsed }));
-                    }
-                  }}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
-                />
+        <div id="tour-body-stats">
+          <GlassCard title="Hồ sơ cơ thể" icon={<Ruler className="w-6 h-6" />}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Cân nặng (kg)</label>
+                <div className="relative">
+                  <Weight className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={weightInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setWeightInput(val);
+                      const parsed = parseFloat(val.replace(',', '.'));
+                      if (!isNaN(parsed)) {
+                        setUserData(prev => ({ ...prev, weight: parsed }));
+                      }
+                    }}
+                    className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Chiều cao (cm)</label>
+                <div className="relative">
+                  <Ruler className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    value={userData.height}
+                    onChange={(e) => setUserData({ ...userData, height: Number(e.target.value) })}
+                    className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                  />
+                </div>
               </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Chiều cao (cm)</label>
-              <div className="relative">
-                <Ruler className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                <input
-                  type="number"
-                  value={userData.height}
-                  onChange={(e) => setUserData({ ...userData, height: Number(e.target.value) })}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
-                />
-              </div>
-            </div>
-          </div>
-        </GlassCard>
+          </GlassCard>
+        </div>
       )}
 
       {/* --- CONDITIONAL VIEWS --- */}
       <div className="min-h-[400px]">
         {activeTab === 'workout' && (
-          <div className="space-y-6">
+          <div id="tour-workout-input-area" className="space-y-6">
             <WorkoutInput
               userData={userData}
               setUserData={setUserData}
               onSickDay={onSickDay}
             />
             <button
+              id="tour-generate-btn"
               onClick={() => onSubmit('workout')}
               disabled={isLoading}
               className="group relative w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 cursor-pointer shadow-2xl bg-gradient-to-r from-cyan-600 to-blue-600 border-cyan-400/50 hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] border text-white hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:grayscale component-shadow"
@@ -160,6 +163,7 @@ export const UserForm: React.FC<UserFormProps> = ({
             <div className="grid grid-cols-1 gap-4 mt-2">
               {/* Option 1: AI Plan (Primary) */}
               <button
+                id="tour-nutrition-ai-btn"
                 onClick={() => onSubmit('nutrition')}
                 disabled={isLoading}
                 className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-5 text-left transition-all hover:border-emerald-500/50 hover:from-emerald-500/20 hover:to-teal-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] active:scale-[0.98]"
@@ -184,11 +188,13 @@ export const UserForm: React.FC<UserFormProps> = ({
 
               {/* Option 2: Quick Check (Secondary) */}
               <button
+                id="tour-check-calo"
                 onClick={onStartTracking}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition-all hover:border-white/20 hover:bg-white/10 active:scale-[0.98]"
               >
                 <div className="relative z-10 flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-800/50 border border-white/5 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-all duration-300">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-800/50 border border-white/5 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-all duration-300">
                     <Camera className="h-6 w-6 text-gray-400 group-hover:text-emerald-400 transition-colors" />
                   </div>
                   <div className="flex-1 min-w-0">

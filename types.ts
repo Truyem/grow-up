@@ -74,6 +74,7 @@ export interface UserInput {
   equipment: string[];
   availableIngredients: Ingredient[];
   consumedFood: string[];
+  hasSeenOnboarding?: boolean;
 }
 
 export interface Ingredient {
@@ -172,7 +173,6 @@ export interface WorkoutHistoryItem {
     totalProtein: number;
     totalCarbs?: number; // Optional for backward compatibility
     totalFat?: number;   // Optional for backward compatibility
-    totalCost?: number;
     consumedIngredients?: { name: string, quantity: number, unit: string }[];
     meals: Meal[];
 

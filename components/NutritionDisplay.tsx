@@ -676,6 +676,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                         <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
                             {/* Camera Button */}
                             <button
+                                id="tour-nutri-camera"
                                 onClick={() => setShowCamera(true)}
                                 disabled={isScanning}
                                 className="group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all"
@@ -692,6 +693,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
                             {/* Manual Input Button */}
                             <button
+                                id="tour-nutri-manual"
                                 onClick={() => setShowManualInput(!showManualInput)}
                                 className={`group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 border ${showManualInput ? 'border-amber-400' : 'border-amber-500/30'} rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all`}
                             >
@@ -742,7 +744,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                     </div>
 
                     {/* Macro Visualization Ring Section */}
-                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
+                    <div id="tour-nutri-macros" className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
 
                         <div className="relative z-10 grid grid-cols-2 gap-8 md:gap-12 justify-items-center">
@@ -782,7 +784,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                     </div>
 
                     {/* Plan Details & Meals */}
-                    <div className="space-y-4">
+                    <div id="tour-nutri-meals" className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                 <Utensils className="w-5 h-5 text-emerald-400" />
@@ -875,6 +877,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                             *Mẹo: Chạm vào món ăn để xem chi tiết
                         </p>
                         <button
+                            id="tour-nutri-reset"
                             onClick={onReset}
                             className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
                         >

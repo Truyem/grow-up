@@ -156,7 +156,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
   };
 
   return (
-    <div className="space-y-6 animate-fade-in relative pb-8">
+    <div id="tour-history-calendar" className="space-y-6 animate-fade-in relative pb-8">
 
       {/* --- HEADER & CONTROLS --- */}
       <div className="flex flex-col gap-4">
@@ -384,10 +384,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                             <div className="flex flex-col">
                               <span className="text-[10px] text-gray-400">Protein</span>
                               <span className="font-bold text-emerald-400">{item.nutrition.totalProtein}g</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-gray-400">Cost</span>
-                              <span className="font-bold text-yellow-400">{formatCurrency(item.nutrition.totalCost)}</span>
                             </div>
                           </div>
                           <div className="space-y-1">

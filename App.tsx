@@ -20,6 +20,8 @@ import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
 import { AuthPage } from './components/AuthPage';
 import { AccountSettings } from './components/AccountSettings';
+// import { UserGuide } from './components/UserGuide'; // REPLACED WITH TOUR
+import { OnboardingTour, TourStep } from './components/OnboardingTour';
 
 import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -28,7 +30,7 @@ import { Session } from '@supabase/supabase-js';
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus, getBasicNutritionPlan } from './services/geminiService';
-import { Sparkles, History, Dumbbell, Utensils, Settings } from 'lucide-react';
+import { Sparkles, History, Dumbbell, Utensils, Settings, BookOpen } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
 
@@ -59,7 +61,8 @@ const INITIAL_USER_DATA: UserInput = {
   allowExtraVeggies: true, // Default to true for health
   equipment: DEFAULT_EQUIPMENT,
   availableIngredients: [],
-  consumedFood: []
+  consumedFood: [],
+  hasSeenOnboarding: false // Default to false
 };
 
 // Initial Stats (Only Streak)
@@ -68,7 +71,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide';
 
 
 // Helper to match the date format used in service
@@ -139,6 +142,202 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
+
+  // Tour Configuration
+  const tourSteps: TourStep[] = [
+    {
+      targetId: 'tour-streak',
+      title: 'Chuỗi Streak 🔥',
+      content: 'Theo dõi chuỗi ngày tập luyện liên tục của bạn tại đây. Đừng để dứt chuỗi nhé!',
+      placement: 'bottom',
+      onBeforeShow: () => setViewMode('workout')
+    },
+    {
+      targetId: 'tour-body-stats',
+      title: 'Chỉ Số Cơ Thể 📏',
+      content: 'Cập nhật cân nặng và chiều cao thường xuyên để AI tính toán chính xác nhất.',
+      placement: 'bottom',
+      onBeforeShow: () => setViewMode('workout')
+    },
+    {
+      targetId: 'tour-training-mode',
+      title: 'Chế Độ Tập 🏋️',
+      content: 'Chọn nơi bạn tập luyện: Gym, Ở nhà (Home) hoặc Calisthenics.',
+      placement: 'top',
+      onBeforeShow: () => {
+        setViewMode('workout');
+        setPlan(null);
+      }
+    },
+    {
+      targetId: 'tour-input-intensity',
+      title: 'Cường Độ 🔥',
+      content: 'Chọn cường độ mong muốn: Vừa sức (Normal) hoặc Thử thách (Hard).',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-input-fatigue',
+      title: 'Mức Độ Mệt Mỏi 🔋',
+      content: 'Bạn đang cảm thấy thế nào? Hãy khai báo thật để AI điều chỉnh volume bài tập.',
+      placement: 'bottom'
+    },
+    {
+      targetId: 'tour-input-muscle',
+      title: 'Nhóm Cơ Đau 🩹',
+      content: 'Nếu đang đau cơ nào, hãy chọn ở đây để AI tránh hoặc giảm tải nhóm cơ đó.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-generate-btn',
+      title: 'Tạo Lịch Tập ⚡',
+      content: 'Sau khi điền thông tin, bấm nút này để nhận lịch tập cá nhân hóa ngay lập tức.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-tabs',
+      title: 'Điều Hướng 🧭',
+      content: 'Chuyển sang "Dinh Dưỡng" để xem thực đơn hôm nay nào!',
+      placement: 'bottom'
+    },
+
+    {
+      targetId: 'tour-nutri-goals',
+      title: 'Mục Tiêu Dinh Dưỡng 🎯',
+      content: 'Chọn chế độ (Bulking/Cutting) và bật Creatine để tối ưu hóa kế hoạch.',
+      placement: 'bottom',
+      onBeforeShow: () => {
+        setViewMode('nutrition');
+        setPlan(null);
+      }
+    },
+    {
+      targetId: 'tour-nutri-fridge',
+      title: 'Tủ Lạnh Thông Minh ❄️',
+      content: 'Nhập nguyên liệu bạn có sẵn, AI sẽ gợi ý các món ăn phù hợp.',
+      placement: 'bottom'
+    },
+    {
+      targetId: 'tour-nutri-diary',
+      title: 'Nhật Ký Ăn Uống 📝',
+      content: 'Ghi lại những món bạn đã ăn trong ngày để theo dõi chính xác hơn.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-nutrition-ai-btn',
+      title: 'Tạo Kế Hoạch AI ✨',
+      content: 'Bấm nút này để AI thiết kế thực đơn chi tiết cho cả ngày của bạn.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-check-calo',
+      title: 'Check Calo 📸',
+      content: 'Chụp ảnh món ăn để AI tự động tính Calorie cho bạn. Rất tiện lợi!',
+      placement: 'bottom',
+      onBeforeShow: () => setViewMode('nutrition')
+    },
+    {
+      targetId: 'tour-nutri-camera',
+      title: 'Chụp Ảnh Món Ăn 📷',
+      content: 'Bấm vào đây để mở camera và quét nhanh món ăn của bạn.',
+      placement: 'bottom',
+      onBeforeShow: () => handleStartTracking() // Simulate entering the feature
+    },
+    {
+      targetId: 'tour-nutri-manual',
+      title: 'Nhập Tay ⌨️',
+      content: 'Hoặc gõ tên món ăn nếu bạn không tiện chụp ảnh (VD: "1 bát phở bò").',
+      placement: 'bottom'
+    },
+    {
+      targetId: 'tour-nutri-macros',
+      title: 'Theo Dõi Macro 📊',
+      content: 'Xem biểu đồ tròn thể hiện lượng Calo, Đạm, Béo, Tinh bột đã nạp trong ngày.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-nutri-meals',
+      title: 'Danh Sách Món Ăn 🥗',
+      content: 'Nhấn vào từng món để đánh dấu đã ăn hoặc xem chi tiết dinh dưỡng.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-nutri-reset',
+      title: 'Tạo Lại Kế Hoạch 🔄',
+      content: 'Nếu muốn thay đổi hoặc reset ngày mới, hãy bấm vào đây.',
+      placement: 'top'
+    },
+    {
+      targetId: 'tour-history-calendar',
+      title: 'Lịch Sử Tập Luyện 📅',
+      content: 'Theo dõi lại quá trình và thành quả tập luyện của bạn tại đây.',
+      placement: 'top',
+      onBeforeShow: () => setViewMode('history')
+    },
+    {
+      targetId: 'tour-settings',
+      title: 'Cài Đặt ⚙️',
+      content: 'Chỉnh sửa thông tin cá nhân và thiết bị tập luyện của bạn.',
+      placement: 'bottom',
+      onBeforeShow: () => setViewMode('workout') // Return to main view
+    },
+    {
+      targetId: 'tour-guide',
+      title: 'Xem Lại Hướng Dẫn 📖',
+      content: 'Cần xem lại? Bấm vào đây bất cứ lúc nào.',
+      placement: 'bottom'
+    }
+  ];
+
+  // Auto-start tour if new user
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    // Check if user is loaded and hasn't seen onboarding
+    // We add a check for 'user_settings' in localStorage to avoid false positives during initial load
+    const localSettings = localStorage.getItem('user_settings');
+    const localHasSeen = localSettings ? JSON.parse(localSettings).hasSeenOnboarding : false;
+
+    // If explicit local storage says true, we shouldn't open. 
+    // But userData might not be updated yet. 
+    // Actually, userData update will trigger this effect again.
+    // So we just need to ensure we don't open if it eventually becomes true.
+
+    if (!loading && !isAuthChecking && userData.hasSeenOnboarding === false) {
+      // Small delay to ensure UI is ready and allow for local storage/auth data to sync
+      timeoutId = setTimeout(() => {
+        // Double check state before opening
+        if (userData.hasSeenOnboarding === false) {
+          setIsTourOpen(true);
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [loading, isAuthChecking, userData.hasSeenOnboarding]);
+
+  const handleTourComplete = async () => {
+    setIsTourOpen(false);
+
+    // Update local state
+    const newUserData = { ...userData, hasSeenOnboarding: true };
+    setUserData(newUserData);
+
+    // Save to Local Storage immediately
+    localStorage.setItem('user_settings', JSON.stringify(newUserData));
+
+    // Save to server
+    if (session?.user) {
+      await supabase.from('profiles').update({
+        settings: newUserData,
+        updated_at: new Date().toISOString()
+      }).eq('id', session.user.id);
+    }
+
+    setToastMessage("Bạn đã hoàn thành hướng dẫn! Chúc bạn tập luyện hiệu quả.");
+  };
 
   // Debug version to ensure HMR works
   useEffect(() => {
@@ -251,7 +450,14 @@ export default function App() {
                     user_id: user.id,
                     date: localDateStr,
                     timestamp: item.timestamp,
-                    data: item
+                    data: (() => {
+                      const { totalCost, ...restNutrition } = (item.nutrition || {}) as any;
+                      const cleanedNutrition = item.nutrition ? { ...restNutrition } : undefined;
+                      return {
+                        ...item,
+                        nutrition: cleanedNutrition
+                      };
+                    })()
                   };
                 });
 
@@ -819,6 +1025,14 @@ export default function App() {
         });
       }
     }
+
+    // Reset plan to return to "Create Schedule" tab
+    setPlan(null);
+    localStorage.removeItem('daily_plan_cache');
+    // workout_progress is already cleared in PlanDisplay but good to ensure cleanup
+    localStorage.removeItem('workout_progress');
+    setViewMode('workout');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteHistoryItem = async (timestamp: number) => {
@@ -1008,13 +1222,28 @@ export default function App() {
               <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
                 Grow <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Up</span>
               </h1>
-              <button
-                onClick={() => setViewMode('settings')}
-                className="text-lg text-gray-300 font-light max-w-lg mx-auto hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 justify-center"
-              >
-                Xin chào, <span className="text-cyan-400 font-semibold group-hover:text-cyan-300">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
-                <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
-              </button>
+
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  id="tour-settings"
+                  onClick={() => setViewMode('settings')}
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
+                >
+                  <span className="text-cyan-400 font-semibold group-hover:text-cyan-300">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
+                  <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+                </button>
+
+                <div className="h-4 w-px bg-gray-700"></div>
+
+                <button
+                  id="tour-guide"
+                  onClick={() => setIsTourOpen(true)}
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
+                >
+                  <span className="group-hover:text-cyan-300">Hướng dẫn</span>
+                  <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+                </button>
+              </div>
 
               {/* API Status Badge & Online Counter - Global Removed as requested */}
               {/* <div className="flex flex-col items-center gap-3 pt-4">
@@ -1037,7 +1266,7 @@ export default function App() {
 
               {/* If plan exists (even partial), show global tabs to navigate between W/N/H */}
               {/* Always show PlanTabs to allow navigation between Input forms and History */}
-              <div className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
+              <div id="tour-tabs" className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
                 <PlanTabs
                   activeTab={viewMode}
                   onTabChange={(tab) => setViewMode(tab)}
@@ -1118,6 +1347,20 @@ export default function App() {
                   onDelete={handleDeleteHistoryItem}
                   onRefresh={handleRefreshHistory}
                   isRefreshing={isRefreshing}
+                />
+              )}
+
+              {/* {viewMode === 'guide' && (
+                <UserGuide onBackend={() => setViewMode('workout')} />
+              )} */ }
+
+              {/* Onboarding Tour */}
+              {isTourOpen && (
+                <OnboardingTour
+                  steps={tourSteps}
+                  isOpen={isTourOpen}
+                  onComplete={handleTourComplete}
+                  onSkip={handleTourComplete}
                 />
               )}
             </div>

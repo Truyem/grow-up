@@ -86,7 +86,7 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
         <div className="space-y-6 animate-fade-in pb-20">
 
             {/* 1. GOAL DASHBOARD (Top) */}
-            <GlassCard title="Mục tiêu dinh dưỡng" icon={<Leaf className="w-6 h-6 text-emerald-400" />}>
+            <GlassCard id="tour-nutri-goals" title="Mục tiêu dinh dưỡng" icon={<Leaf className="w-6 h-6 text-emerald-400" />}>
                 <div className="grid grid-cols-2 gap-4 mb-6">
                     {/* Bulking Toggle */}
                     <button
@@ -152,7 +152,7 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
             </GlassCard>
 
             {/* 2. SMART FRIDGE (Middle) */}
-            < GlassCard title="Tủ lạnh thông minh" icon={< Refrigerator className="w-6 h-6 text-cyan-400" />}>
+            < GlassCard id="tour-nutri-fridge" title="Tủ lạnh thông minh" icon={< Refrigerator className="w-6 h-6 text-cyan-400" />}>
                 <div className="space-y-4">
                     {/* RESTRICTIVE MODE TOGGLES */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
@@ -264,7 +264,7 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
             </GlassCard >
 
             {/* 3. MEAL LOG (Bottom) */}
-            < GlassCard title="Nhật ký ăn uống" icon={< Utensils className="w-6 h-6 text-amber-400" />}>
+            < GlassCard id="tour-nutri-diary" title="Nhật ký ăn uống" icon={< Utensils className="w-6 h-6 text-amber-400" />}>
                 <div className="space-y-3">
                     <div className="flex gap-2">
                         <input

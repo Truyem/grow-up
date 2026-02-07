@@ -107,37 +107,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
             </div>
           </div>
 
-          {/* Muscle Groups Display */}
-          {(exercise.primaryMuscleGroups || exercise.secondaryMuscleGroups) && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {exercise.primaryMuscleGroups && exercise.primaryMuscleGroups.length > 0 && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="text-[10px] text-cyan-400 font-bold">🎯</span>
-                  {exercise.primaryMuscleGroups.map((muscle, idx) => (
-                    <span
-                      key={idx}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                    >
-                      {muscle}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {exercise.secondaryMuscleGroups && exercise.secondaryMuscleGroups.length > 0 && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="text-[10px] text-gray-400 font-bold">💪</span>
-                  {exercise.secondaryMuscleGroups.map((muscle, idx) => (
-                    <span
-                      key={idx}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20"
-                    >
-                      {muscle}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+
 
           <div className="flex items-center justify-between">
             <div
