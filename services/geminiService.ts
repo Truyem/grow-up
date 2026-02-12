@@ -875,17 +875,31 @@ export const generateDailyPlan = async (
 
       const fallback = getFallbackPlan(userData);
 
+      // Build result: ONLY include the generated part.
+      // The OTHER part should be blank (isGenerated: false, no data)
+      // to avoid fallback meals/workout leaking into daily_plans.
+      const blankNutrition = {
+        totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
+        advice: '', isGenerated: false, meals: [] as Meal[]
+      };
+      const blankWorkout = {
+        summary: '', detail: { levelName: '', description: '', morning: [] as Exercise[], evening: [] as Exercise[] },
+        isGenerated: false
+      };
+
       const result: DailyPlan = {
-        ...fallback, // Start with full fallback
-        date: getCurrentDate(), // Update date
-        // Overwrite only if we generated something
-        ...(generationType === 'workout' || generationType === 'both' ? {
-          workout: { ...workoutPart.workout, isGenerated: true },
-          schedule: workoutPart.schedule // Also update schedule
-        } : {}),
-        ...(generationType === 'nutrition' || generationType === 'both' ? {
-          nutrition: { ...nutritionPart.nutrition, isGenerated: true }
-        } : {})
+        date: getCurrentDate(),
+        schedule: (generationType === 'workout' || generationType === 'both')
+          ? (workoutPart.schedule || fallback.schedule)
+          : fallback.schedule,
+        // Workout: use generated if applicable, otherwise blank
+        workout: (generationType === 'workout' || generationType === 'both')
+          ? { ...workoutPart.workout, isGenerated: true }
+          : blankWorkout,
+        // Nutrition: use generated if applicable, otherwise blank
+        nutrition: (generationType === 'nutrition' || generationType === 'both')
+          ? { ...nutritionPart.nutrition, isGenerated: true }
+          : blankNutrition,
       };
 
       return result;

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, Pause, Plus, Minus, RotateCcw, Footprints } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Play, Pause, Plus, Minus, RotateCcw, GripHorizontal } from 'lucide-react';
 
 interface RestTimerProps {
   isOpen: boolean;
@@ -8,18 +8,69 @@ interface RestTimerProps {
 }
 
 export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDuration = 30 }) => {
-  // Timer State
   const [timeLeft, setTimeLeft] = useState(defaultDuration);
   const [isActive, setIsActive] = useState(false);
   const [duration, setDuration] = useState(defaultDuration);
 
+  // Drag state (desktop only) — use translate offset instead of absolute position
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; offsetX: number; offsetY: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Reset drag offset when timer opens
+  useEffect(() => {
+    if (isOpen) {
+      setDragOffset({ x: 0, y: 0 });
+    }
+  }, [isOpen]);
+
+  // --- DRAG LOGIC (desktop only, via mouse) ---
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (window.innerWidth < 640) return;
+    e.preventDefault();
+
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      offsetX: dragOffset.x,
+      offsetY: dragOffset.y,
+    };
+  }, [dragOffset]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = e.clientY - dragStartRef.current.mouseY;
+
+      setDragOffset({
+        x: dragStartRef.current.offsetX + dx,
+        y: dragStartRef.current.offsetY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   // --- TIMER LOGIC ---
   useEffect(() => {
     if (isOpen) {
-      // If the timer was closed and re-opened with a different default duration (e.g. 60 min walk), update it
-      // Only update if not currently active to prevent overwriting running timer
       if (!isActive) {
         setTimeLeft(defaultDuration);
         setDuration(defaultDuration);
@@ -88,150 +139,117 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
 
   if (!isOpen) return null;
 
-  // Calculate progress percentage for circular indicator
   const progressPercent = duration > 0 ? ((duration - timeLeft) / duration) * 100 : 0;
-  const circumference = 2 * Math.PI * 45; // radius = 45
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+  const isUrgent = timeLeft < 10 && timeLeft > 0;
+  const isDone = timeLeft === 0;
+
+  const hasDragOffset = dragOffset.x !== 0 || dragOffset.y !== 0;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] animate-slide-down">
-      <div className="bg-gradient-to-b from-[#0f172a]/98 to-[#0f172a]/95 backdrop-blur-2xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] px-3 py-2 sm:px-4 sm:py-4 pt-safe transition-all duration-300">
-        <div className="max-w-6xl mx-auto">
+    <div
+      ref={containerRef}
+      className={`fixed top-3 left-3 right-3 z-[60] animate-slide-down sm:left-auto sm:right-4 sm:max-w-sm pt-safe select-none`}
+      style={hasDragOffset ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+    >
+      <div className="relative overflow-hidden rounded-2xl bg-black/50 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
 
-          {/* Main Timer Display */}
-          <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
+        {/* Linear Progress Bar - top of pill */}
+        <div className="h-1 w-full bg-white/5">
+          <div
+            className={`h-full transition-all duration-1000 ease-linear ${isDone
+              ? 'bg-emerald-400'
+              : isUrgent
+                ? 'bg-red-400'
+                : 'bg-gradient-to-r from-cyan-400 to-blue-500'
+              }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
 
-            {/* Left: Timer Display with Circular Progress Ring */}
-            <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
-              <div className="relative">
-                {/* Circular Progress SVG - Smaller on mobile */}
-                <svg className="w-14 h-14 sm:w-28 sm:h-28 -rotate-90 transition-all duration-300" viewBox="0 0 100 100">
-                  {/* Background circle */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    fill="none"
-                    stroke="rgba(255, 255, 255, 0.05)"
-                    strokeWidth="4"
-                  />
-                  {/* Progress circle */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    fill="none"
-                    stroke="url(#gradient)"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className="transition-all duration-1000 ease-linear"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#06b6d4" />
-                      <stop offset="100%" stopColor="#3b82f6" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+        {/* Controls Row */}
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
 
-                {/* Timer Text in Center */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`font-mono font-bold tracking-wider transition-all duration-300 
-                    text-base sm:text-3xl
-                    ${timeLeft < 10 && timeLeft > 0
-                      ? 'text-red-400 animate-pulse'
-                      : 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400'
-                    }`}>
-                    {formatTime(timeLeft)}
-                  </div>
-                </div>
-              </div>
+          {/* Drag Handle (desktop only) */}
+          <div
+            onMouseDown={handleMouseDown}
+            className={`hidden sm:flex items-center text-gray-600 hover:text-gray-400 transition-colors mr-1 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            title="Kéo để di chuyển"
+          >
+            <GripHorizontal className="w-4 h-4" />
+          </div>
 
-              {/* Status Text - Simplified on Mobile */}
-              <div className="flex flex-col gap-0.5 sm:gap-1">
-                <div className="text-xs sm:text-sm font-bold text-white whitespace-nowrap">
-                  {isActive ? 'Wait...' : 'Paused'}
-                </div>
-                <div className="text-[10px] sm:text-xs text-gray-500 font-medium hidden sm:block">
-                  Rest Timer
-                </div>
-              </div>
-            </div>
+          {/* Timer Display */}
+          <div
+            className={`font-mono font-bold tracking-wide text-xl sm:text-2xl min-w-[4.5rem] tabular-nums transition-colors duration-300 ${isDone
+              ? 'text-emerald-400'
+              : isUrgent
+                ? 'text-red-400 animate-pulse'
+                : 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400'
+              }`}
+          >
+            {formatTime(timeLeft)}
+          </div>
 
-            {/* Center: Controls - Horizontal and Compact */}
-            <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end sm:justify-center flex-1">
-              {/* Time Adjustment Buttons */}
-              <div className="flex items-center gap-1 sm:gap-2 bg-white/5 rounded-full p-1 sm:p-1.5 border border-white/10 backdrop-blur-sm">
-                <button
-                  onClick={() => adjustTime(-10)}
-                  className="p-1.5 sm:p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer"
-                  title="Giảm 10 giây"
-                >
-                  <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
+          {/* Spacer */}
+          <div className="flex-1" />
 
-                {/* Play/Pause Button */}
-                <button
-                  onClick={() => setIsActive(!isActive)}
-                  className={`rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-95 cursor-pointer
-                    w-8 h-8 sm:w-12 sm:h-12
-                    ${isActive
-                      ? 'bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/50 hover:bg-yellow-500/30'
-                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/30 hover:shadow-cyan-500/50'
-                    }
-                  `}
-                  title={isActive ? 'Tạm dừng' : 'Bắt đầu'}
-                >
-                  {isActive ? <Pause className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-current" /> : <Play className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-current ml-0.5" />}
-                </button>
-
-                <button
-                  onClick={() => adjustTime(10)}
-                  className="p-1.5 sm:p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer"
-                  title="Thêm 10 giây"
-                >
-                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-              </div>
-
-              {/* Reset Button */}
-              <button
-                onClick={() => { setTimeLeft(defaultDuration); setDuration(defaultDuration); setIsActive(true); }}
-                className="p-2 sm:p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 text-gray-400 hover:text-cyan-300 active:scale-95 transition-all cursor-pointer hidden sm:block"
-                title="Reset về thời gian ban đầu"
-              >
-                <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-
-              {/* Walking Preset Button - Icon Only on Mobile */}
-              <button
-                onClick={() => { setTimeLeft(3600); setDuration(3600); setIsActive(true); }}
-                className="flex items-center gap-2 p-2 sm:px-4 sm:py-2.5 rounded-full bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-300 font-bold text-sm whitespace-nowrap transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/10"
-                title="Đặt timer 60 phút cho đi bộ"
-              >
-                <Footprints className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">60 phút</span>
-              </button>
-            </div>
-
-            {/* Right: Close Button - Smaller on mobile */}
+          {/* Control Buttons Group */}
+          <div className="flex items-center gap-1 bg-white/5 rounded-xl p-0.5 border border-white/[.07]">
             <button
-              onClick={onClose}
-              className="p-1.5 sm:p-2.5 rounded-full bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-gray-500 hover:text-red-400 transition-all active:scale-95 cursor-pointer flex-shrink-0"
-              title="Đóng timer"
+              onClick={() => adjustTime(-10)}
+              className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-90 transition-all cursor-pointer"
+              title="Giảm 10 giây"
             >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Minus className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => setIsActive(!isActive)}
+              className={`p-2 rounded-xl flex items-center justify-center transition-all active:scale-90 cursor-pointer ${isActive
+                ? 'bg-white/10 text-amber-400 hover:bg-white/15'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
+                }`}
+              title={isActive ? 'Tạm dừng' : 'Bắt đầu'}
+            >
+              {isActive
+                ? <Pause className="w-4 h-4 fill-current" />
+                : <Play className="w-4 h-4 fill-current ml-0.5" />
+              }
+            </button>
+
+            <button
+              onClick={() => adjustTime(10)}
+              className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-cyan-300 active:scale-90 transition-all cursor-pointer"
+              title="Thêm 10 giây"
+            >
+              <Plus className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Reset */}
+          <button
+            onClick={() => { setTimeLeft(defaultDuration); setDuration(defaultDuration); setIsActive(true); }}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/[.07] text-gray-400 hover:text-cyan-300 active:scale-90 transition-all cursor-pointer"
+            title="Reset"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-white/5 hover:bg-red-500/15 border border-white/[.07] hover:border-red-500/20 text-gray-500 hover:text-red-400 active:scale-90 transition-all cursor-pointer"
+            title="Đóng"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Safe area spacer + Animation styles */}
+      {/* Animation Styles */}
       <style>{`
         .pt-safe {
-          padding-top: env(safe-area-inset-top, 16px);
+          padding-top: env(safe-area-inset-top, 0px);
         }
         @keyframes slide-down {
           from {
@@ -244,7 +262,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({ isOpen, onClose, defaultDu
           }
         }
         .animate-slide-down {
-          animation: slide-down 0.4s ease-out forwards;
+          animation: slide-down 0.3s ease-out forwards;
         }
       `}</style>
     </div>

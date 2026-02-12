@@ -9,7 +9,7 @@ import { AddExerciseModal } from './AddExerciseModal';
 import { suggestNextExercises } from '../services/geminiService';
 
 
-import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, ArrowLeft, RefreshCw, Filter, Layers, Sun, Moon, MoonStar, AlarmClock, Footprints, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, RefreshCw, Layers, Sun, Moon, Footprints, Sparkles, Loader2 } from 'lucide-react';
 
 
 interface PlanDisplayProps {
@@ -172,7 +172,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
 
 
 
-type FilterType = 'All' | 'Board' | 'Dumbbell' | 'Band' | 'Bodyweight' | 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
+
 
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onReset, onComplete, onUpdatePlan, history }) => {
   const [isCompleted, setIsCompleted] = useState(false);
@@ -180,7 +180,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const [isTimerOpen, setIsTimerOpen] = useState(false);
   const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
-  const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+
 
 
 
@@ -209,33 +209,48 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalExercises > 0 ? Math.round((checkedCount / totalExercises) * 100) : 0;
 
-  // Restore progress from local storage on mount
+  // Restore progress from local storage or plan.workoutProgress (Supabase cross-device)
   useEffect(() => {
     const savedProgressStr = localStorage.getItem('workout_progress');
     if (savedProgressStr) {
       try {
         const savedProgress = JSON.parse(savedProgressStr);
-        // Only restore if the saved progress matches the current plan's date
         if (savedProgress.planDate === plan.date) {
           setCheckedState(savedProgress.checkedState || {});
           setUserNote(savedProgress.userNote || '');
+          return; // Found local progress, skip Supabase fallback
         }
       } catch (e) {
         console.error("Failed to restore progress", e);
       }
     }
+
+    // Fallback: restore from plan.workoutProgress (loaded from Supabase)
+    if (plan.workoutProgress?.checkedState) {
+      setCheckedState(plan.workoutProgress.checkedState);
+      setUserNote(plan.workoutProgress.userNote || '');
+      console.log('[PlanDisplay] Restored progress from Supabase');
+    }
   }, [plan.date]);
 
-  // Save progress to local storage whenever it changes
+  // Save progress to local storage + sync to Supabase whenever it changes
   useEffect(() => {
-    if (!isCompleted) { // Don't save if already marked completed
+    if (!isCompleted) {
       const progressData = {
         planDate: plan.date,
         checkedState,
         userNote,
         lastUpdated: Date.now()
       };
+      // Save locally for offline fallback
       localStorage.setItem('workout_progress', JSON.stringify(progressData));
+
+      // Sync to Supabase via onUpdatePlan (debounced in App.tsx)
+      // Only sync if there are actual checked items to avoid initial empty state overwrite
+      if (Object.keys(checkedState).length > 0) {
+        const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote } };
+        onUpdatePlan(updatedPlan);
+      }
     }
   }, [checkedState, userNote, plan.date, isCompleted]);
 
@@ -322,51 +337,21 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     }
   };
 
-  // Filter Logic Helper
-  const filterExercise = (ex: Exercise) => {
-    if (activeFilter === 'All') return true;
-    if (['Red', 'Blue', 'Yellow', 'Green', 'Pink', 'Purple', 'Orange'].includes(activeFilter)) return ex.colorCode === activeFilter;
-    if (activeFilter === 'Board') return !!ex.colorCode || ex.equipment?.toLowerCase().includes('board');
-    if (activeFilter === 'Dumbbell') return ex.equipment?.toLowerCase().includes('tạ') || ex.equipment?.toLowerCase().includes('dumbbell');
-    if (activeFilter === 'Band') return ex.equipment?.toLowerCase().includes('dây') || ex.equipment?.toLowerCase().includes('band') || ex.isBFR;
-    if (activeFilter === 'Bodyweight') {
-      const eq = ex.equipment?.toLowerCase();
-      return !eq || eq.includes('không') || eq.includes('bodyweight') || eq === 'none';
-    }
-    return true;
-  };
 
-  const filteredMorning = currentWorkout.morning.filter(filterExercise);
-  const filteredEvening = currentWorkout.evening.filter(filterExercise);
 
-  const filterOptions: { id: FilterType; label: string; color: string }[] = [
-    { id: 'All', label: 'Tất cả', color: 'bg-white/10 text-white' },
-    { id: 'Board', label: 'Board (Chống đẩy)', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-    { id: 'Dumbbell', label: 'Tạ đơn', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-    { id: 'Band', label: 'Dây/BFR', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
-    { id: 'Bodyweight', label: 'Bodyweight', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
-    { id: 'Red', label: 'Vai', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
-    { id: 'Blue', label: 'Ngực', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-    { id: 'Yellow', label: 'Lưng', color: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30' },
-    { id: 'Green', label: 'Tay sau', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-    { id: 'Pink', label: 'Tay trước', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
-    { id: 'Purple', label: 'Chân', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-    { id: 'Orange', label: 'Bụng/Tim mạch', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-  ];
-
-  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, filtered: Exercise[], sectionKey: 'morning' | 'evening') => (
+  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, sectionKey: 'morning' | 'evening') => (
     <div className="mb-6 last:mb-0">
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10 text-cyan-200">
         {icon}
         <h4 className="font-bold uppercase tracking-wider text-sm">{title}</h4>
-        <span className="text-xs text-gray-500 ml-auto">({filtered.length} bài)</span>
+        <span className="text-xs text-gray-500 ml-auto">({exercises.length} bài)</span>
       </div>
 
       <div className="space-y-1">
-        {filtered.length > 0 ? (
-          filtered.map((ex) => {
+        {exercises.length > 0 ? (
+          exercises.map((ex, originalIndex) => {
             // Find original index in the unfiltered array to maintain state consistency
-            const originalIndex = exercises.indexOf(ex);
+
 
             // Fallback for newly added exercises that might not be in the original list if we are filtering?
             // Actually filtered is derived from exercises.
@@ -387,7 +372,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
             );
           })
         ) : (
-          <p className="text-sm text-gray-500 italic py-2">Không có bài tập nào phù hợp với bộ lọc.</p>
+          <p className="text-sm text-gray-500 italic py-2">Chưa có bài tập nào.</p>
         )}
       </div>
 
@@ -415,8 +400,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   );
 
   return (
-    // Added pt-28 (top padding) to accommodate the sticky top RestTimer
-    <div className="space-y-6 animate-fade-in relative pt-28">
+    <div className="space-y-6 animate-fade-in relative">
       <RestTimer
         isOpen={isTimerOpen}
         onClose={() => setIsTimerOpen(false)}
@@ -508,24 +492,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
           </div>
 
 
-          {/* Filter Bar */}
-          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10">
-            <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            {filterOptions.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => setActiveFilter(opt.id)}
-                className={`
-                    flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors duration-200 cursor-pointer
-                    ${activeFilter === opt.id
-                    ? `${opt.color} border-current shadow-[0_0_10px_rgba(255,255,255,0.1)]`
-                    : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-300'}
-                  `}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+
 
           <div className="mb-4">
             <div className="flex justify-between text-xs mb-1">
@@ -543,15 +510,15 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
           {currentWorkout.evening && currentWorkout.evening.length > 0 ? (
             <>
               {/* Render Morning Session */}
-              {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
+              {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', 'morning')}
 
               {/* Render Evening Session */}
-              {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', filteredEvening, 'evening')}
+              {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', 'evening')}
             </>
           ) : (
             <>
               {/* Single Session Render (No Morning/Evening Header needed, or generic header) */}
-              {renderSection("Bài Tập Trong Ngày", <Dumbbell className="w-4 h-4 text-emerald-400" />, currentWorkout.morning, 'mor', filteredMorning, 'morning')}
+              {renderSection("Bài Tập Trong Ngày", <Dumbbell className="w-4 h-4 text-emerald-400" />, currentWorkout.morning, 'mor', 'morning')}
             </>
           )}
 

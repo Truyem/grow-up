@@ -122,6 +122,7 @@ export interface Meal {
   description: string;
   carbs?: number;
   fat?: number;
+  consumed?: boolean;
 }
 
 export interface WorkoutLevel {
@@ -155,6 +156,10 @@ export interface DailyPlan {
     advice: string;
     isGenerated?: boolean; // New flag
     suggestedIngredients?: Ingredient[]; // Gợi ý thức ăn bổ sung từ AI
+  };
+  workoutProgress?: {
+    checkedState: Record<string, boolean>;
+    userNote?: string;
   };
 
 }

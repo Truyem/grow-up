@@ -1,7 +1,8 @@
-import React, { useMemo, useState, lazy, Suspense } from 'react';
+import React, { useMemo, useState, lazy, Suspense, useCallback } from 'react';
 import { WorkoutHistoryItem, MuscleGroup, UserInput, AIOverview } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw } from 'lucide-react';
+import { ActivityRings } from './ui/ActivityRings';
+import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { generateAIOverview } from '../services/geminiService';
 
@@ -31,6 +32,19 @@ const MUSCLE_COLORS: Record<string, string> = {
   'Cardio': '#06b6d4',
 };
 
+const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const MONTH_NAMES = [
+  'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+  'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+];
+
+// --- RING GOALS ---
+const RING_GOALS = {
+  exercises: 6,    // ~6 exercises per day
+  calories: 2000,  // ~2000 kcal
+  protein: 100,    // ~100g protein
+};
+
 export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing }) => {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
@@ -40,6 +54,70 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAIOverview, setShowAIOverview] = useState(false);
+
+  // Calendar state
+  const now = new Date();
+  const [calendarDate, setCalendarDate] = useState({ month: now.getMonth(), year: now.getFullYear() });
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  // --- Build lookup: dateKey → history item ---
+  const historyByDate = useMemo(() => {
+    const map = new Map<string, WorkoutHistoryItem>();
+    history.forEach(item => {
+      const d = new Date(item.timestamp);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      // Keep item with most exercises if duplicates
+      const existing = map.get(key);
+      if (!existing || (item.completedExercises?.length || 0) > (existing.completedExercises?.length || 0)) {
+        map.set(key, item);
+      }
+    });
+    return map;
+  }, [history]);
+
+  // --- Calendar grid ---
+  const calendarGrid = useMemo(() => {
+    const { month, year } = calendarDate;
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    // getDay(): 0=Sun, 1=Mon ... 6=Sat
+    // We want Mon=0, so shift: (getDay() + 6) % 7
+    const startOffset = (firstDay.getDay() + 6) % 7;
+
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    // Pad to complete last row
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    return cells;
+  }, [calendarDate]);
+
+  // --- Get history item for a day ---
+  const getItemForDay = useCallback((day: number) => {
+    const key = `${calendarDate.year}-${calendarDate.month}-${day}`;
+    return historyByDate.get(key) || null;
+  }, [calendarDate, historyByDate]);
+
+  // --- Is today ---
+  const isToday = useCallback((day: number) => {
+    const t = new Date();
+    return day === t.getDate() && calendarDate.month === t.getMonth() && calendarDate.year === t.getFullYear();
+  }, [calendarDate]);
+
+  // --- Navigate months ---
+  const goMonth = (delta: number) => {
+    setCalendarDate(prev => {
+      let m = prev.month + delta;
+      let y = prev.year;
+      if (m < 0) { m = 11; y--; }
+      if (m > 11) { m = 0; y++; }
+      return { month: m, year: y };
+    });
+    setSelectedDay(null);
+  };
 
   // --- STATS CALCULATION ---
   const stats = useMemo(() => {
@@ -155,6 +233,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
     setExpandedItemId(expandedItemId === id ? null : id);
   };
 
+  // --- Selected day details ---
+  const selectedDayItem = selectedDay ? getItemForDay(selectedDay) : null;
+
+  // --- Items for current month (for list below calendar) ---
+  const monthItems = useMemo(() => {
+    return history
+      .filter(item => {
+        const d = new Date(item.timestamp);
+        return d.getMonth() === calendarDate.month && d.getFullYear() === calendarDate.year;
+      })
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [history, calendarDate]);
+
   return (
     <div id="tour-history-calendar" className="space-y-6 animate-fade-in relative pb-8">
 
@@ -253,163 +344,220 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
         </div>
       )}
 
-      {/* --- HISTORY LIST (Accordion) --- */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <LayoutList className="w-5 h-5 text-purple-400" />
-            <h3 className="text-lg font-bold text-white">Nhật ký chi tiết</h3>
-          </div>
-          {onRefresh && (
+      {/* ============================== */}
+      {/* --- ACTIVITY RINGS CALENDAR --- */}
+      {/* ============================== */}
+      <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <button
+            onClick={() => goMonth(-1)}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h3 className="text-lg font-bold text-white">
+            {MONTH_NAMES[calendarDate.month]} {calendarDate.year !== now.getFullYear() ? calendarDate.year : ''}
+          </h3>
+          <div className="flex items-center gap-1">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                title="Làm mới"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            )}
             <button
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              title="Làm mới"
+              onClick={() => goMonth(1)}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
             >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <ChevronRight className="w-5 h-5" />
             </button>
-          )}
+          </div>
         </div>
 
-        {history.length === 0 ? (
-          <div className="text-center py-12 opacity-50">
-            <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-500" />
-            <p className="text-gray-400">Chưa có dữ liệu lịch sử</p>
+        {/* Ring Legend */}
+        <div className="flex items-center justify-center gap-4 px-4 py-2 border-b border-white/5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#fa114f]" />
+            <span className="text-[10px] text-gray-400">Bài tập</span>
           </div>
-        ) : (
-          history.map((item) => {
-            const isExpanded = expandedItemId === item.timestamp;
-            const isConfirmingDelete = confirmingDeleteId === item.timestamp;
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#92e82a]" />
+            <span className="text-[10px] text-gray-400">Calories</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#00d4aa]" />
+            <span className="text-[10px] text-gray-400">Protein</span>
+          </div>
+        </div>
+
+        {/* Weekday Headers */}
+        <div className="grid grid-cols-7 px-2 pt-2">
+          {WEEKDAY_LABELS.map(d => (
+            <div key={d} className="text-center text-[10px] font-semibold text-gray-500 uppercase py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 px-2 pb-3">
+          {calendarGrid.map((day, idx) => {
+            if (day === null) {
+              return <div key={`empty-${idx}`} className="p-1" />;
+            }
+
+            const item = getItemForDay(day);
+            const today = isToday(day);
+            const isSelected = selectedDay === day;
+
+            // Calculate ring progress
+            const exercisesCount = item?.completedExercises?.length || 0;
+            const calories = item?.nutrition?.totalCalories || 0;
+            const protein = item?.nutrition?.totalProtein || 0;
+
+            const moveProgress = exercisesCount / RING_GOALS.exercises;
+            const exerciseProgress = calories / RING_GOALS.calories;
+            const standProgress = protein / RING_GOALS.protein;
+
+            // Check if day is in the future
+            const dayDate = new Date(calendarDate.year, calendarDate.month, day);
+            const isFuture = dayDate > new Date();
 
             return (
               <div
-                key={item.timestamp}
+                key={`day-${day}`}
+                onClick={() => item && setSelectedDay(isSelected ? null : day)}
                 className={`
-                        border rounded-xl transition-all duration-300 overflow-hidden
-                        ${isExpanded
-                    ? 'bg-purple-900/10 border-purple-500/30'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }
-                     `}
+                  flex flex-col items-center py-1.5 rounded-xl transition-all cursor-pointer
+                  ${isSelected ? 'bg-white/10 ring-1 ring-purple-500/50' : ''}
+                  ${today ? 'bg-white/5' : ''}
+                  ${item ? 'hover:bg-white/5' : 'opacity-60'}
+                `}
               >
-                {/* Summary Header (Always Visible) */}
-                <div
-                  onClick={() => toggleExpand(item.timestamp)}
-                  className="p-4 flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-col items-center justify-center p-2 bg-black/30 rounded-lg min-w-[60px]">
-                      <span className="text-xs text-gray-400 uppercase">{item.date.split(',')[0]}</span>
-                      <span className="text-lg font-bold text-white">{item.date.split('/')[0].split(' ')[1] || item.date.split('/')[0]}</span>
-                      <span className="text-[10px] text-gray-500">{item.date.split('/')[1]}/{item.date.split('/')[2]}</span>
-                    </div>
-
-                    <div>
-                      <h4 className="font-bold text-white text-base md:text-lg">{item.summary}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
-                                    ${item.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'}
-                                 `}>
-                          {item.levelSelected}
-                        </span>
-                        {item.completedExercises && (
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <Dumbbell className="w-3 h-3" /> {item.completedExercises.length} bài
-                          </span>
-                        )}
-                        {item.weight && (
-                          <span className="text-xs text-cyan-300 flex items-center gap-1 ml-2">
-                            <Weight className="w-3 h-3" /> {item.weight}kg
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* Delete Button */}
-                    <button
-                      onClick={(e) => handleDeleteRequest(item.timestamp, e)}
-                      className={`p-2 rounded-lg transition-all ${isConfirmingDelete ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-red-500/20 hover:text-red-400'}`}
-                      title="Xóa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    {/* Expand Icon */}
-                    <div className={`p-1 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-white/10' : ''}`}>
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                <div className={`
-                        overflow-hidden transition-all duration-300 bg-black/20
-                        ${isExpanded ? 'max-h-[1000px] opacity-100 border-t border-white/5' : 'max-h-0 opacity-0'}
-                     `}>
-                  <div className="p-4 grid md:grid-cols-2 gap-4">
-                    {/* Exercises */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                        <Dumbbell className="w-3 h-3" /> Chi tiết bài tập
-                      </div>
-                      <ul className="space-y-1 pl-1">
-                        {item.completedExercises && item.completedExercises.length > 0 ? (
-                          item.completedExercises.map((ex, idx) => (
-                            <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                              <span className="text-blue-500 mt-1.5 w-1 h-1 rounded-full bg-blue-500 flex-shrink-0" />
-                              {ex}
-                            </li>
-                          ))
-                        ) : (
-                          <li className="text-sm text-gray-500 italic">Không có bài tập nào</li>
-                        )}
-                      </ul>
-                    </div>
-
-                    {/* Nutrition & Notes */}
-                    <div className="space-y-4">
-                      {item.nutrition && (
-                        <div className="bg-emerald-500/5 rounded-xl p-3 border border-emerald-500/10">
-                          <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <Utensils className="w-3 h-3" /> Dinh dưỡng
-                          </div>
-                          <div className="flex gap-4 text-sm mb-2 pb-2 border-b border-white/5">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-gray-400">Calories</span>
-                              <span className="font-bold text-white">{item.nutrition.totalCalories}</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-gray-400">Protein</span>
-                              <span className="font-bold text-emerald-400">{item.nutrition.totalProtein}g</span>
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            {item.nutrition.meals.map((m, i) => (
-                              <div key={i} className="text-xs text-gray-400 truncate">
-                                <span className="text-emerald-300/80">{m.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {item.userNotes && (
-                        <div className="bg-yellow-500/5 rounded-xl p-3 border border-yellow-500/10">
-                          <div className="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-1 flex items-center gap-2">
-                            <FileText className="w-3 h-3" /> Ghi chú
-                          </div>
-                          <p className="text-sm text-gray-300 italic">"{item.userNotes}"</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <span className={`text-[11px] mb-0.5 font-medium ${today ? 'text-purple-400' : isSelected ? 'text-white' : 'text-gray-400'}`}>
+                  {day}
+                </span>
+                {isFuture ? (
+                  <div className="w-[36px] h-[36px]" />
+                ) : (
+                  <ActivityRings
+                    move={moveProgress}
+                    exercise={exerciseProgress}
+                    stand={standProgress}
+                    size={36}
+                    isToday={today}
+                  />
+                )}
               </div>
             );
-          })
+          })}
+        </div>
+
+        {/* Selected Day Detail Card */}
+        {selectedDay && selectedDayItem && (
+          <div className="px-3 pb-3 animate-fade-in">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-white text-sm">
+                    {selectedDay}/{calendarDate.month + 1} — {selectedDayItem.summary}
+                  </h4>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase mt-1
+                    ${selectedDayItem.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'}
+                  `}>
+                    {selectedDayItem.levelSelected}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => handleDeleteRequest(selectedDayItem.timestamp, e)}
+                  className={`p-2 rounded-lg transition-all ${confirmingDeleteId === selectedDayItem.timestamp ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-red-500/20 hover:text-red-400'}`}
+                  title="Xóa"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Ring Stats */}
+              <div className="grid grid-cols-5 gap-2 mt-2">
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-[#fa114f] font-bold">Bài tập</div>
+                  <div className="text-sm font-bold text-white">{selectedDayItem.completedExercises?.length || 0}</div>
+                </div>
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-[#92e82a] font-bold">Calories</div>
+                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalCalories || 0}</div>
+                </div>
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-[#00d4aa] font-bold">Protein</div>
+                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalProtein || 0}g</div>
+                </div>
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-orange-400 font-bold">Carbs</div>
+                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalCarbs || 0}g</div>
+                </div>
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-yellow-400 font-bold">Fat</div>
+                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalFat || 0}g</div>
+                </div>
+              </div>
+
+              {/* Two-column: Meals (left) + Exercises (right) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                {/* LEFT: Meals */}
+                <div className="bg-black/20 rounded-xl p-2.5 border border-emerald-500/10">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Utensils className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[10px] font-bold text-emerald-400 uppercase">Thực đơn</span>
+                  </div>
+                  {selectedDayItem.nutrition?.meals && selectedDayItem.nutrition.meals.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {selectedDayItem.nutrition.meals.map((meal, i) => (
+                        <li key={i} className="bg-black/20 rounded-lg px-2 py-1.5">
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="text-[11px] font-semibold text-white leading-tight">{meal.name}</span>
+                            <span className="text-[9px] text-emerald-300 whitespace-nowrap">{meal.calories} kcal</span>
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">{meal.description}</p>
+                          <div className="flex gap-2 mt-0.5">
+                            <span className="text-[9px] text-[#00d4aa]">P: {meal.protein}g</span>
+                            {meal.carbs != null && <span className="text-[9px] text-orange-400">C: {meal.carbs}g</span>}
+                            {meal.fat != null && <span className="text-[9px] text-yellow-400">F: {meal.fat}g</span>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 italic">Chưa có thực đơn</p>
+                  )}
+                </div>
+
+                {/* RIGHT: Exercises */}
+                <div className="bg-black/20 rounded-xl p-2.5 border border-blue-500/10">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Dumbbell className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-400 uppercase">Bài tập</span>
+                  </div>
+                  {selectedDayItem.completedExercises && selectedDayItem.completedExercises.length > 0 ? (
+                    <ul className="space-y-0.5">
+                      {selectedDayItem.completedExercises.map((ex, i) => (
+                        <li key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
+                          <span className="mt-1.5 w-1 h-1 rounded-full bg-blue-500 flex-shrink-0" />
+                          {ex}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 italic">Chưa tập</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

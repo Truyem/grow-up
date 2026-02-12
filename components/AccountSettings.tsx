@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { loadLoginHistory } from '../services/supabasePlanSync';
 import { User } from '@supabase/supabase-js';
-import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe } from 'lucide-react';
 import { Toast } from './ui/Toast';
+
+interface LoginRecord {
+    id: string;
+    device_info: string;
+    ip_address: string;
+    location: string;
+    login_time: string;
+    is_online: boolean;
+    last_seen: string;
+}
 
 interface AccountSettingsProps {
     user: User;
@@ -17,6 +28,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
     const [isLoading, setIsLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loginHistory, setLoginHistory] = useState<LoginRecord[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     // Sync full name if it changes externally or initially
     useEffect(() => {
@@ -24,6 +37,22 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
             setFullName(user.user_metadata.full_name);
         }
     }, [user]);
+
+    // Load login history on mount
+    useEffect(() => {
+        const fetchHistory = async () => {
+            setIsLoadingHistory(true);
+            try {
+                const history = await loadLoginHistory(user.id);
+                setLoginHistory(history || []);
+            } catch (e) {
+                console.error('[AccountSettings] Failed to load login history', e);
+            } finally {
+                setIsLoadingHistory(false);
+            }
+        };
+        fetchHistory();
+    }, [user.id]);
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,6 +128,40 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const formatLoginTime = (isoStr: string) => {
+        try {
+            const d = new Date(isoStr);
+            const now = new Date();
+            const diffMs = now.getTime() - d.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Vừa xong';
+            if (diffMins < 60) return `${diffMins} phút trước`;
+            if (diffHours < 24) return `${diffHours} giờ trước`;
+            if (diffDays < 7) return `${diffDays} ngày trước`;
+
+            return d.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return isoStr;
+        }
+    };
+
+    const getDeviceIcon = (deviceInfo: string) => {
+        const lower = (deviceInfo || '').toLowerCase();
+        if (lower.includes('mobile') || lower.includes('android') || lower.includes('iphone') || lower.includes('ipad')) {
+            return <Smartphone className="w-5 h-5" />;
+        }
+        return <Monitor className="w-5 h-5" />;
     };
 
     return (
@@ -225,6 +288,88 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                         </button>
                     </div>
                 </form>
+            </div>
+
+            {/* Login History Section */}
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl">
+                        <Globe className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">Lịch Sử Đăng Nhập</h3>
+                        <p className="text-sm text-gray-400">Các phiên đăng nhập gần đây</p>
+                    </div>
+                </div>
+
+                {isLoadingHistory ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                        <span className="ml-3 text-gray-400">Đang tải...</span>
+                    </div>
+                ) : loginHistory.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                        <Monitor className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p>Chưa có lịch sử đăng nhập</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {loginHistory.slice(0, 10).map((record, idx) => (
+                            <div
+                                key={record.id || idx}
+                                className={`relative p-4 rounded-2xl border transition-all ${record.is_online
+                                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                                    : 'bg-white/[0.02] border-white/5'
+                                    }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    {/* Device Icon */}
+                                    <div className={`p-2 rounded-xl ${record.is_online
+                                        ? 'bg-emerald-500/10 text-emerald-400'
+                                        : 'bg-white/5 text-gray-500'
+                                        }`}>
+                                        {getDeviceIcon(record.device_info)}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        {/* Device Info */}
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm font-medium text-white truncate">
+                                                {record.device_info || 'Thiết bị không xác định'}
+                                            </span>
+                                            {record.is_online && (
+                                                <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full">
+                                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                                                    Online
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Details */}
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                            {record.location && (
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3" />
+                                                    {record.location}
+                                                </span>
+                                            )}
+                                            {record.ip_address && (
+                                                <span className="flex items-center gap-1">
+                                                    <Wifi className="w-3 h-3" />
+                                                    {record.ip_address}
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {formatLoginTime(record.login_time)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Logout Section */}

@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { DailyPlan, Meal, Ingredient } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Utensils, RefreshCw, Check, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
+import { Utensils, RefreshCw, Check, CheckCircle2, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 
 interface NutritionDisplayProps {
@@ -11,6 +11,7 @@ interface NutritionDisplayProps {
     onReset: () => void;
     onUpdatePlan: (plan: DailyPlan) => void;
     onAddSuggestedIngredient?: (ingredient: Ingredient) => void;
+    onCompleteNutrition?: (nutrition: DailyPlan['nutrition']) => void;
 }
 
 // --- MICRO COMPONENTS ---
@@ -506,9 +507,8 @@ const LocketCameraModal: React.FC<{
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onAddSuggestedIngredient }) => {
-    // State to track consumed meal names
-    const [consumedMealNames, setConsumedMealNames] = useState<string[]>([]);
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onAddSuggestedIngredient, onCompleteNutrition }) => {
+    // Consumed state is now persisted in meal.consumed via onUpdatePlan
 
     // State for modal
     const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
@@ -523,11 +523,14 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
     // Cleanup stream in case component unmounts while camera is open (though handled in modal)
 
     const toggleMeal = (mealName: string) => {
-        setConsumedMealNames(prev =>
-            prev.includes(mealName)
-                ? prev.filter(n => n !== mealName)
-                : [...prev, mealName]
-        );
+        const updatedPlan = { ...plan };
+        updatedPlan.nutrition = {
+            ...updatedPlan.nutrition,
+            meals: updatedPlan.nutrition.meals.map(m =>
+                m.name === mealName ? { ...m, consumed: !m.consumed } : m
+            )
+        };
+        onUpdatePlan(updatedPlan);
     };
 
     // Delete meal function - only for meals added via camera (with timestamp)
@@ -537,8 +540,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             meal => meal.name !== mealName
         );
         onUpdatePlan(updatedPlan);
-        // Also remove from consumed list
-        setConsumedMealNames(prev => prev.filter(n => n !== mealName));
+        // consumed state is now handled in the meal object itself via toggleMeal
     };
 
     // Check if meal can be deleted (added via camera - has timestamp format)
@@ -586,7 +588,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
     // Calculate consumed totals
     const consumed = useMemo(() => {
         return plan.nutrition.meals.reduce((acc, meal) => {
-            if (consumedMealNames.includes(meal.name)) {
+            if (meal.consumed) {
                 return {
                     calories: acc.calories + (meal.calories || 0),
                     protein: acc.protein + (meal.protein || 0),
@@ -596,7 +598,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             }
             return acc;
         }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    }, [plan.nutrition.meals, consumedMealNames]);
+    }, [plan.nutrition.meals]);
 
     // Handle manual food text analysis
     const handleManualFoodAnalysis = async () => {
@@ -648,7 +650,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             {selectedMeal && (
                 <MealDetailModal
                     meal={selectedMeal}
-                    isConsumed={consumedMealNames.includes(selectedMeal.name)}
+                    isConsumed={!!selectedMeal.consumed}
                     onClose={() => setSelectedMeal(null)}
                     onToggle={() => toggleMeal(selectedMeal.name)}
                 />
@@ -791,7 +793,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                 Thực Đơn
                             </h3>
                             <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                                {consumedMealNames.length}/{plan.nutrition.meals.length} Hoàn thành
+                                {plan.nutrition.meals.filter(m => m.consumed).length}/{plan.nutrition.meals.length} Hoàn thành
                             </div>
                         </div>
 
@@ -800,7 +802,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                 <MealItem
                                     key={index}
                                     meal={meal}
-                                    isConsumed={consumedMealNames.includes(meal.name)}
+                                    isConsumed={!!meal.consumed}
                                     onToggle={(e) => {
                                         e.stopPropagation();
                                         toggleMeal(meal.name);
@@ -872,10 +874,26 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                     )}
 
                     {/* Footer Actions */}
-                    <div className="text-center pt-8 border-t border-white/5">
+                    <div className="text-center pt-8 border-t border-white/5 space-y-4">
                         <p className="text-xs text-gray-500 mb-4 italic">
                             *Mẹo: Chạm vào món ăn để xem chi tiết
                         </p>
+
+                        {/* Complete Nutrition Button */}
+                        {onCompleteNutrition && (
+                            <button
+                                onClick={() => onCompleteNutrition(plan.nutrition)}
+                                className="group relative w-full max-w-xs mx-auto px-8 py-4 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-emerald-600 to-cyan-600 shadow-lg shadow-emerald-500/25"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-0 group-hover:opacity-30 transition-opacity" />
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
+                                <div className="relative flex items-center justify-center gap-3 text-white">
+                                    <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                    <span className="font-bold text-base">Hoàn Thành Thực Đơn</span>
+                                </div>
+                            </button>
+                        )}
+
                         <button
                             id="tour-nutri-reset"
                             onClick={onReset}

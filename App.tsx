@@ -13,7 +13,7 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient, Exercise } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
@@ -25,6 +25,7 @@ import { OnboardingTour, TourStep } from './components/OnboardingTour';
 
 import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
+import { debouncedSavePlan, savePlanToSupabase, loadPlanFromSupabase, deleteOldPlans, recordLoginHistory, markOffline } from './services/supabasePlanSync';
 
 
 import { Toast } from './components/ui/Toast';
@@ -143,6 +144,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [loginHistoryId, setLoginHistoryId] = useState<string | null>(null);
 
   // Tour Configuration
   const tourSteps: TourStep[] = [
@@ -398,15 +400,11 @@ export default function App() {
           .single();
 
         if (profile?.settings) {
-          // Load settings from server
           setUserData(prev => ({ ...prev, ...profile.settings }));
         } else if (!profileError || profileError.code === 'PGRST116') {
-          // No profile or empty settings -> Migration from LocalStorage?
-          // If we have local settings, upload them.
           const localSettings = localStorage.getItem('user_settings');
           if (localSettings) {
             const parsed = JSON.parse(localSettings);
-            // Upload to Supabase
             await supabase.from('profiles').upsert({
               id: user.id,
               email: user.email,
@@ -418,31 +416,68 @@ export default function App() {
           }
         }
 
-        // 2. Load Workout History
-        const { data: logs, error: logsError } = await supabase
+        // 2. Load today's plan from Supabase (cross-device sync)
+        const { plan: supabasePlan, workoutProgress } = await loadPlanFromSupabase(user.id);
+        if (supabasePlan) {
+          const todayStr = getTodayString();
+          if (supabasePlan.date === todayStr) {
+            setPlan(supabasePlan);
+            console.log('[Sync] Loaded today plan from Supabase');
+            // Also update localStorage as offline fallback
+            localStorage.setItem('daily_plan_cache', JSON.stringify(supabasePlan));
+            if (workoutProgress) {
+              localStorage.setItem('workout_progress', JSON.stringify({
+                planDate: supabasePlan.date,
+                checkedState: workoutProgress.checkedState || {},
+                userNote: workoutProgress.userNote || '',
+                lastUpdated: Date.now()
+              }));
+            }
+          } else {
+            // Plan is from a different day — auto-save it first
+            console.log('[Sync] Found stale plan from Supabase, auto-saving...');
+            // We'll handle this after history is loaded
+          }
+        } else {
+          // Fallback: check localStorage for offline-generated plan
+          const cachedStr = localStorage.getItem('daily_plan_cache');
+          if (cachedStr) {
+            try {
+              const cached = JSON.parse(cachedStr) as DailyPlan;
+              const todayStr = getTodayString();
+              if (cached.date === todayStr) {
+                setPlan(cached);
+                // Upload to Supabase for cross-device sync
+                await savePlanToSupabase(user.id, cached);
+              }
+            } catch (e) {
+              console.error('[Sync] Failed to parse local plan cache', e);
+            }
+          }
+        }
+
+        // 3. Load Workout History
+        const { data: logs } = await supabase
           .from('workout_logs')
-          .select('id, data, timestamp') // Select ID
+          .select('id, data, timestamp')
           .eq('user_id', user.id)
           .order('date', { ascending: false });
 
         if (logs) {
           let serverHistory = logs.map(l => ({
             ...(l.data as WorkoutHistoryItem),
-            id: l.id // Attach the database ID
+            id: l.id
           }));
 
-          // 3. Local Storage Migration (Check & Upload missing)
+          // Local Storage Migration
           const localHistJson = localStorage.getItem('gym_history');
           if (localHistJson) {
             try {
               const localHist: WorkoutHistoryItem[] = JSON.parse(localHistJson);
               const serverTimestamps = new Set(serverHistory.map(s => s.timestamp));
-
-              // Identify items that are on local but NOT on server (by timestamp)
               const missingOnServer = localHist.filter(l => !serverTimestamps.has(l.timestamp));
 
               if (missingOnServer.length > 0) {
-                console.log(`Found ${missingOnServer.length} local items to migrate.`);
                 const rowsToInsert = missingOnServer.map(item => {
                   const d = new Date(item.timestamp);
                   const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -453,56 +488,40 @@ export default function App() {
                     data: (() => {
                       const { totalCost, ...restNutrition } = (item.nutrition || {}) as any;
                       const cleanedNutrition = item.nutrition ? { ...restNutrition } : undefined;
-                      return {
-                        ...item,
-                        nutrition: cleanedNutrition
-                      };
+                      return { ...item, nutrition: cleanedNutrition };
                     })()
                   };
                 });
 
-                // Upload missing items
                 const { data: inserted, error: migErr } = await supabase.from('workout_logs')
                   .insert(rowsToInsert)
                   .select('id, data, timestamp');
 
                 if (!migErr && inserted) {
-                  console.log("Migration successful.");
-                  // Add new server items to our list
                   const newItems = inserted.map(l => ({
                     ...(l.data as WorkoutHistoryItem),
                     id: l.id
                   }));
                   serverHistory = [...serverHistory, ...newItems];
-                } else {
-                  console.error("Migration failed:", migErr);
+                  // Only remove local history after successful upload
+                  localStorage.removeItem('gym_history');
                 }
+              } else {
+                // No missing items, safe to remove local history
+                localStorage.removeItem('gym_history');
               }
-
-              // Clear Local Storage after attempt (Success or partial) to enforce Server Source of Truth
-              // User requirement: "check if any stored on local, delete all and upload all to server"
-              localStorage.removeItem('gym_history');
-              console.log("Local history cleared.");
-
             } catch (e) {
               console.error("Local history parse error:", e);
             }
           }
 
-          // Deduplicate Combined History (Server + Newly Migrated)
+          // Deduplicate
           const uniqueHistoryMap = new Map<string, WorkoutHistoryItem>();
           serverHistory.forEach(item => {
-            // Priority: Keep item with ID (should be all now), or later timestamp
             if (uniqueHistoryMap.has(item.date)) {
               const existing = uniqueHistoryMap.get(item.date)!;
               const existingCount = existing.completedExercises?.length || 0;
               const newCount = item.completedExercises?.length || 0;
-              // Resolution: Prefer existing server record unless new one has significantly more data. 
-              // Actually, simplest is to just keep what we have. If timestamp differs -> different item.
-              // IF existing has same date but different timestamp -> Keep BOTH?
-              // User said: "duplicate date different ID still up" -> Allow multiples per day?
-              // BUT existing dedupe logic enforces 1 per day.
-              // Let's STICK to the existing dedupe logic for now to stay consistent with UI.
               if (newCount > existingCount || (newCount === existingCount && item.timestamp > existing.timestamp)) {
                 uniqueHistoryMap.set(item.date, item);
               }
@@ -513,9 +532,11 @@ export default function App() {
 
           const finalHistory = Array.from(uniqueHistoryMap.values())
             .sort((a, b) => b.timestamp - a.timestamp);
-
           setWorkoutHistory(finalHistory);
         }
+
+        // 4. Record login history
+        recordLoginHistory(user.id).catch(console.error);
       };
 
       try {
@@ -552,6 +573,116 @@ export default function App() {
     const handleBeforeUnload = () => { /* ... */ };
     // ... Simplified
   }, []);
+
+  // === AUTO-SAVE FUNCTION: Save nutrition + workout when day changes ===
+  const performAutoSave = async (cachedPlan: DailyPlan) => {
+    const todayStr = getTodayString();
+    console.log("[AutoSave] Triggered for stale plan from:", cachedPlan.date);
+
+    // Clear consumed food for the new day
+    setUserData(prev => ({ ...prev, consumedFood: [] }));
+
+    const currentHistory = [...workoutHistory];
+    const alreadyExists = currentHistory.some(h => h.date === cachedPlan.date);
+
+    if (!alreadyExists) {
+      let completedList: string[] = [];
+      let userNoteFromProgress = "";
+      let savedTimestamp = Date.now();
+
+      // Try to get progress from localStorage (offline fallback) or plan data
+      const savedProgressStr = localStorage.getItem('workout_progress');
+      if (savedProgressStr) {
+        try {
+          const progress = JSON.parse(savedProgressStr);
+          if (progress.planDate === cachedPlan.date && progress.checkedState) {
+            const morningEx = cachedPlan.workout.detail.morning || [];
+            const eveningEx = cachedPlan.workout.detail.evening || [];
+
+            morningEx.forEach((ex: Exercise, idx: number) => {
+              if (progress.checkedState[`mor-${idx}`]) completedList.push(ex.name);
+            });
+
+            eveningEx.forEach((ex: Exercise, idx: number) => {
+              if (progress.checkedState[`eve-${idx}`]) completedList.push(ex.name);
+            });
+
+            userNoteFromProgress = progress.userNote || "";
+            savedTimestamp = progress.lastUpdated || Date.now();
+          }
+        } catch (e) {
+          console.error("[AutoSave] Failed to parse progress", e);
+        }
+      }
+
+      const exSummary = completedList.length > 0 ? completedList.join(', ') : "Chưa hoàn thành bài tập";
+      const finalNote = userNoteFromProgress
+        ? userNoteFromProgress + " (Tự động lưu do qua ngày)"
+        : "(Tự động lưu do qua ngày)";
+
+      const newItem: WorkoutHistoryItem = {
+        date: cachedPlan.date,
+        timestamp: savedTimestamp,
+        levelSelected: cachedPlan.workout.detail.levelName,
+        summary: cachedPlan.workout.summary,
+        completedExercises: completedList,
+        userNotes: finalNote,
+        exercisesSummary: exSummary,
+        nutrition: cachedPlan.nutrition,
+        weight: userData.weight
+      };
+
+      const newHistory = [newItem, ...currentHistory];
+      setWorkoutHistory(newHistory);
+
+      // Upload to Supabase workout_logs
+      if (session?.user) {
+        try {
+          const d = new Date(savedTimestamp);
+          const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+          const { data: existingData } = await supabase.from('workout_logs')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('date', dateKey)
+            .maybeSingle();
+
+          if (existingData) {
+            await supabase.from('workout_logs').update({
+              timestamp: newItem.timestamp,
+              data: newItem
+            }).eq('id', existingData.id);
+          } else {
+            await supabase.from('workout_logs').insert({
+              user_id: session.user.id,
+              date: dateKey,
+              timestamp: newItem.timestamp,
+              data: newItem
+            });
+          }
+
+          // Delete old daily_plans entries
+          const now = new Date();
+          const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          await deleteOldPlans(session.user.id, todayKey);
+          console.log("[AutoSave] Uploaded to Supabase + cleaned daily_plans");
+        } catch (err) {
+          console.error("[AutoSave] Supabase upload failed:", err);
+        }
+      }
+
+      const exerciseCount = completedList.length;
+      setToastMessage(`Đã tự động lưu buổi tập ngày ${cachedPlan.date} (${exerciseCount} bài tập). Dữ liệu đồ ăn đã được reset.`);
+    }
+
+    // Clean up old cache
+    localStorage.removeItem('daily_plan_cache');
+    localStorage.removeItem('workout_progress');
+
+    // Reset plan to create TODAY's plan
+    setPlan(null);
+    setViewMode('workout');
+  };
 
   // Load local history, cached plan, stats and auto-complete logic
   useEffect(() => {
@@ -619,87 +750,13 @@ export default function App() {
 
         // AUTO-SAVE LOGIC: If the plan is from a DIFFERENT day
         if (cachedPlan.date !== todayStr) {
-          console.log("Found stale plan from:", cachedPlan.date);
-
-          // Clear consumed food for the new day
-          setUserData(prev => ({ ...prev, consumedFood: [] }));
-
-          let currentHistory: WorkoutHistoryItem[] = [];
-          try {
-            const localHist = localStorage.getItem('gym_history');
-            if (localHist) currentHistory = JSON.parse(localHist);
-          } catch (e) { }
-
-          // Check if this date already exists in history to prevent duplicates
-          const alreadyExists = currentHistory.some(h => h.date === cachedPlan.date);
-
-          if (!alreadyExists) {
-            // Get progress if available
-            let completedList: string[] = [];
-            let userNoteFromProgress = "";
-            let savedTimestamp = Date.now();
-
-            if (savedProgressStr) {
-              try {
-                const progress = JSON.parse(savedProgressStr);
-                if (progress.planDate === cachedPlan.date && progress.checkedState) {
-                  const morningEx = cachedPlan.workout.detail.morning || [];
-                  const eveningEx = cachedPlan.workout.detail.evening || [];
-
-                  morningEx.forEach((ex, idx) => {
-                    if (progress.checkedState[`mor-${idx}`]) completedList.push(ex.name);
-                  });
-
-                  eveningEx.forEach((ex, idx) => {
-                    if (progress.checkedState[`eve-${idx}`]) completedList.push(ex.name);
-                  });
-
-                  userNoteFromProgress = progress.userNote || "";
-                  savedTimestamp = progress.lastUpdated || Date.now();
-                }
-              } catch (e) {
-                console.error("Failed to parse progress", e);
-              }
-            }
-
-            // Always save the workout (even if no exercises were checked)
-            const exSummary = completedList.length > 0 ? completedList.join(', ') : "Chưa hoàn thành bài tập";
-            const finalNote = userNoteFromProgress
-              ? userNoteFromProgress + " (Tự động lưu do qua ngày)"
-              : "(Tự động lưu do qua ngày)";
-
-            const newItem: WorkoutHistoryItem = {
-              date: cachedPlan.date,
-              timestamp: savedTimestamp,
-              levelSelected: cachedPlan.workout.detail.levelName,
-              summary: cachedPlan.workout.summary,
-              completedExercises: completedList,
-              userNotes: finalNote,
-              exercisesSummary: exSummary,
-              nutrition: cachedPlan.nutrition
-            };
-
-            const newHistory = [newItem, ...currentHistory];
-            setWorkoutHistory(newHistory);
-            localStorage.setItem('gym_history', JSON.stringify(newHistory));
-
-            const exerciseCount = completedList.length;
-            setToastMessage(`Đã tự động lưu buổi tập ngày ${cachedPlan.date} (${exerciseCount} bài tập). Dữ liệu đồ ăn đã được reset.`);
-          }
-
-          // Clean up old cache whether we saved it or not
-          localStorage.removeItem('daily_plan_cache');
-          localStorage.removeItem('workout_progress');
-
-          // Stay on input mode to create TODAY's plan
-          setViewMode('workout');
-
+          // Delegate to the extracted performAutoSave function
+          performAutoSave(cachedPlan);
         } else {
           // If plan is for TODAY, load it normally
           setPlan(cachedPlan);
           setViewMode('workout');
           console.log("Loaded cached plan for today:", todayStr);
-
         }
 
       } catch (e) {
@@ -709,6 +766,30 @@ export default function App() {
       }
     }
   }, []);
+
+  // === REAL-TIME MIDNIGHT DETECTION ===
+  // Check every 30s if the day has changed while the app is open
+  useEffect(() => {
+    const checkMidnight = () => {
+      const cachedPlanStr = localStorage.getItem('daily_plan_cache');
+      if (!cachedPlanStr) return;
+
+      try {
+        const cachedPlan = JSON.parse(cachedPlanStr) as DailyPlan;
+        const todayStr = getTodayString();
+
+        if (cachedPlan.date !== todayStr) {
+          console.log("[MidnightCheck] Day changed! Auto-saving...");
+          performAutoSave(cachedPlan);
+        }
+      } catch (e) {
+        console.error("[MidnightCheck] Error:", e);
+      }
+    };
+
+    const interval = setInterval(checkMidnight, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, [session, workoutHistory, userData]);
 
   // Save user settings whenever userData changes
   useEffect(() => {
@@ -766,8 +847,7 @@ export default function App() {
     let finalPlan: DailyPlan;
 
     if (!plan) {
-      // If no previous plan, the generated partial is mostly complete but might miss the other half.
-      // However, generatedPartial ALWAYS has a fallback for the missing half, so it is safe to usage.
+      // No previous plan: generatedPartial has blank (not fallback) data for the non-generated part
       finalPlan = generatedPartial;
     } else {
       // If we have a previous plan, we must ONLY update the part we just generated.
@@ -858,11 +938,14 @@ export default function App() {
     }
 
 
-    // Save to local storage cache
+    // Save to local storage cache + Supabase
     localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
-
-    // Clear any old progress when generating a fresh plan
     localStorage.removeItem('workout_progress');
+
+    // Sync to Supabase for cross-device access
+    if (session?.user) {
+      savePlanToSupabase(session.user.id, finalPlan, {}).catch(console.error);
+    }
 
     setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -870,11 +953,20 @@ export default function App() {
 
 
   const handleReset = () => {
-    // Direct reset without confirmation dialog to ensure button responsiveness
     setPlan(null);
     localStorage.removeItem('daily_plan_cache');
-    localStorage.removeItem('workout_progress'); // Also clear progress on manual reset
+    localStorage.removeItem('workout_progress');
     setViewMode('workout');
+
+    // Also delete from Supabase
+    if (session?.user) {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      supabase.from('daily_plans').delete()
+        .eq('user_id', session.user.id)
+        .eq('date', todayKey)
+        .then(() => console.log('[Reset] Deleted daily_plan from Supabase'));
+    }
   };
 
   const handleStartTracking = () => {
@@ -896,8 +988,11 @@ export default function App() {
     setPlan(finalPlan);
     setViewMode('nutrition');
 
-    // Save cache
+    // Save cache + Supabase
     localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
+    if (session?.user) {
+      savePlanToSupabase(session.user.id, finalPlan).catch(console.error);
+    }
   };
 
   // Handle adding suggested ingredient to fridge
@@ -918,6 +1013,9 @@ export default function App() {
       );
       setPlan(updatedPlan);
       localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+      if (session?.user) {
+        debouncedSavePlan(session.user.id, updatedPlan);
+      }
     }
 
     setToastMessage(`Đã thêm "${ingredient.name}" vào tủ lạnh!`);
@@ -931,11 +1029,29 @@ export default function App() {
     nutrition: DailyPlan['nutrition']
   ) => {
     const now = new Date();
-    const todayDateStr = getTodayString(); // Use the standardized date string helper
+    const todayDateStr = getTodayString();
 
     const exercisesSummary = completedExercises.length > 0
       ? completedExercises.join(', ')
       : "Không có bài tập";
+
+    // Generate YYYY-MM-DD key using local time
+    const nowLocal = new Date();
+    const todayKey = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
+
+    const isSameDay = (ts: number) => {
+      const d = new Date(ts);
+      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return dKey === todayKey;
+    };
+
+    // Find existing entry for today (might have nutrition saved separately)
+    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
+    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
+
+    // Merge: keep nutrition from existing entry if it was saved separately
+    const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
+    const mergedNutrition = existingToday?.nutrition || undefined;
 
     const newItem: WorkoutHistoryItem = {
       date: todayDateStr,
@@ -945,64 +1061,30 @@ export default function App() {
       completedExercises,
       userNotes: userNotes || "",
       exercisesSummary,
-      nutrition, // Save nutrition to history
-      weight: userData.weight // Save current weight
+      nutrition: mergedNutrition, // Keep existing nutrition if saved separately
+      weight: userData.weight
     };
-
-    // Logic: Only keep 1 workout per day. Keep the one with the MOST exercises.
-    const nowLocal = new Date();
-    // Generate YYYY-MM-DD key using local time manually to avoid timezone issues
-    const todayKey = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
-
-    const isSameDay = (ts: number) => {
-      const d = new Date(ts);
-      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return dKey === todayKey;
-    };
-
-    // Filter existing items: split into "Today's items" and "Others"
-    // Use both date string AND timestamp check to be thorough against legacy data
-    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
-    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
 
     let itemToSave = newItem;
 
-    if (existingTodayItems.length > 0) {
-      // Find existing item with max exercises
-      let bestExisting = existingTodayItems[0];
-      for (let i = 1; i < existingTodayItems.length; i++) {
-        const curr = existingTodayItems[i];
-        const currCount = curr.completedExercises ? curr.completedExercises.length : 0;
-        const bestCount = bestExisting.completedExercises ? bestExisting.completedExercises.length : 0;
-        if (currCount > bestCount) {
-          bestExisting = curr;
-        }
-      }
-
-      const bestExistingCount = bestExisting.completedExercises ? bestExisting.completedExercises.length : 0;
+    if (existingToday) {
+      const bestExistingCount = existingToday.completedExercises ? existingToday.completedExercises.length : 0;
       const newCount = newItem.completedExercises ? newItem.completedExercises.length : 0;
 
       if (bestExistingCount > newCount) {
-        // Keep existing as it has more exercises
-        itemToSave = bestExisting;
-      } else {
-        // New is better or equal
-        itemToSave = newItem;
+        // Keep existing workout but merge
+        itemToSave = { ...existingToday, nutrition: mergedNutrition };
       }
     }
 
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
-    // localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
 
     // Save to Supabase
-    // Save to Supabase
     if (session?.user) {
-      // Use LOCAL time date for the DB Key (YYYY-MM-DD)
       const d = new Date(itemToSave.timestamp);
       const localDateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-      // CHECK BEFORE INSERT: Do we already have a log for this day?
       const { data: existingData } = await supabase.from('workout_logs')
         .select('id')
         .eq('user_id', session.user.id)
@@ -1010,13 +1092,11 @@ export default function App() {
         .maybeSingle();
 
       if (existingData) {
-        // Update existing
         await supabase.from('workout_logs').update({
           timestamp: itemToSave.timestamp,
           data: itemToSave
         }).eq('id', existingData.id);
       } else {
-        // Insert new
         await supabase.from('workout_logs').insert({
           user_id: session.user.id,
           date: localDateKey,
@@ -1026,12 +1106,103 @@ export default function App() {
       }
     }
 
-    // Reset plan to return to "Create Schedule" tab
+    // Reset plan + delete from daily_plans
     setPlan(null);
     localStorage.removeItem('daily_plan_cache');
-    // workout_progress is already cleared in PlanDisplay but good to ensure cleanup
     localStorage.removeItem('workout_progress');
+
+    // Delete today's daily_plan from Supabase (it's now in workout_logs)
+    if (session?.user) {
+      supabase.from('daily_plans').delete()
+        .eq('user_id', session.user.id)
+        .eq('date', todayKey)
+        .then(() => console.log('[CompleteWorkout] Cleaned daily_plans'));
+    }
     setViewMode('workout');
+    setToastMessage(`Đã lưu buổi tập: ${completedExercises.length} bài tập hoàn thành!`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // === COMPLETE NUTRITION: Save nutrition separately, merge with existing workout if any ===
+  const handleCompleteNutrition = async (nutrition: DailyPlan['nutrition']) => {
+    const now = new Date();
+    const todayDateStr = getTodayString();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const isSameDay = (ts: number) => {
+      const d = new Date(ts);
+      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return dKey === todayKey;
+    };
+
+    // Find existing entry for today (might have workout saved separately)
+    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
+    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
+    const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
+
+    let itemToSave: WorkoutHistoryItem;
+
+    if (existingToday) {
+      // Merge nutrition into existing workout entry
+      itemToSave = {
+        ...existingToday,
+        nutrition,
+        weight: userData.weight,
+        timestamp: Math.max(existingToday.timestamp, now.getTime()) // Keep latest timestamp
+      };
+    } else {
+      // Create new entry with only nutrition
+      itemToSave = {
+        date: todayDateStr,
+        timestamp: now.getTime(),
+        levelSelected: 'Chỉ dinh dưỡng',
+        summary: 'Chỉ lưu thực đơn dinh dưỡng',
+        completedExercises: [],
+        exercisesSummary: 'Không có bài tập',
+        nutrition,
+        weight: userData.weight
+      };
+    }
+
+    const updatedHistory = [itemToSave, ...otherItems];
+    setWorkoutHistory(updatedHistory);
+
+    // Save to Supabase
+    if (session?.user) {
+      const { data: existingData } = await supabase.from('workout_logs')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('date', todayKey)
+        .maybeSingle();
+
+      if (existingData) {
+        await supabase.from('workout_logs').update({
+          timestamp: itemToSave.timestamp,
+          data: itemToSave
+        }).eq('id', existingData.id);
+      } else {
+        await supabase.from('workout_logs').insert({
+          user_id: session.user.id,
+          date: todayKey,
+          timestamp: itemToSave.timestamp,
+          data: itemToSave
+        });
+      }
+    }
+
+    // Reset nutrition part of the plan, keep workout if it exists
+    if (plan) {
+      const updatedPlan = { ...plan };
+      updatedPlan.nutrition = { ...updatedPlan.nutrition, isGenerated: false };
+      setPlan(updatedPlan);
+      localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+      if (session?.user) {
+        savePlanToSupabase(session.user.id, updatedPlan).catch(console.error);
+      }
+    }
+
+    setViewMode('nutrition');
+    setToastMessage(`Đã lưu thực đơn dinh dưỡng: ${nutrition.totalCalories} kcal, ${nutrition.totalProtein}g protein!`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1174,9 +1345,13 @@ export default function App() {
 
 
   const handleUpdatePlan = (updatedPlan: DailyPlan) => {
-
     setPlan(updatedPlan);
     localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+
+    // Sync to Supabase (debounced to avoid spamming on rapid toggles)
+    if (session?.user) {
+      debouncedSavePlan(session.user.id, updatedPlan);
+    }
   };
 
   return (
@@ -1319,6 +1494,7 @@ export default function App() {
                     onReset={handleReset}
                     onUpdatePlan={handleUpdatePlan}
                     onAddSuggestedIngredient={handleAddSuggestedIngredient}
+                    onCompleteNutrition={handleCompleteNutrition}
                   />
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-4">
