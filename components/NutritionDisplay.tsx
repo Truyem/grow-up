@@ -8,7 +8,7 @@ import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 
 interface NutritionDisplayProps {
     plan: DailyPlan;
-    onReset: () => void;
+    onReset: (type: 'workout' | 'nutrition') => void;
     onUpdatePlan: (plan: DailyPlan) => void;
     onAddSuggestedIngredient?: (ingredient: Ingredient) => void;
     onCompleteNutrition?: (nutrition: DailyPlan['nutrition']) => void;
@@ -896,7 +896,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
                         <button
                             id="tour-nutri-reset"
-                            onClick={onReset}
+                            onClick={() => onReset('nutrition')}
                             className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
                         >
                             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />

@@ -15,7 +15,7 @@ import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, 
 interface PlanDisplayProps {
   plan: DailyPlan;
   userData: UserInput;
-  onReset: () => void;
+  onReset: (type: 'workout' | 'nutrition') => void;
   onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition']) => void;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
   history: WorkoutHistoryItem[];
@@ -194,7 +194,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     return (
       <div className="p-8 text-center text-red-400 bg-red-900/10 rounded-xl border border-red-500/20">
         <p>Lỗi dữ liệu: Không tìm thấy chi tiết bài tập.</p>
-        <button onClick={onReset} className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300">
+        <button onClick={() => onReset('workout')} className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300">
           Reset Dữ Liệu
         </button>
       </div>
@@ -573,7 +573,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
       <div className="text-center pt-8 border-t border-white/5">
         <button
-          onClick={onReset}
+          onClick={() => onReset('workout')}
           className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />

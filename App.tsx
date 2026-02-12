@@ -952,20 +952,54 @@ export default function App() {
   };
 
 
-  const handleReset = () => {
-    setPlan(null);
-    localStorage.removeItem('daily_plan_cache');
-    localStorage.removeItem('workout_progress');
-    setViewMode('workout');
+  const handleReset = (type: 'workout' | 'nutrition') => {
+    if (!plan) {
+      // No plan to reset
+      setPlan(null);
+      localStorage.removeItem('daily_plan_cache');
+      localStorage.removeItem('workout_progress');
+      return;
+    }
 
-    // Also delete from Supabase
-    if (session?.user) {
-      const now = new Date();
-      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      supabase.from('daily_plans').delete()
-        .eq('user_id', session.user.id)
-        .eq('date', todayKey)
-        .then(() => console.log('[Reset] Deleted daily_plan from Supabase'));
+    const updatedPlan = { ...plan };
+
+    if (type === 'workout') {
+      updatedPlan.workout = {
+        summary: '', detail: { levelName: '', description: '', morning: [], evening: [] },
+        isGenerated: false
+      };
+      updatedPlan.workoutProgress = undefined;
+      localStorage.removeItem('workout_progress');
+    }
+
+    if (type === 'nutrition') {
+      updatedPlan.nutrition = {
+        totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
+        advice: '', isGenerated: false, meals: []
+      };
+    }
+
+    // If BOTH parts are now non-generated, fully clear the plan
+    const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
+    if (bothBlank) {
+      setPlan(null);
+      localStorage.removeItem('daily_plan_cache');
+      // Delete from Supabase entirely
+      if (session?.user) {
+        const now = new Date();
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        supabase.from('daily_plans').delete()
+          .eq('user_id', session.user.id)
+          .eq('date', todayKey)
+          .then(() => console.log('[Reset] Deleted daily_plan from Supabase (both blank)'));
+      }
+    } else {
+      // One part still has data — update, don't delete
+      setPlan(updatedPlan);
+      localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+      if (session?.user) {
+        savePlanToSupabase(session.user.id, updatedPlan).catch(console.error);
+      }
     }
   };
 
@@ -1106,19 +1140,33 @@ export default function App() {
       }
     }
 
-    // Reset plan + delete from daily_plans
-    setPlan(null);
-    localStorage.removeItem('daily_plan_cache');
-    localStorage.removeItem('workout_progress');
+    // Mark workout as completed (not generated), keep nutrition if it exists
+    if (plan) {
+      const updatedPlan = { ...plan };
+      updatedPlan.workout = { ...updatedPlan.workout, isGenerated: false };
+      updatedPlan.workoutProgress = undefined;
 
-    // Delete today's daily_plan from Supabase (it's now in workout_logs)
-    if (session?.user) {
-      supabase.from('daily_plans').delete()
-        .eq('user_id', session.user.id)
-        .eq('date', todayKey)
-        .then(() => console.log('[CompleteWorkout] Cleaned daily_plans'));
+      // If BOTH parts are now non-generated, fully clear
+      const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
+      if (bothBlank) {
+        setPlan(null);
+        localStorage.removeItem('daily_plan_cache');
+        localStorage.removeItem('workout_progress');
+        if (session?.user) {
+          supabase.from('daily_plans').delete()
+            .eq('user_id', session.user.id)
+            .eq('date', todayKey)
+            .then(() => console.log('[CompleteWorkout] Cleaned daily_plans (both done)'));
+        }
+      } else {
+        setPlan(updatedPlan);
+        localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+        localStorage.removeItem('workout_progress');
+        if (session?.user) {
+          savePlanToSupabase(session.user.id, updatedPlan).catch(console.error);
+        }
+      }
     }
-    setViewMode('workout');
     setToastMessage(`Đã lưu buổi tập: ${completedExercises.length} bài tập hoàn thành!`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
