@@ -1,5 +1,5 @@
 import React, { useMemo, useState, lazy, Suspense, useCallback } from 'react';
-import { WorkoutHistoryItem, MuscleGroup, UserInput, AIOverview } from '../types';
+import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { ActivityRings } from './ui/ActivityRings';
 import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
@@ -304,7 +304,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             <div className="h-[200px] bg-white/5 rounded-xl" />
           </div>
         }>
-          <StatsCharts chartData={chartData} muscleDistribution={muscleDistribution} />
+          <StatsCharts chartData={chartData} muscleDistribution={muscleDistribution} history={history} />
         </Suspense>
       )}
 
@@ -556,6 +556,63 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                   )}
                 </div>
               </div>
+
+              {/* Weight Tracking Section */}
+              {selectedDayItem.exerciseLogs && selectedDayItem.exerciseLogs.length > 0 && (
+                <div className="bg-black/30 rounded-xl p-2.5 border border-blue-500/10 mt-2">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Weight className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-400 uppercase">Tracking Tạ</span>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedDayItem.exerciseLogs.map((log: ExerciseLog, logIdx: number) => {
+                      // Progressive overload detection
+                      const previousLogs = history
+                        .filter(h => h.timestamp < selectedDayItem.timestamp && h.exerciseLogs)
+                        .sort((a, b) => b.timestamp - a.timestamp)
+                        .flatMap(h => h.exerciseLogs || [])
+                        .filter((l: ExerciseLog) => l.exerciseName === log.exerciseName);
+                      const prevLog = previousLogs.length > 0 ? previousLogs[0] : null;
+                      const prevMaxWeight = prevLog ? Math.max(...prevLog.sets.map(s => s.weight)) : 0;
+                      const currMaxWeight = Math.max(...log.sets.map(s => s.weight));
+                      const weightUp = prevLog && currMaxWeight > prevMaxWeight;
+                      const volumeUp = prevLog && log.totalVolume > prevLog.totalVolume;
+
+                      return (
+                        <div key={logIdx} className="bg-black/20 rounded-lg p-2">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] font-bold text-white">{log.exerciseName}</span>
+                            <div className="flex items-center gap-1">
+                              {weightUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">🟢 +Kg</span>}
+                              {volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-bold">🔵 +Vol</span>}
+                              {prevLog && !weightUp && !volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-500/20 text-gray-400 font-bold">➡️ Giữ</span>}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-[24px_1fr_1fr_1fr] gap-1 text-[9px] text-gray-500 font-bold uppercase mb-1">
+                            <span>#</span>
+                            <span>Kg</span>
+                            <span>Reps</span>
+                            <span>Vol</span>
+                          </div>
+                          {log.sets.map((set, sIdx) => (
+                            <div key={sIdx} className="grid grid-cols-[24px_1fr_1fr_1fr] gap-1 text-[11px] text-gray-300">
+                              <span className="text-gray-500">{sIdx + 1}</span>
+                              <span>{set.weight}kg</span>
+                              <span>{set.reps}</span>
+                              <span className="text-emerald-400">{(set.weight * set.reps).toLocaleString()}</span>
+                            </div>
+                          ))}
+                          <div className="mt-1 pt-1 border-t border-white/5 text-[10px] font-bold text-emerald-400 text-right">
+                            Tổng Volume: {log.totalVolume.toLocaleString()} kg
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+
             </div>
           </div>
         )}

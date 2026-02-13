@@ -13,11 +13,12 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient, Exercise } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient, Exercise, ExerciseLog } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
+import { FridgeView } from './components/FridgeView';
 import { AuthPage } from './components/AuthPage';
 import { AccountSettings } from './components/AccountSettings';
 // import { UserGuide } from './components/UserGuide'; // REPLACED WITH TOUR
@@ -72,7 +73,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide' | 'fridge';
 
 
 // Helper to match the date format used in service
@@ -830,6 +831,10 @@ export default function App() {
       setViewMode('settings');
       return;
     }
+    if (type === 'fridge') {
+      setViewMode('fridge');
+      return;
+    }
 
     setLoading(true);
 
@@ -1060,7 +1065,8 @@ export default function App() {
     summary: string,
     completedExercises: string[],
     userNotes: string,
-    nutrition: DailyPlan['nutrition']
+    nutrition: DailyPlan['nutrition'],
+    exerciseLogs?: ExerciseLog[]
   ) => {
     const now = new Date();
     const todayDateStr = getTodayString();
@@ -1095,6 +1101,7 @@ export default function App() {
       completedExercises,
       userNotes: userNotes || "",
       exercisesSummary,
+      exerciseLogs: exerciseLogs || undefined,
       nutrition: mergedNutrition, // Keep existing nutrition if saved separately
       weight: userData.weight
     };
@@ -1571,6 +1578,13 @@ export default function App() {
                   onDelete={handleDeleteHistoryItem}
                   onRefresh={handleRefreshHistory}
                   isRefreshing={isRefreshing}
+                />
+              )}
+
+              {viewMode === 'fridge' && (
+                <FridgeView
+                  userData={userData}
+                  setUserData={setUserData}
                 />
               )}
 

@@ -1,9 +1,9 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from 'recharts';
-import { Activity, Utensils } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
+import { Activity, Utensils, TrendingUp, Dumbbell, ChevronDown, ChevronUp } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { HumanBodyMuscleMap } from './HumanBodyMuscleMap';
-import { MuscleGroup } from '../../types';
+import { MuscleGroup, WorkoutHistoryItem, ExerciseLog } from '../../types';
 
 interface ChartData {
     name: string;
@@ -23,6 +23,7 @@ interface MuscleData {
 interface StatsChartsProps {
     chartData: ChartData[];
     muscleDistribution: MuscleData[];
+    history?: WorkoutHistoryItem[]; // Added history prop
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -31,16 +32,56 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         return (
             <div className="bg-black/90 border border-white/10 p-3 rounded-xl shadow-xl backdrop-blur-md">
                 <p className="text-cyan-300 font-bold mb-1">{label}</p>
-                <p className="text-white text-sm">Bài tập: {data.exercises}</p>
+                {data.exercises !== undefined && <p className="text-white text-sm">Bài tập: {data.exercises}</p>}
                 {data.calories > 0 && <p className="text-orange-400 text-xs">Calories: {data.calories} kcal</p>}
                 {data.protein > 0 && <p className="text-emerald-400 text-xs">Protein: {data.protein}g</p>}
+
+                {/* For Weight Tracking Charts */}
+                {data.volume !== undefined && <p className="text-emerald-400 text-xs">Volume: {data.volume.toLocaleString()} kg</p>}
+                {data.maxWeight !== undefined && <p className="text-cyan-400 text-xs">Max Weight: {data.maxWeight} kg</p>}
             </div>
         );
     }
     return null;
 };
 
-export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistribution }) => {
+export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistribution, history = [] }) => {
+    const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+
+    // Process history data for weight tracking charts
+    const exerciseTrends = useMemo(() => {
+        if (!history || history.length === 0) return [];
+
+        const exerciseMap = new Map<string, { date: string; timestamp: number; volume: number; maxWeight: number }[]>();
+
+        // Sort history by date ascending
+        const sortedHistory = [...history].sort((a, b) => a.timestamp - b.timestamp);
+
+        sortedHistory.forEach(item => {
+            if (item.exerciseLogs) {
+                item.exerciseLogs.forEach(log => {
+                    if (!exerciseMap.has(log.exerciseName)) {
+                        exerciseMap.set(log.exerciseName, []);
+                    }
+
+                    const d = new Date(item.timestamp);
+                    exerciseMap.get(log.exerciseName)?.push({
+                        date: `${d.getDate()}/${d.getMonth() + 1}`,
+                        timestamp: item.timestamp,
+                        volume: log.totalVolume,
+                        maxWeight: Math.max(...log.sets.map(s => s.weight))
+                    });
+                });
+            }
+        });
+
+        // Convert map to array and filter out exercises with less than 2 data points
+        return Array.from(exerciseMap.entries())
+            .map(([name, data]) => ({ name, data }))
+            .filter(item => item.data.length >= 1)
+            .sort((a, b) => b.data[b.data.length - 1].timestamp - a.data[a.data.length - 1].timestamp); // Sort by most recent activity
+    }, [history]);
+
     return (
         <div className="animate-fade-in-down space-y-6">
             <div className="grid md:grid-cols-2 gap-4">
@@ -114,6 +155,86 @@ export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistr
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </GlassCard>
+            )}
+
+            {/* WEIGHT TRACKING CHARTS */}
+            {exerciseTrends.length > 0 && (
+                <GlassCard title="Tiến bộ bài tập (Tracking Tạ)" icon={<TrendingUp className="w-5 h-5" />}>
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                        {exerciseTrends.map((exercise, index) => {
+                            const isExpanded = expandedExercise === exercise.name;
+                            const first = exercise.data[0];
+                            const last = exercise.data[exercise.data.length - 1];
+                            const volChange = last.volume - first.volume;
+                            const wtChange = last.maxWeight - first.maxWeight;
+
+                            return (
+                                <div key={index} className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                                    <button
+                                        onClick={() => setExpandedExercise(isExpanded ? null : exercise.name)}
+                                        className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                                <Dumbbell className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="text-sm font-bold text-white">{exercise.name}</div>
+                                                <div className="flex gap-3 text-[10px]">
+                                                    <span className={volChange >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                                                        Vol: {volChange >= 0 ? '+' : ''}{volChange.toLocaleString()}
+                                                    </span>
+                                                    <span className={wtChange >= 0 ? 'text-cyan-400' : 'text-red-400'}>
+                                                        Max: {wtChange >= 0 ? '+' : ''}{wtChange}kg
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="p-3 pt-0 border-t border-white/5 animate-fade-in">
+                                            <div className="h-[200px] w-full mt-4">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={exercise.data}>
+                                                        <defs>
+                                                            <linearGradient id={`vol-${index}`} x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                                                            </linearGradient>
+                                                            <linearGradient id={`wt-${index}`} x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={5} />
+                                                        <YAxis yAxisId="left" stroke="#34d399" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val / 1000}k`} />
+                                                        <YAxis yAxisId="right" orientation="right" stroke="#22d3ee" fontSize={10} tickLine={false} axisLine={false} />
+                                                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+                                                        <Area yAxisId="left" type="monotone" dataKey="volume" stroke="#34d399" fillOpacity={1} fill={`url(#vol-${index})`} strokeWidth={2} name="Volume" />
+                                                        <Area yAxisId="right" type="monotone" dataKey="maxWeight" stroke="#22d3ee" fillOpacity={1} fill={`url(#wt-${index})`} strokeWidth={2} name="Max Weight" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="flex justify-center gap-6 mt-2 text-[10px]">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                                    <span className="text-gray-400">Total Volume (Trục trái)</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                                                    <span className="text-gray-400">Max Weight (Trục phải)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </GlassCard>
             )}

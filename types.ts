@@ -79,12 +79,14 @@ export interface UserInput {
 
 export interface Ingredient {
   id: string;
+  user_id?: string;
   name: string;
   quantity: number;
   unit: string;
   category?: 'protein' | 'carb' | 'fat' | 'veg' | 'spice' | 'other';
   expiryDate?: string;
   caloriesPer100g?: number;
+  notes?: string;
 }
 
 export interface Expense {
@@ -102,6 +104,17 @@ export interface UserStats {
 }
 
 export type ExerciseColor = 'Red' | 'Blue' | 'Yellow' | 'Green' | 'Pink' | 'Purple' | 'Orange';
+
+export interface ExerciseSetLog {
+  weight: number; // kg
+  reps: number;
+}
+
+export interface ExerciseLog {
+  exerciseName: string;
+  sets: ExerciseSetLog[];
+  totalVolume: number; // Σ(weight × reps)
+}
 
 export interface Exercise {
   name: string;
@@ -160,6 +173,7 @@ export interface DailyPlan {
   workoutProgress?: {
     checkedState: Record<string, boolean>;
     userNote?: string;
+    exerciseLogs?: Record<string, ExerciseLog>; // key = exercise key (e.g. "mor-0")
   };
 
 }
@@ -173,6 +187,7 @@ export interface WorkoutHistoryItem {
   completedExercises: string[];
   userNotes?: string;
   exercisesSummary?: string;
+  exerciseLogs?: ExerciseLog[]; // Weight/rep tracking per exercise
   nutrition?: {
     totalCalories: number;
     totalProtein: number;

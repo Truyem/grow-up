@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { DailyPlan, Exercise, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
+import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
@@ -9,14 +9,14 @@ import { AddExerciseModal } from './AddExerciseModal';
 import { suggestNextExercises } from '../services/geminiService';
 
 
-import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, RefreshCw, Layers, Sun, Moon, Footprints, Sparkles, Loader2 } from 'lucide-react';
+import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, RefreshCw, Layers, Sun, Moon, Footprints, Sparkles, Loader2, Weight, Plus, Minus } from 'lucide-react';
 
 
 interface PlanDisplayProps {
   plan: DailyPlan;
   userData: UserInput;
   onReset: (type: 'workout' | 'nutrition') => void;
-  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition']) => void;
+  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => void;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
   history: WorkoutHistoryItem[];
 }
@@ -64,10 +64,51 @@ interface ExerciseItemProps {
   onToggle: () => void;
   onPreview: () => void;
   onStartTimer: () => void;
+  exerciseLog?: ExerciseLog;
+  onUpdateLog: (log: ExerciseLog) => void;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer }) => {
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer, exerciseLog, onUpdateLog }) => {
   const isWalking = exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking');
+  const hasEquipment = !!exercise.equipment;
+
+  // Initialize sets from exerciseLog or default based on exercise.sets
+  const currentSets: ExerciseSetLog[] = exerciseLog?.sets ||
+    Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0 }));
+
+  const handleSetChange = (setIndex: number, field: 'weight' | 'reps', value: number) => {
+    const updatedSets = [...currentSets];
+    updatedSets[setIndex] = { ...updatedSets[setIndex], [field]: Math.max(0, value) };
+    const totalVolume = updatedSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+    onUpdateLog({
+      exerciseName: exercise.name,
+      sets: updatedSets,
+      totalVolume,
+    });
+  };
+
+  const handleAddSet = () => {
+    const updatedSets = [...currentSets, { weight: currentSets[currentSets.length - 1]?.weight || 0, reps: 0 }];
+    const totalVolume = updatedSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+    onUpdateLog({
+      exerciseName: exercise.name,
+      sets: updatedSets,
+      totalVolume,
+    });
+  };
+
+  const handleRemoveSet = () => {
+    if (currentSets.length <= 1) return;
+    const updatedSets = currentSets.slice(0, -1);
+    const totalVolume = updatedSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+    onUpdateLog({
+      exerciseName: exercise.name,
+      sets: updatedSets,
+      totalVolume,
+    });
+  };
+
+  const totalVolume = currentSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
 
   return (
     <div
@@ -164,6 +205,72 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
               🔥 "{exercise.notes}"
             </p>
           )}
+
+          {/* Weight Tracking Inline Form */}
+          {isChecked && hasEquipment && (
+            <div className="mt-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/15 animate-fade-in">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Weight className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Tracking Tạ</span>
+                </div>
+                {totalVolume > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    Vol: {totalVolume.toLocaleString()} kg
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                {/* Header */}
+                <div className="grid grid-cols-[32px_1fr_1fr] gap-2 text-[10px] text-gray-500 font-bold uppercase px-1">
+                  <span>Set</span>
+                  <span>Kg</span>
+                  <span>Reps</span>
+                </div>
+
+                {currentSets.map((set, idx) => (
+                  <div key={idx} className="grid grid-cols-[32px_1fr_1fr] gap-2 items-center">
+                    <span className="text-[11px] font-bold text-gray-400 text-center">{idx + 1}</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={set.weight || ''}
+                      onChange={(e) => handleSetChange(idx, 'weight', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={set.reps || ''}
+                      onChange={(e) => handleSetChange(idx, 'reps', parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Add/Remove Set Buttons */}
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={handleAddSet}
+                  className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-[10px] font-bold transition-all active:scale-95"
+                >
+                  <Plus className="w-3 h-3" /> Thêm Set
+                </button>
+                {currentSets.length > 1 && (
+                  <button
+                    onClick={handleRemoveSet}
+                    className="flex items-center justify-center gap-1 px-3 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-[10px] font-bold transition-all active:scale-95"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -180,6 +287,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const [isTimerOpen, setIsTimerOpen] = useState(false);
   const [timerDuration, setTimerDuration] = useState(120); // Default rest
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
+  const [exerciseLogs, setExerciseLogs] = useState<Record<string, ExerciseLog>>({});
 
 
 
@@ -218,6 +326,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
         if (savedProgress.planDate === plan.date) {
           setCheckedState(savedProgress.checkedState || {});
           setUserNote(savedProgress.userNote || '');
+          setExerciseLogs(savedProgress.exerciseLogs || {});
           return; // Found local progress, skip Supabase fallback
         }
       } catch (e) {
@@ -229,6 +338,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     if (plan.workoutProgress?.checkedState) {
       setCheckedState(plan.workoutProgress.checkedState);
       setUserNote(plan.workoutProgress.userNote || '');
+      setExerciseLogs(plan.workoutProgress.exerciseLogs || {});
       console.log('[PlanDisplay] Restored progress from Supabase');
     }
   }, [plan.date]);
@@ -240,6 +350,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
         planDate: plan.date,
         checkedState,
         userNote,
+        exerciseLogs,
         lastUpdated: Date.now()
       };
       // Save locally for offline fallback
@@ -248,14 +359,18 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
       // Sync to Supabase via onUpdatePlan (debounced in App.tsx)
       // Only sync if there are actual checked items to avoid initial empty state overwrite
       if (Object.keys(checkedState).length > 0) {
-        const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote } };
+        const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote, exerciseLogs } };
         onUpdatePlan(updatedPlan);
       }
     }
-  }, [checkedState, userNote, plan.date, isCompleted]);
+  }, [checkedState, userNote, exerciseLogs, plan.date, isCompleted]);
 
   const handleToggle = (key: string) => {
     setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleUpdateExerciseLog = (key: string, log: ExerciseLog) => {
+    setExerciseLogs(prev => ({ ...prev, [key]: log }));
   };
 
   const handleOpenYouTube = (exerciseName: string) => {
@@ -307,12 +422,19 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     };
 
 
+    // Collect exercise logs for completed exercises only
+    const completedLogs: ExerciseLog[] = (Object.entries(exerciseLogs) as [string, ExerciseLog][])
+      .filter(([key]) => checkedState[key])
+      .map(([, log]) => log)
+      .filter(log => log.sets.some(s => s.weight > 0 || s.reps > 0)); // only include logs with data
+
     onComplete(
       currentWorkout.levelName,
       plan.workout.summary,
       completedExercisesList,
       userNote,
-      finalNutrition
+      finalNutrition,
+      completedLogs.length > 0 ? completedLogs : undefined
     );
   };
 
@@ -368,6 +490,8 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
                 onToggle={() => handleToggle(key)}
                 onPreview={() => handleOpenYouTube(ex.name)}
                 onStartTimer={() => handleStartTimer(ex.name)}
+                exerciseLog={exerciseLogs[key]}
+                onUpdateLog={(log) => handleUpdateExerciseLog(key, log)}
               />
             );
           })

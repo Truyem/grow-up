@@ -473,9 +473,17 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   const model = MODELS.WORKOUT;
 
   // Determine Day Number (1-7)
-  const today = new Date();
-  const dayIndex = today.getDay(); // 0 is Sunday, 1 is Monday...
-  const currentDayNumber = dayIndex === 0 ? 7 : dayIndex;
+  // Determine Day Number based on completed workouts this week (Mon-Sun)
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  const currentDay = startOfWeek.getDay() || 7; // Mon=1, ... Sun=7
+  startOfWeek.setDate(now.getDate() - currentDay + 1);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Filter history for workouts completed on or after startOfWeek
+  const workoutsThisWeek = history.filter(h => h.timestamp >= startOfWeek.getTime()).length;
+  // Current day is (workouts completed + 1). If 0 completed, it's Day 1.
+  const currentDayNumber = (workoutsThisWeek % 7) + 1;
   const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
   const currentSplitName = dayNames[currentDayNumber];
 
