@@ -1,17 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { DailyPlan, Meal, Ingredient } from '../types';
+import { DailyPlan, Meal } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { Utensils, RefreshCw, Check, CheckCircle2, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
+
 
 interface NutritionDisplayProps {
     plan: DailyPlan;
     onReset: (type: 'workout' | 'nutrition') => void;
     onUpdatePlan: (plan: DailyPlan) => void;
-    onAddSuggestedIngredient?: (ingredient: Ingredient) => void;
+
     onCompleteNutrition?: (nutrition: DailyPlan['nutrition']) => void;
+    userId: string;
 }
 
 // --- MICRO COMPONENTS ---
@@ -507,13 +509,14 @@ const LocketCameraModal: React.FC<{
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onAddSuggestedIngredient, onCompleteNutrition }) => {
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onCompleteNutrition, userId }) => {
     // Consumed state is now persisted in meal.consumed via onUpdatePlan
 
     // State for modal
     const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [showCamera, setShowCamera] = useState(false);
+
 
     // State for manual food input
     const [showManualInput, setShowManualInput] = useState(false);
@@ -664,250 +667,202 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             ) : (
                 <>
                     {/* Header Section */}
-                    <div className="text-center space-y-2">
-                        <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
-                            Dinh Dưỡng Hôm Nay
-                        </h2>
-                        <p className="text-gray-400 text-sm">
-                            Theo dõi lượng Macro đã tiêu thụ của bạn
-                        </p>
+                    <div className="text-center space-y-4">
+                        <>
+                            <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                                Dinh Dưỡng Hôm Nay
+                            </h2>
+                            <p className="text-gray-400 text-sm">
+                                Theo dõi lượng Macro đã tiêu thụ của bạn
+                            </p>
+                        </>
                     </div>
 
-                    {/* Food Action Buttons */}
-                    <div className="flex flex-col gap-3">
-                        <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
-                            {/* Camera Button */}
-                            <button
-                                id="tour-nutri-camera"
-                                onClick={() => setShowCamera(true)}
-                                disabled={isScanning}
-                                className="group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all"
-                            >
-                                <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className={`p-3 rounded-xl bg-emerald-500/20 text-emerald-400 ${isScanning ? 'animate-spin' : ''}`}>
-                                    {isScanning ? <Loader2 className="w-6 h-6" /> : <Camera className="w-6 h-6" />}
-                                </div>
-                                <div className="text-center relative z-10">
-                                    <div className="font-bold text-emerald-300">Chụp Ảnh</div>
-                                    <div className="text-xs text-emerald-400/60">Quét món ăn</div>
-                                </div>
-                            </button>
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Food Action Buttons */}
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
+                                {/* Camera Button */}
+                                <button
+                                    id="tour-nutri-camera"
+                                    onClick={() => setShowCamera(true)}
+                                    disabled={isScanning}
+                                    className="group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all"
+                                >
+                                    <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className={`p-3 rounded-xl bg-emerald-500/20 text-emerald-400 ${isScanning ? 'animate-spin' : ''}`}>
+                                        {isScanning ? <Loader2 className="w-6 h-6" /> : <Camera className="w-6 h-6" />}
+                                    </div>
+                                    <div className="text-center relative z-10">
+                                        <div className="font-bold text-emerald-300">Chụp Ảnh</div>
+                                        <div className="text-xs text-emerald-400/60">Quét món ăn</div>
+                                    </div>
+                                </button>
 
-                            {/* Manual Input Button */}
-                            <button
-                                id="tour-nutri-manual"
-                                onClick={() => setShowManualInput(!showManualInput)}
-                                className={`group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 border ${showManualInput ? 'border-amber-400' : 'border-amber-500/30'} rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all`}
-                            >
-                                <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400">
-                                    <Utensils className="w-6 h-6" />
-                                </div>
-                                <div className="text-center relative z-10">
-                                    <div className="font-bold text-amber-300">Nhập Tay</div>
-                                    <div className="text-xs text-amber-400/60">Gõ tên món</div>
-                                </div>
-                            </button>
-                        </div>
-
-                        {/* Manual Food Input Form */}
-                        {showManualInput && (
-                            <div className="max-w-lg mx-auto w-full animate-fade-in">
-                                <div className="flex gap-2 p-3 bg-white/5 border border-amber-500/30 rounded-2xl backdrop-blur-md">
-                                    <input
-                                        type="text"
-                                        value={manualFoodText}
-                                        onChange={(e) => setManualFoodText(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleManualFoodAnalysis()}
-                                        placeholder="VD: 1 tô phở bò, 2 quả trứng chiên..."
-                                        className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 outline-none"
-                                        autoFocus
-                                    />
-                                    <button
-                                        onClick={handleManualFoodAnalysis}
-                                        disabled={isAnalyzingManual || !manualFoodText.trim()}
-                                        className="px-4 py-2 bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-                                    >
-                                        {isAnalyzingManual ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                <span>Đang tính...</span>
-                                            </>
-                                        ) : (
-                                            <span>+ Thêm</span>
-                                        )}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1 text-center">
-                                    AI sẽ tự động tính calo & macros cho món ăn của bạn
-                                </p>
+                                {/* Manual Input Button */}
+                                <button
+                                    id="tour-nutri-manual"
+                                    onClick={() => setShowManualInput(!showManualInput)}
+                                    className={`group relative flex flex-col items-center gap-2 px-4 py-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 border ${showManualInput ? 'border-amber-400' : 'border-amber-500/30'} rounded-2xl overflow-hidden hover:scale-105 active:scale-95 transition-all`}
+                                >
+                                    <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400">
+                                        <Utensils className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-center relative z-10">
+                                        <div className="font-bold text-amber-300">Nhập Tay</div>
+                                        <div className="text-xs text-amber-400/60">Gõ tên món</div>
+                                    </div>
+                                </button>
                             </div>
-                        )}
-                    </div>
 
-                    {/* Macro Visualization Ring Section */}
-                    <div id="tour-nutri-macros" className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-
-                        <div className="relative z-10 grid grid-cols-2 gap-8 md:gap-12 justify-items-center">
-                            <CircularProgress
-                                value={consumed.calories}
-                                max={plan.nutrition.totalCalories}
-                                color="#ef4444" // Red for Calories/Energy
-                                label="Calories"
-                                unit="kcal"
-                                icon={<Flame className="w-5 h-5 text-red-400" />}
-                            />
-                            <CircularProgress
-                                value={consumed.protein}
-                                max={plan.nutrition.totalProtein}
-                                color="#3b82f6" // Blue for Protein
-                                label="Protein"
-                                unit="g"
-                                icon={<Beef className="w-5 h-5 text-blue-400" />}
-                            />
-                            <CircularProgress
-                                value={consumed.carbs}
-                                max={plan.nutrition.totalCarbs || 0}
-                                color="#f59e0b" // Orange for Carbs
-                                label="Carbs"
-                                unit="g"
-                                icon={<Wheat className="w-5 h-5 text-orange-400" />}
-                            />
-                            <CircularProgress
-                                value={consumed.fat}
-                                max={plan.nutrition.totalFat || 0}
-                                color="#eab308" // Yellow for Fat
-                                label="Fat"
-                                unit="g"
-                                icon={<Droplets className="w-5 h-5 text-yellow-400" />}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Plan Details & Meals */}
-                    <div id="tour-nutri-meals" className="space-y-4">
-                        <div className="flex items-center justify-between px-2">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Utensils className="w-5 h-5 text-emerald-400" />
-                                Thực Đơn
-                            </h3>
-                            <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                                {plan.nutrition.meals.filter(m => m.consumed).length}/{plan.nutrition.meals.length} Hoàn thành
-                            </div>
+                            {/* Manual Food Input Form */}
+                            {showManualInput && (
+                                <div className="max-w-lg mx-auto w-full animate-fade-in">
+                                    <div className="flex gap-2 p-3 bg-white/5 border border-amber-500/30 rounded-2xl backdrop-blur-md">
+                                        <input
+                                            type="text"
+                                            value={manualFoodText}
+                                            onChange={(e) => setManualFoodText(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleManualFoodAnalysis()}
+                                            placeholder="VD: 1 tô phở bò, 2 quả trứng chiên..."
+                                            className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 outline-none"
+                                            autoFocus
+                                        />
+                                        <button
+                                            onClick={handleManualFoodAnalysis}
+                                            disabled={isAnalyzingManual || !manualFoodText.trim()}
+                                            className="px-4 py-2 bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                                        >
+                                            {isAnalyzingManual ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    <span>Đang tính...</span>
+                                                </>
+                                            ) : (
+                                                <span>+ Thêm</span>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1 text-center">
+                                        AI sẽ tự động tính calo & macros cho món ăn của bạn
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="grid gap-3">
-                            {plan.nutrition.meals.map((meal, index) => (
-                                <MealItem
-                                    key={index}
-                                    meal={meal}
-                                    isConsumed={!!meal.consumed}
-                                    onToggle={(e) => {
-                                        e.stopPropagation();
-                                        toggleMeal(meal.name);
-                                    }}
-                                    onClick={() => setSelectedMeal(meal)}
-                                    canDelete={canDeleteMeal(meal.name)}
-                                    onDelete={(e) => {
-                                        e.stopPropagation();
-                                        deleteMeal(meal.name);
-                                    }}
+                        {/* Macro Visualization Ring Section */}
+                        <div id="tour-nutri-macros" className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+
+                            <div className="relative z-10 grid grid-cols-2 gap-8 md:gap-12 justify-items-center">
+                                <CircularProgress
+                                    value={consumed.calories}
+                                    max={plan.nutrition.totalCalories}
+                                    color="#ef4444" // Red for Calories/Energy
+                                    label="Calories"
+                                    unit="kcal"
+                                    icon={<Flame className="w-5 h-5 text-red-400" />}
                                 />
-                            ))}
+                                <CircularProgress
+                                    value={consumed.protein}
+                                    max={plan.nutrition.totalProtein}
+                                    color="#3b82f6" // Blue for Protein
+                                    label="Protein"
+                                    unit="g"
+                                    icon={<Beef className="w-5 h-5 text-blue-400" />}
+                                />
+                                <CircularProgress
+                                    value={consumed.carbs}
+                                    max={plan.nutrition.totalCarbs || 0}
+                                    color="#f59e0b" // Orange for Carbs
+                                    label="Carbs"
+                                    unit="g"
+                                    icon={<Wheat className="w-5 h-5 text-orange-400" />}
+                                />
+                                <CircularProgress
+                                    value={consumed.fat}
+                                    max={plan.nutrition.totalFat || 0}
+                                    color="#eab308" // Yellow for Fat
+                                    label="Fat"
+                                    unit="g"
+                                    icon={<Droplets className="w-5 h-5 text-yellow-400" />}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Suggested Food Items Section */}
-                    {plan.nutrition.suggestedIngredients && plan.nutrition.suggestedIngredients.length > 0 && onAddSuggestedIngredient && (
-                        <div className="space-y-4 pt-6 border-t border-white/5">
+                        {/* Plan Details & Meals */}
+                        <div id="tour-nutri-meals" className="space-y-4">
                             <div className="flex items-center justify-between px-2">
                                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <Zap className="w-5 h-5 text-amber-400" />
-                                    Gợi Ý Thêm Nguyên Liệu
+                                    <Utensils className="w-5 h-5 text-emerald-400" />
+                                    Thực Đơn
                                 </h3>
-                                <div className="text-xs text-gray-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                                    AI Suggest
+                                <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                    {plan.nutrition.meals.filter(m => m.consumed).length}/{plan.nutrition.meals.length} Hoàn thành
                                 </div>
                             </div>
 
-                            <p className="text-xs text-gray-400 px-2">
-                                Dựa trên mục tiêu dinh dưỡng, AI gợi ý thêm các nguyên liệu sau để bù đắp macros còn thiếu:
-                            </p>
-
-                            <div className="grid gap-2">
-                                {plan.nutrition.suggestedIngredients.map((ingredient, index) => (
-                                    <div
-                                        key={ingredient.id || index}
-                                        className="group relative overflow-hidden p-3 rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5 hover:from-amber-500/10 hover:to-orange-500/10 transition-all duration-300"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                                    {ingredient.category === 'protein' && <Beef className="w-5 h-5 text-red-400" />}
-                                                    {ingredient.category === 'carb' && <Wheat className="w-5 h-5 text-orange-400" />}
-                                                    {ingredient.category === 'fat' && <Droplets className="w-5 h-5 text-yellow-400" />}
-                                                    {ingredient.category === 'veg' && <Utensils className="w-5 h-5 text-emerald-400" />}
-                                                    {(!ingredient.category || ingredient.category === 'other') && <Utensils className="w-5 h-5 text-gray-400" />}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-white">{ingredient.name}</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-amber-400">{ingredient.quantity} {ingredient.unit}</span>
-                                                        {(ingredient as any).reason && (
-                                                            <span className="text-xs text-gray-500">• {(ingredient as any).reason}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => onAddSuggestedIngredient(ingredient)}
-                                                className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-medium hover:bg-amber-500/30 transition-all active:scale-95 border border-amber-500/30"
-                                            >
-                                                + Thêm
-                                            </button>
-                                        </div>
-                                    </div>
+                            <div className="grid gap-3">
+                                {plan.nutrition.meals.map((meal, index) => (
+                                    <MealItem
+                                        key={index}
+                                        meal={meal}
+                                        isConsumed={!!meal.consumed}
+                                        onToggle={(e) => {
+                                            e.stopPropagation();
+                                            toggleMeal(meal.name);
+                                        }}
+                                        onClick={() => setSelectedMeal(meal)}
+                                        canDelete={canDeleteMeal(meal.name)}
+                                        onDelete={(e) => {
+                                            e.stopPropagation();
+                                            deleteMeal(meal.name);
+                                        }}
+                                    />
                                 ))}
                             </div>
                         </div>
-                    )}
 
-                    {/* Footer Actions */}
-                    <div className="text-center pt-8 border-t border-white/5 space-y-4">
-                        <p className="text-xs text-gray-500 mb-4 italic">
-                            *Mẹo: Chạm vào món ăn để xem chi tiết
-                        </p>
+                        {/* Suggested Food Items Section Removed */}
 
-                        {/* Complete Nutrition Button */}
-                        {onCompleteNutrition && (
+                        {/* Footer Actions */}
+                        <div className="text-center pt-8 border-t border-white/5 space-y-4">
+                            <p className="text-xs text-gray-500 mb-4 italic">
+                                *Mẹo: Chạm vào món ăn để xem chi tiết
+                            </p>
+
+                            {/* Complete Nutrition Button */}
+                            {onCompleteNutrition && (
+                                <button
+                                    onClick={() => onCompleteNutrition(plan.nutrition)}
+                                    className="group relative w-full max-w-xs mx-auto px-8 py-4 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-emerald-600 to-cyan-600 shadow-lg shadow-emerald-500/25"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-0 group-hover:opacity-30 transition-opacity" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
+                                    <div className="relative flex items-center justify-center gap-3 text-white">
+                                        <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                        <span className="font-bold text-base">Hoàn Thành Thực Đơn</span>
+                                    </div>
+                                </button>
+                            )}
+
                             <button
-                                onClick={() => onCompleteNutrition(plan.nutrition)}
-                                className="group relative w-full max-w-xs mx-auto px-8 py-4 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-emerald-600 to-cyan-600 shadow-lg shadow-emerald-500/25"
+                                id="tour-nutri-reset"
+                                onClick={() => onReset('nutrition')}
+                                className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
                             >
-                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-0 group-hover:opacity-30 transition-opacity" />
-                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
-                                <div className="relative flex items-center justify-center gap-3 text-white">
-                                    <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                    <span className="font-bold text-base">Hoàn Thành Thực Đơn</span>
+                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
+                                    <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                                    <span className="font-medium">Tạo Kế Hoạch Mới</span>
                                 </div>
                             </button>
-                        )}
-
-                        <button
-                            id="tour-nutri-reset"
-                            onClick={() => onReset('nutrition')}
-                            className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
-                                <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                                <span className="font-medium">Tạo Kế Hoạch Mới</span>
-                            </div>
-                        </button>
+                        </div>
                     </div>
                 </>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };

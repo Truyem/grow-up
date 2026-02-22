@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Dumbbell, Utensils, History, Refrigerator } from 'lucide-react';
+import { Dumbbell, Utensils, History } from 'lucide-react';
 
-export type TabType = 'workout' | 'nutrition' | 'fridge' | 'history' | 'settings';
+export type TabType = 'workout' | 'nutrition' | 'history' | 'settings';
 
 interface PlanTabsProps {
     activeTab: TabType;
@@ -46,34 +46,18 @@ export const PlanTabs: React.FC<PlanTabsProps> = ({ activeTab, onTabChange, clas
             </button>
 
             <button
-                onClick={() => onTabChange('fridge')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all duration-300 relative overflow-hidden cursor-pointer ${activeTab === 'fridge'
+                onClick={() => onTabChange('schedule')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all duration-300 relative overflow-hidden cursor-pointer ${activeTab === 'schedule'
                     ? 'text-white shadow-lg'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                     }`}
             >
-                {activeTab === 'fridge' && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-400 animate-fade-in rounded-xl" />
-                )}
-                <span className="relative z-10 flex items-center gap-2 text-sm md:text-base">
-                    <Refrigerator className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'fridge' ? 'fill-white' : ''}`} />
-                    <span className="hidden min-[380px]:inline">Tủ lạnh</span>
-                </span>
-            </button>
-
-            <button
-                onClick={() => onTabChange('history')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all duration-300 relative overflow-hidden cursor-pointer ${activeTab === 'history'
-                    ? 'text-white shadow-lg'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                    }`}
-            >
-                {activeTab === 'history' && (
+                {activeTab === 'schedule' && (
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-violet-600 animate-fade-in rounded-xl" />
                 )}
                 <span className="relative z-10 flex items-center gap-2 text-sm md:text-base">
-                    <History className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'history' ? '' : ''}`} />
-                    <span className="hidden min-[380px]:inline">Lịch sử</span>
+                    <History className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'schedule' ? '' : ''}`} />
+                    <span className="hidden min-[380px]:inline">Lịch trình</span>
                 </span>
             </button>
         </div>

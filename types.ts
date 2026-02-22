@@ -69,24 +69,9 @@ export interface UserInput {
   nutritionGoal: NutritionGoal;
   trainingMode: TrainingMode;
   useCreatine: boolean; // New field
-  useOnlyAvailableIngredients: boolean; // New field
-  allowExtraVeggies: boolean; // New field
   equipment: string[];
-  availableIngredients: Ingredient[];
   consumedFood: string[];
   hasSeenOnboarding?: boolean;
-}
-
-export interface Ingredient {
-  id: string;
-  user_id?: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  category?: 'protein' | 'carb' | 'fat' | 'veg' | 'spice' | 'other';
-  expiryDate?: string;
-  caloriesPer100g?: number;
-  notes?: string;
 }
 
 export interface Expense {
@@ -164,14 +149,13 @@ export interface DailyPlan {
     totalProtein: number;
     totalCarbs: number;
     totalFat: number;
-    consumedIngredients?: { name: string, quantity: number, unit: string }[];
     meals: Meal[];
     advice: string;
     isGenerated?: boolean; // New flag
-    suggestedIngredients?: Ingredient[]; // Gợi ý thức ăn bổ sung từ AI
   };
   workoutProgress?: {
     checkedState: Record<string, boolean>;
+    scheduleState?: Record<string, boolean>; // New field for schedule progress
     userNote?: string;
     exerciseLogs?: Record<string, ExerciseLog>; // key = exercise key (e.g. "mor-0")
   };
@@ -193,11 +177,11 @@ export interface WorkoutHistoryItem {
     totalProtein: number;
     totalCarbs?: number; // Optional for backward compatibility
     totalFat?: number;   // Optional for backward compatibility
-    consumedIngredients?: { name: string, quantity: number, unit: string }[];
     meals: Meal[];
 
   };
   weight?: number; // Recorded weight for that day
+  completedSchedule?: string[]; // Track the text of the completed schedule goals
 }
 
 // AI Overview - Insights from Gemini AI about workout progress

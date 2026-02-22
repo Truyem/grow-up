@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, Ingredient } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
 const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
@@ -737,18 +737,6 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
           totalProtein: { type: Type.NUMBER },
           totalCarbs: { type: Type.NUMBER },
           totalFat: { type: Type.NUMBER },
-          consumedIngredients: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                name: { type: Type.STRING },
-                quantity: { type: Type.NUMBER },
-                unit: { type: Type.STRING }
-              }
-            }
-          },
           advice: { type: Type.STRING },
 
           meals: {
@@ -774,29 +762,14 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
     ACT AS A NUTRITIONIST.
     GENERATE A 1-DAY MEAL PLAN.
     
-    ### INVENTORY & INGREDIENT RULES
-    - **AVAILABLE INGREDIENTS**: ${JSON.stringify(userData.availableIngredients.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })))}.
-    - **STRICT MODE**: ${userData.useOnlyAvailableIngredients ? "YES (MANDATORY)" : "NO"}.
-    - **RULE if STRICT MODE is YES**: You MUST ONLY usage ingredients listed above. Do NOT suggest rice, bread, or staples if they are not in the list.
-    - **EXTRA VEGETABLES RULE**: ${userData.allowExtraVeggies ? "ALLOWED (Add common healthy vegetables if needed)" : "FORBIDDEN (Only usage what's in the list)"}.
-    - **RULE if STRICT MODE is NO**: Prioritize using available items but you can add missing essentials.
-
     ### NUTRITION RULES (DYNAMIC MATH)
     - **CALCULATED TARGET**: ${Math.round(target)} kcal.
     - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
     - **GOAL**: ${goalText}.
-    - **VEGETABLES**: Prioritize: ${userData.availableIngredients.filter(i => i.category === 'veg').map(i => i.name).join(', ')}.
     - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
     - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
     - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
     - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
-    - **INVENTORY DEDUCTION**:
-      - You MUST return a 'consumedIngredients' list.
-      - Map the meals back to the user's available ingredients: ${JSON.stringify(userData.availableIngredients.map(i => ({ id: i.id, name: i.name, unit: i.unit })))}.
-      - **CRITICAL**: Return the exact 'id' of the ingredient used.
-      - Estimate how much of each available ingredient was used.
-      - If an available item was NOT used, do not include it.
-      - Example: Return [{"id": "123", "name": "Chicken", "quantity": 0.2, "unit": "kg"}]
  
 
     ### DATA INPUTS
@@ -850,33 +823,7 @@ export const generateDailyPlan = async (
       if (generationType === 'nutrition' || generationType === 'both') {
         nutritionPart = await generateNutritionPart(userData, apiKey);
 
-        // Automatically suggest additional food items based on remaining macros
-        try {
-          const { target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
-          const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0;
-          const proteinTarget = Math.round(userData.weight * proteinMultiplier);
-          const fatTarget = Math.round(userData.weight * 0.9);
-          const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
-          const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
 
-          const targetMacros = {
-            calories: target,
-            protein: proteinTarget,
-            carbs: carbTarget,
-            fat: fatTarget
-          };
-
-          const meals = nutritionPart?.nutrition?.meals || [];
-          const suggestions = await suggestFoodItems(userData, meals, targetMacros);
-
-          if (suggestions && suggestions.length > 0) {
-            nutritionPart.nutrition.suggestedIngredients = suggestions;
-            console.log(`✅ Added ${suggestions.length} food suggestions`);
-          }
-        } catch (suggestError) {
-          console.warn("Could not generate food suggestions:", suggestError);
-          // Continue without suggestions - not critical
-        }
       }
 
       // ... (rest of success logic)
@@ -1073,66 +1020,6 @@ OUTPUT: JSON format.
   return getFallbackAIOverview(history);
 };
 
-// --- FRIDGE ARGUMENT PARSING ---
-
-export const parseFridgeItems = async (text: string): Promise<{ id: string, name: string, quantity: number, unit: string }[]> => {
-  const apiKey = getCurrentApiKey();
-  if (!apiKey || !text.trim()) {
-    console.warn("No API Key or empty text for fridge parsing");
-    return [];
-  }
-
-  let ai = new GoogleGenAI({ apiKey });
-  let retriesLeft = API_KEYS.length;
-  const model = MODELS.FOOD_SCAN;
-
-  // Gemma-3-27b-it does not support JSON mode, so we remove responseSchema/responseMimeType
-  // and rely on the prompt and manual parsing.
-
-  const prompt = `
-    ROLE: Data Parser specific to cooking ingredients.
-    INPUT: "${text}"
-    TASK: Parse the input string into a structured JSON array of ingredients.
-    RULES:
-    - Translate ingredient names to standard Vietnamese (e.g., "ức gà", "trứng", "gạo").
-    - Extract approximate quantity and unit. If not specified, estimate reasonable default (e.g. 1 unit, 100g).
-    - Assign a category (protein, carb, fat, veg, spice, other).
-    - generate a random short ID for each item.
-    - If input contains multiple items (e.g., "500g chicken and 10 eggs"), split them.
-    
-    OUTPUT FORMAT:
-    Return ONLY a valid JSON Array. Do not include markdown formatting (like \`\`\`json).
-    Example:
-    [{"id":"1","name":"Trứng","quantity":10,"unit":"quả","category":"protein"}]
-  `;
-
-  while (retriesLeft > 0) {
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        // Config removed to avoid "JSON mode not enabled" error
-      });
-
-      let jsonText = response.text;
-      if (!jsonText) throw new Error("Empty response");
-
-      return cleanAndParseJSON(jsonText, "FridgeParse");
-    } catch (error) {
-      console.error("Fridge Parse Error:", error);
-      if (isRateLimitError(error) && retriesLeft > 1) {
-        const newKey = markRateLimitedAndRotate();
-        if (newKey) {
-          ai = new GoogleGenAI({ apiKey: newKey });
-          retriesLeft--;
-          continue;
-        }
-      }
-      return [];
-    }
-  }
-  return [];
-};
 
 
 // --- SINGLE EXERCISE SUGGESTION ---
@@ -1422,119 +1309,4 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
   }
 };
 
-// --- SUGGEST FOOD ITEMS ---
-// Gợi ý thức ăn bổ sung khi tạo nutrition plan
-export const suggestFoodItems = async (
-  userData: UserInput,
-  currentMeals: Meal[],
-  targetMacros: { calories: number; protein: number; carbs: number; fat: number }
-): Promise<Ingredient[]> => {
-  const apiKey = getCurrentApiKey();
-  if (!apiKey) {
-    console.warn("No API Key for food suggestion");
-    return [];
-  }
 
-  let ai = new GoogleGenAI({ apiKey });
-  let retriesLeft = API_KEYS.length;
-  const model = MODELS.FOOD_SUGGEST;
-
-  // Calculate current macros from meals
-  const currentMacros = currentMeals.reduce(
-    (acc, meal) => ({
-      calories: acc.calories + (meal.calories || 0),
-      protein: acc.protein + (meal.protein || 0),
-      carbs: acc.carbs + (meal.carbs || 0),
-      fat: acc.fat + (meal.fat || 0),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-  // Calculate remaining macros needed
-  const remainingMacros = {
-    calories: Math.max(0, targetMacros.calories - currentMacros.calories),
-    protein: Math.max(0, targetMacros.protein - currentMacros.protein),
-    carbs: Math.max(0, targetMacros.carbs - currentMacros.carbs),
-    fat: Math.max(0, targetMacros.fat - currentMacros.fat),
-  };
-
-  const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
-  const existingIngredients = userData.availableIngredients.map(i => i.name).join(', ');
-
-  const schema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        id: { type: Type.STRING },
-        name: { type: Type.STRING },
-        quantity: { type: Type.NUMBER },
-        unit: { type: Type.STRING },
-        category: { type: Type.STRING },
-        reason: { type: Type.STRING }, // Lý do gợi ý
-      }
-    }
-  };
-
-  const prompt = `
-    ACT AS A NUTRITIONIST.
-    SUGGEST 3-5 FOOD ITEMS to help user reach their nutrition goals.
-
-    ### USER CONTEXT
-    - Goal: ${goalText}
-    - Current Weight: ${userData.weight}kg
-    - Available Ingredients: ${existingIngredients || "Không có"}
-    
-    ### MACROS ANALYSIS
-    - Target: ${targetMacros.calories} kcal, ${targetMacros.protein}g Protein, ${targetMacros.carbs}g Carbs, ${targetMacros.fat}g Fat
-    - Current (from meals): ${currentMacros.calories} kcal, ${currentMacros.protein}g Protein, ${currentMacros.carbs}g Carbs, ${currentMacros.fat}g Fat
-    - REMAINING NEEDED: ${remainingMacros.calories} kcal, ${remainingMacros.protein}g Protein, ${remainingMacros.carbs}g Carbs, ${remainingMacros.fat}g Fat
-
-    ### TASK
-    Suggest 3-5 food items that:
-    1. Help fill the REMAINING macros gap
-    2. Are practical and easy to find in Vietnam
-    3. Are NOT already in the available ingredients list
-    4. Match the user's goal (high protein for bulking, low calorie density for cutting)
-
-    ### OUTPUT FORMAT
-    Return JSON Array of ingredients. Each item must have:
-    - id: Random short string
-    - name: Vietnamese food name (e.g., "Ức gà", "Trứng", "Cơm gạo lứt")
-    - quantity: Suggested quantity (number)
-    - unit: Unit (e.g., "g", "quả", "hộp")
-    - category: One of "protein", "carb", "fat", "veg", "other"
-    - reason: SHORT Vietnamese explanation why this food is suggested (max 10 words)
-
-    RESPOND ONLY WITH JSON ARRAY. NO MARKDOWN.
-  `;
-
-  while (retriesLeft > 0) {
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: schema },
-      });
-
-      const jsonText = response.text;
-      if (!jsonText) throw new Error("Empty suggestion response");
-
-      const suggestions = cleanAndParseJSON(jsonText, "FoodSuggest");
-      console.log("Food Suggestions:", suggestions);
-      return suggestions;
-    } catch (error) {
-      console.error("Food Suggest Error:", error);
-      if (isRateLimitError(error) && retriesLeft > 1) {
-        const newKey = markRateLimitedAndRotate();
-        if (newKey) {
-          ai = new GoogleGenAI({ apiKey: newKey });
-          retriesLeft--;
-          continue;
-        }
-      }
-      return [];
-    }
-  }
-  return [];
-};

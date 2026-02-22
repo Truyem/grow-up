@@ -13,16 +13,58 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Ingredient, Exercise, ExerciseLog } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Exercise, ExerciseLog } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
-import { FridgeView } from './components/FridgeView';
+import { ScheduleView } from './components/ScheduleView';
+
 import { AuthPage } from './components/AuthPage';
 import { AccountSettings } from './components/AccountSettings';
-// import { UserGuide } from './components/UserGuide'; // REPLACED WITH TOUR
+import { UserGuide } from './components/UserGuide';
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
+
+
+const SCHEDULE_LABELS: Record<string, string> = {
+  'smor-0': 'Thức dậy',
+  'smor-1': 'Vệ sinh cá nhân',
+  'smor-2': 'Chuẩn bị ăn sáng',
+  'smor-3': 'Ăn sáng',
+  'smor-4': 'Đến phòng tập',
+  'smor-5': 'Tập luyện chính',
+  'smor-6': 'Về nhà',
+  'smor-7': 'Mua đồ ăn trưa',
+  'smor-8': 'Chuẩn bị đồ ăn',
+  'smor-9': 'Nấu ăn',
+  'smor-10': 'Ăn trưa',
+  'smor-11': 'Rửa bát, nghỉ ngơi',
+  'smor-12': 'Đến trường',
+  'saft-0': 'Về nhà rèn luyện',
+  'saft-1': 'Ngủ trưa',
+  'saft-2': 'Chuẩn bị bữa tối',
+  'saft-3': 'Bật nóng lạnh, cắm cơm',
+  'saft-4': 'Nấu ăn',
+  'saft-5': 'Ăn cơm',
+  'saft-6': 'Tắm rửa',
+  'saft-7': 'Giặt quần áo',
+  'saft-8': 'Ôn bài',
+  'saft-9': 'Tập Isolation (Nhẹ)',
+  'saft-10': 'Giải trí & Thực phẩm bổ sung',
+  'saft-11': 'Screen-off',
+  'saft-12': 'Đi ngủ',
+};
+
+const getCompletedScheduleText = (state?: Record<string, boolean>) => {
+  if (!state) return [];
+  const res: string[] = [];
+  Object.entries(state).forEach(([key, isChecked]) => {
+    if (isChecked && SCHEDULE_LABELS[key]) {
+      res.push(SCHEDULE_LABELS[key]);
+    }
+  });
+  return res;
+};
 
 import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -59,10 +101,7 @@ const INITIAL_USER_DATA: UserInput = {
   nutritionGoal: 'bulking',
   trainingMode: 'gym',
   useCreatine: false, // Default false
-  useOnlyAvailableIngredients: false, // New field 
-  allowExtraVeggies: true, // Default to true for health
   equipment: DEFAULT_EQUIPMENT,
-  availableIngredients: [],
   consumedFood: [],
   hasSeenOnboarding: false // Default to false
 };
@@ -73,7 +112,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide' | 'fridge';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide' | 'schedule';
 
 
 // Helper to match the date format used in service
@@ -214,12 +253,7 @@ export default function App() {
         setPlan(null);
       }
     },
-    {
-      targetId: 'tour-nutri-fridge',
-      title: 'Tủ Lạnh Thông Minh ❄️',
-      content: 'Nhập nguyên liệu bạn có sẵn, AI sẽ gợi ý các món ăn phù hợp.',
-      placement: 'bottom'
-    },
+
     {
       targetId: 'tour-nutri-diary',
       title: 'Nhật Ký Ăn Uống 📝',
@@ -457,10 +491,16 @@ export default function App() {
           }
         }
 
-        // 3. Load Workout History
+        // 3. Load Workout History & Schedule Logs
         const { data: logs } = await supabase
           .from('workout_logs')
           .select('id, data, timestamp')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+
+        const { data: scheduleLogs } = await supabase
+          .from('daily_schedules_logs')
+          .select('id, date, timestamp, completed_schedule')
           .eq('user_id', user.id)
           .order('date', { ascending: false });
 
@@ -531,8 +571,40 @@ export default function App() {
             }
           });
 
-          const finalHistory = Array.from(uniqueHistoryMap.values())
-            .sort((a, b) => b.timestamp - a.timestamp);
+          let finalHistory = Array.from(uniqueHistoryMap.values());
+
+          // Merge Schedule Logs into finalHistory
+          if (scheduleLogs) {
+            scheduleLogs.forEach(sLog => {
+              const existingItemIndex = finalHistory.findIndex(h => h.date === sLog.date);
+
+              if (existingItemIndex !== -1) {
+                // Merge completedSchedule into existing workout history item
+                finalHistory[existingItemIndex] = {
+                  ...finalHistory[existingItemIndex],
+                  completedSchedule: Array.from(new Set([
+                    ...(finalHistory[existingItemIndex].completedSchedule || []),
+                    ...(sLog.completed_schedule || [])
+                  ])),
+                  timestamp: Math.max(finalHistory[existingItemIndex].timestamp, sLog.timestamp)
+                };
+              } else {
+                // Create a standalone history item for the schedule if no workout exists for that day
+                finalHistory.push({
+                  date: sLog.date,
+                  timestamp: sLog.timestamp,
+                  levelSelected: 'Chỉ lịch trình',
+                  summary: 'Chỉ lưu lịch trình',
+                  completedExercises: [],
+                  exercisesSummary: 'Không có bài tập',
+                  completedSchedule: sLog.completed_schedule || [],
+                  weight: 0 // Default or try to find previous weight in a real scenario
+                });
+              }
+            });
+          }
+
+          finalHistory = finalHistory.sort((a, b) => b.timestamp - a.timestamp);
           setWorkoutHistory(finalHistory);
         }
 
@@ -590,6 +662,7 @@ export default function App() {
       let completedList: string[] = [];
       let userNoteFromProgress = "";
       let savedTimestamp = Date.now();
+      let scheduleStateObj = {};
 
       // Try to get progress from localStorage (offline fallback) or plan data
       const savedProgressStr = localStorage.getItem('workout_progress');
@@ -610,6 +683,7 @@ export default function App() {
 
             userNoteFromProgress = progress.userNote || "";
             savedTimestamp = progress.lastUpdated || Date.now();
+            scheduleStateObj = progress.scheduleState || {};
           }
         } catch (e) {
           console.error("[AutoSave] Failed to parse progress", e);
@@ -621,10 +695,13 @@ export default function App() {
         ? userNoteFromProgress + " (Tự động lưu do qua ngày)"
         : "(Tự động lưu do qua ngày)";
 
+      const completedSchedule = getCompletedScheduleText(scheduleStateObj);
+
       const newItem: WorkoutHistoryItem = {
         date: cachedPlan.date,
         timestamp: savedTimestamp,
         levelSelected: cachedPlan.workout.detail.levelName,
+        completedSchedule,
         summary: cachedPlan.workout.summary,
         completedExercises: completedList,
         userNotes: finalNote,
@@ -698,20 +775,6 @@ export default function App() {
         console.error("Failed to load user settings", e);
       }
     }
-
-    // 0.1 Load Inventory specific logic (If we separate it or just merge)
-    // For now we persist 'user_settings' which should contain it, but let's double check save logic
-    const savedInventory = localStorage.getItem('user_inventory');
-    if (savedInventory) {
-      try {
-        const parsedInventory = JSON.parse(savedInventory);
-        setUserData(prev => ({ ...prev, availableIngredients: parsedInventory }));
-      } catch (e) {
-        console.error("Failed to load inventory", e);
-      }
-    }
-
-
 
     // 1. Load History (Supabase handled above, but keeping local cache load if not auth? No, strict auth)
     // If not logged in, we shouldn't show data. 
@@ -796,14 +859,11 @@ export default function App() {
   useEffect(() => {
     // Local backup
     localStorage.setItem('user_settings', JSON.stringify(userData));
-    localStorage.setItem('user_inventory', JSON.stringify(userData.availableIngredients));
 
     // Supabase Sync
     if (session?.user) {
       const settingsToSave = {
-        ...userData,
-        // ensure we save inventory too
-        availableIngredients: userData.availableIngredients
+        ...userData
       };
 
       // Debounce this? For now direct save
@@ -831,10 +891,11 @@ export default function App() {
       setViewMode('settings');
       return;
     }
-    if (type === 'fridge') {
-      setViewMode('fridge');
+    if (type === 'schedule') {
+      setViewMode('schedule');
       return;
     }
+
 
     setLoading(true);
 
@@ -877,70 +938,6 @@ export default function App() {
 
     // Switch to the relevant view
     setViewMode(generationType);
-
-    // --- INVENTORY DEDUCTION LOGIC (Only runs if nutrition was generated) ---
-    if (generationType === 'nutrition' && generatedPartial.nutrition?.consumedIngredients && generatedPartial.nutrition.consumedIngredients.length > 0) {
-      const usedItems = generatedPartial.nutrition.consumedIngredients;
-      let updatedIngredients = [...(userData.availableIngredients || [])];
-
-      let deductionLog: string[] = [];
-
-      usedItems.forEach(used => {
-        // 1. Try Match by ID (Most Accurate)
-        let matchIndex = -1;
-        if ((used as any).id) {
-          matchIndex = updatedIngredients.findIndex(inv => inv.id === (used as any).id);
-        }
-
-        // 2. Fallback to Name Matching if ID failed or missing
-        if (matchIndex === -1) {
-          const usedName = used.name.toLowerCase().trim();
-          matchIndex = updatedIngredients.findIndex(inv => {
-            const invName = inv.name.toLowerCase().trim();
-            return invName === usedName || invName.includes(usedName) || usedName.includes(invName);
-          });
-        }
-
-        if (matchIndex !== -1) {
-          const invItem = updatedIngredients[matchIndex];
-          // Simple unit handling - assuming AI tries to match units or we just subtract if units match
-          // If units differ (e.g. kg vs g), this minimal version might struggle without complex conversion lib.
-          // For now, prompt instructs AI to try matching provided units.
-          // If units match, subtract.
-
-          // Basic conversion for g/kg commonly used in food
-          let quantityToDeduct = used.quantity;
-
-          if (used.unit === 'g' && invItem.unit === 'kg') {
-            quantityToDeduct = used.quantity / 1000;
-          } else if (used.unit === 'kg' && invItem.unit === 'g') {
-            quantityToDeduct = used.quantity * 1000;
-          }
-
-          const newQuantity = Math.max(0, invItem.quantity - quantityToDeduct);
-
-          if (newQuantity <= 0) {
-            // Mark for removal or keep at 0? Let's remove if 0
-            deductionLog.push(`Hết: ${invItem.name}`);
-            updatedIngredients[matchIndex] = { ...invItem, quantity: 0 }; // Mark 0 first
-          } else {
-            deductionLog.push(`Dùng ${quantityToDeduct} ${invItem.unit} ${invItem.name}`);
-            updatedIngredients[matchIndex] = { ...invItem, quantity: parseFloat(newQuantity.toFixed(2)) };
-          }
-        }
-      });
-
-      // Filter out 0 items if desired, or keep them to show "Out of stock"
-      // User request implied "5 - 4 = 1", so we update quantity.
-      // Let's filter out items that reached exactly 0 to clean up.
-      const finalIngredients = updatedIngredients.filter(i => i.quantity > 0);
-
-      if (deductionLog.length > 0) {
-        setToastMessage(`Đã trừ kho: ${deductionLog.join(', ')}`);
-        // Update user data with new inventory
-        setUserData(prev => ({ ...prev, availableIngredients: finalIngredients }));
-      }
-    }
 
 
     // Save to local storage cache + Supabase
@@ -1034,31 +1031,7 @@ export default function App() {
     }
   };
 
-  // Handle adding suggested ingredient to fridge
-  const handleAddSuggestedIngredient = (ingredient: Ingredient) => {
-    setUserData(prev => ({
-      ...prev,
-      availableIngredients: [
-        ...(prev.availableIngredients || []),
-        { ...ingredient, id: ingredient.id || Date.now().toString() }
-      ]
-    }));
 
-    // Remove from suggested list in plan
-    if (plan?.nutrition?.suggestedIngredients) {
-      const updatedPlan = { ...plan };
-      updatedPlan.nutrition.suggestedIngredients = updatedPlan.nutrition.suggestedIngredients.filter(
-        i => i.id !== ingredient.id
-      );
-      setPlan(updatedPlan);
-      localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
-      if (session?.user) {
-        debouncedSavePlan(session.user.id, updatedPlan);
-      }
-    }
-
-    setToastMessage(`Đã thêm "${ingredient.name}" vào tủ lạnh!`);
-  };
 
   const handleCompleteWorkout = async (
     levelSelected: string,
@@ -1099,6 +1072,7 @@ export default function App() {
       levelSelected,
       summary,
       completedExercises,
+      completedSchedule: getCompletedScheduleText(plan?.workoutProgress?.scheduleState),
       userNotes: userNotes || "",
       exercisesSummary,
       exerciseLogs: exerciseLogs || undefined,
@@ -1203,7 +1177,8 @@ export default function App() {
         ...existingToday,
         nutrition,
         weight: userData.weight,
-        timestamp: Math.max(existingToday.timestamp, now.getTime()) // Keep latest timestamp
+        timestamp: Math.max(existingToday.timestamp, now.getTime()), // Keep latest timestamp
+        completedSchedule: existingToday.completedSchedule || getCompletedScheduleText(plan?.workoutProgress?.scheduleState)
       };
     } else {
       // Create new entry with only nutrition
@@ -1215,7 +1190,8 @@ export default function App() {
         completedExercises: [],
         exercisesSummary: 'Không có bài tập',
         nutrition,
-        weight: userData.weight
+        weight: userData.weight,
+        completedSchedule: getCompletedScheduleText(plan?.workoutProgress?.scheduleState)
       };
     }
 
@@ -1398,7 +1374,6 @@ export default function App() {
   };
 
 
-
   const handleUpdatePlan = (updatedPlan: DailyPlan) => {
     setPlan(updatedPlan);
     localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
@@ -1406,6 +1381,106 @@ export default function App() {
     // Sync to Supabase (debounced to avoid spamming on rapid toggles)
     if (session?.user) {
       debouncedSavePlan(session.user.id, updatedPlan);
+    }
+  };
+
+  const handleToggleSchedule = (id: string) => {
+    if (!plan) return;
+    const progress = plan.workoutProgress || { checkedState: {} };
+    const scheduleState = progress.scheduleState || {};
+    const newState = { ...scheduleState, [id]: !scheduleState[id] };
+
+    const updatedPlan = {
+      ...plan,
+      workoutProgress: {
+        ...progress,
+        scheduleState: newState
+      }
+    };
+
+    // Optimistic UI update
+    setPlan(updatedPlan);
+
+    // Save to local storage for offline fallback matching PlanDisplay's approach
+    const progressData = {
+      planDate: updatedPlan.date,
+      checkedState: progress.checkedState,
+      scheduleState: newState,
+      userNote: progress.userNote || '',
+      exerciseLogs: progress.exerciseLogs || {},
+      lastUpdated: Date.now()
+    };
+    localStorage.setItem('workout_progress', JSON.stringify(progressData));
+
+    // Save to Supabase (debounced save)
+    if (session?.user) {
+      debouncedSavePlan(session.user.id, updatedPlan);
+    }
+
+    // === Update workoutHistory as well to reflect schedule completion ===
+    const now = new Date();
+    const todayDateStr = getTodayString();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const isSameDay = (ts: number) => {
+      const d = new Date(ts);
+      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return dKey === todayKey;
+    };
+
+    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
+    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
+    const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
+
+    let itemToSave: WorkoutHistoryItem;
+
+    const completedSchedule = getCompletedScheduleText(newState);
+
+    if (existingToday) {
+      itemToSave = {
+        ...existingToday,
+        completedSchedule,
+        timestamp: Math.max(existingToday.timestamp, now.getTime())
+      };
+    } else {
+      itemToSave = {
+        date: todayDateStr,
+        timestamp: now.getTime(),
+        levelSelected: 'Chỉ lịch trình',
+        summary: 'Chỉ lưu lịch trình',
+        completedExercises: [],
+        exercisesSummary: 'Không có bài tập',
+        completedSchedule,
+        weight: userData.weight
+      };
+    }
+
+    const updatedHistory = [itemToSave, ...otherItems];
+    setWorkoutHistory(updatedHistory);
+
+    if (session?.user) {
+      const saveScheduleToSupabase = async () => {
+        const { data: existingData } = await supabase.from('daily_schedules_logs')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('date', todayKey)
+          .maybeSingle();
+
+        if (existingData) {
+          await supabase.from('daily_schedules_logs').update({
+            timestamp: now.getTime(),
+            completed_schedule: completedSchedule
+          }).eq('id', existingData.id);
+        } else {
+          await supabase.from('daily_schedules_logs').insert({
+            user_id: session.user.id,
+            date: todayKey,
+            timestamp: now.getTime(),
+            completed_schedule: completedSchedule
+          });
+        }
+      };
+      saveScheduleToSupabase().catch(console.error);
     }
   };
 
@@ -1467,11 +1542,11 @@ export default function App() {
 
                 <button
                   id="tour-guide"
-                  onClick={() => setIsTourOpen(true)}
+                  onClick={() => setViewMode('history')}
                   className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
                 >
-                  <span className="group-hover:text-cyan-300">Hướng dẫn</span>
-                  <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
+                  <span className="group-hover:text-cyan-300">Lịch sử</span>
+                  <History className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
                 </button>
               </div>
 
@@ -1509,6 +1584,7 @@ export default function App() {
                 <AccountSettings
                   user={session.user}
                   onLogout={() => supabase.auth.signOut()}
+                  onViewGuide={() => setViewMode('guide')}
                 />
               ) : null}
 
@@ -1548,8 +1624,9 @@ export default function App() {
                     plan={plan}
                     onReset={handleReset}
                     onUpdatePlan={handleUpdatePlan}
-                    onAddSuggestedIngredient={handleAddSuggestedIngredient}
+
                     onCompleteNutrition={handleCompleteNutrition}
+                    userId={userData.id}
                   />
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-4">
@@ -1581,16 +1658,18 @@ export default function App() {
                 />
               )}
 
-              {viewMode === 'fridge' && (
-                <FridgeView
-                  userData={userData}
-                  setUserData={setUserData}
+              {viewMode === 'schedule' && (
+                <ScheduleView
+                  scheduleState={plan?.workoutProgress?.scheduleState}
+                  onToggleSchedule={handleToggleSchedule}
                 />
               )}
 
-              {/* {viewMode === 'guide' && (
-                <UserGuide onBackend={() => setViewMode('workout')} />
-              )} */ }
+
+
+              {viewMode === 'guide' && (
+                <UserGuide onBackend={() => setViewMode('settings')} />
+              )}
 
               {/* Onboarding Tour */}
               {isTourOpen && (

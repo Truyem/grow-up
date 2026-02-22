@@ -557,6 +557,24 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                 </div>
               </div>
 
+              {/* SCHEDULE SECTION (FULL WIDTH BELOW) */}
+              {selectedDayItem.completedSchedule && selectedDayItem.completedSchedule.length > 0 && (
+                <div className="bg-black/20 rounded-xl p-2.5 border border-purple-500/10 mt-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-[10px] font-bold text-purple-400 uppercase">Lịch trình đã hoàn thành ({selectedDayItem.completedSchedule.length}/26)</span>
+                  </div>
+                  <ul className="space-y-0.5 mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-2">
+                    {selectedDayItem.completedSchedule.map((text, i) => (
+                      <li key={i} className="text-[11px] text-gray-300 flex items-start gap-1.5">
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-purple-500 flex-shrink-0" />
+                        {text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Weight Tracking Section */}
               {selectedDayItem.exerciseLogs && selectedDayItem.exerciseLogs.length > 0 && (
                 <div className="bg-black/30 rounded-xl p-2.5 border border-blue-500/10 mt-2">

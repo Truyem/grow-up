@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { loadLoginHistory } from '../services/supabasePlanSync';
 import { User } from '@supabase/supabase-js';
-import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, BookOpen } from 'lucide-react';
 import { Toast } from './ui/Toast';
 
 interface LoginRecord {
@@ -18,9 +18,10 @@ interface LoginRecord {
 interface AccountSettingsProps {
     user: User;
     onLogout: () => void;
+    onViewGuide: () => void;
 }
 
-export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout }) => {
+export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout, onViewGuide }) => {
     const [fullName, setFullName] = useState(user.user_metadata?.full_name || '');
     const [currentPassword, setCurrentPassword] = useState('');
     const [password, setPassword] = useState('');
@@ -370,6 +371,21 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Guide Section */}
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <h3 className="text-lg font-bold text-cyan-400 mb-1">Hướng dẫn sử dụng</h3>
+                    <p className="text-sm text-gray-400">Xem lại hướng dẫn cách khởi tạo lịch trình, ăn uống và tập luyện hiệu quả nhất.</p>
+                </div>
+                <button
+                    onClick={onViewGuide}
+                    className="px-6 py-3 shrink-0 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 hover:text-emerald-300 transition-all font-medium flex items-center gap-2"
+                >
+                    <BookOpen className="w-5 h-5" />
+                    <span className="font-semibold">Xem Hướng Dẫn</span>
+                </button>
             </div>
 
             {/* Logout Section */}
