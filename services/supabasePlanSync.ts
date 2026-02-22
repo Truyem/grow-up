@@ -123,7 +123,42 @@ export const recordLoginHistory = async (userId: string) => {
         // Get device info
         const deviceInfo = getDeviceInfo();
 
-        // Get IP + location
+        // Check if an entry for this device already exists
+        const { data: existingRecords, error: fetchError } = await supabase
+            .from('login_history')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('device_info', deviceInfo)
+            .order('last_seen', { ascending: false })
+            .limit(1);
+
+        if (fetchError) {
+            console.warn('[LoginHistory] Fetch error:', fetchError);
+        }
+
+        const now = new Date().toISOString();
+
+        if (existingRecords && existingRecords.length > 0) {
+            // Update the existing record instead of creating a new one
+            const recordId = existingRecords[0].id;
+            const { error: updateError } = await supabase
+                .from('login_history')
+                .update({
+                    login_time: now,
+                    last_seen: now,
+                    is_online: true
+                })
+                .eq('id', recordId);
+
+            if (updateError) {
+                console.error('[LoginHistory] Update error:', updateError);
+            } else {
+                console.log('[LoginHistory] Existing device login updated');
+            }
+            return;
+        }
+
+        // It's a new device, so fetch IP and location
         let ipAddress = 'Unknown';
         let location = 'Unknown';
         try {
@@ -142,15 +177,15 @@ export const recordLoginHistory = async (userId: string) => {
             device_info: deviceInfo,
             location,
             ip_address: ipAddress,
-            login_time: new Date().toISOString(),
+            login_time: now,
             is_online: true,
-            last_seen: new Date().toISOString(),
+            last_seen: now,
         });
 
         if (error) {
             console.error('[LoginHistory] Insert error:', error);
         } else {
-            console.log('[LoginHistory] Login recorded');
+            console.log('[LoginHistory] New device login recorded');
         }
     } catch (err) {
         console.error('[LoginHistory] Unexpected error:', err);
