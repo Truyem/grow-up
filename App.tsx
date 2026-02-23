@@ -22,7 +22,7 @@ import { ScheduleView } from './components/ScheduleView';
 
 import { AuthPage } from './components/AuthPage';
 import { AccountSettings } from './components/AccountSettings';
-import { UserGuide } from './components/UserGuide';
+
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
 
 
@@ -75,7 +75,7 @@ import { subscribeToPush } from './services/pushNotification';
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
 import { generateDailyPlan, getApiStatus, ApiStatus, getBasicNutritionPlan } from './services/geminiService';
-import { Sparkles, History, Dumbbell, Utensils, Settings, BookOpen } from 'lucide-react';
+import { Sparkles, History, Dumbbell, Utensils, Settings } from 'lucide-react';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
 
@@ -113,7 +113,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'guide' | 'schedule';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'schedule';
 
 
 // Helper to match the date format used in service
@@ -319,12 +319,6 @@ export default function App() {
       placement: 'bottom',
       onBeforeShow: () => setViewMode('workout') // Return to main view
     },
-    {
-      targetId: 'tour-guide',
-      title: 'Xem Lại Hướng Dẫn 📖',
-      content: 'Cần xem lại? Bấm vào đây bất cứ lúc nào.',
-      placement: 'bottom'
-    }
   ];
 
   // Auto-start tour if new user
@@ -374,7 +368,7 @@ export default function App() {
       }).eq('id', session.user.id);
     }
 
-    setToastMessage("Bạn đã hoàn thành hướng dẫn! Chúc bạn tập luyện hiệu quả.");
+    setToastMessage("Chào mừng bạn đến với Grow Up! Chúc bạn tập luyện hiệu quả.");
   };
 
   // Debug version to ensure HMR works
@@ -1588,7 +1582,6 @@ export default function App() {
                 <AccountSettings
                   user={session.user}
                   onLogout={() => supabase.auth.signOut()}
-                  onViewGuide={() => setViewMode('guide')}
                 />
               ) : null}
 
@@ -1671,9 +1664,6 @@ export default function App() {
 
 
 
-              {viewMode === 'guide' && (
-                <UserGuide onBackend={() => setViewMode('settings')} />
-              )}
 
               {/* Onboarding Tour */}
               {isTourOpen && (

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { loadLoginHistory } from '../services/supabasePlanSync';
+import { subscribeToPush, isPushSubscribed } from '../services/pushNotification';
 import { User } from '@supabase/supabase-js';
-import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, BookOpen } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff } from 'lucide-react';
 import { Toast } from './ui/Toast';
 
 interface LoginRecord {
@@ -18,10 +19,9 @@ interface LoginRecord {
 interface AccountSettingsProps {
     user: User;
     onLogout: () => void;
-    onViewGuide: () => void;
 }
 
-export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout, onViewGuide }) => {
+export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout }) => {
     const [fullName, setFullName] = useState(user.user_metadata?.full_name || '');
     const [currentPassword, setCurrentPassword] = useState('');
     const [password, setPassword] = useState('');
@@ -31,6 +31,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
     const [error, setError] = useState<string | null>(null);
     const [loginHistory, setLoginHistory] = useState<LoginRecord[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [isPushOn, setIsPushOn] = useState<boolean | null>(null);
+    const [isTestingPush, setIsTestingPush] = useState(false);
 
     // Sync full name if it changes externally or initially
     useEffect(() => {
@@ -54,6 +56,36 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
         };
         fetchHistory();
     }, [user.id]);
+
+    // Check push subscription status
+    useEffect(() => {
+        isPushSubscribed().then(setIsPushOn);
+    }, []);
+
+    const handleTestNotification = async () => {
+        setIsTestingPush(true);
+        try {
+            // Re-subscribe if needed
+            if (!isPushOn) {
+                const ok = await subscribeToPush(user.id);
+                setIsPushOn(ok);
+                if (!ok) { setError('Không thể đăng ký thông báo. Kiểm tra quyền trình duyệt.'); return; }
+            }
+            // Fire a local notification via service worker
+            const reg = await navigator.serviceWorker.ready;
+            await reg.showNotification('🔔 Test Thông Báo', {
+                body: 'Push notification hoạt động bình thường! 🎉',
+                icon: '/icon.png',
+                badge: '/icon.png',
+                tag: 'test-notification',
+            } as NotificationOptions);
+            setMsg('Thông báo test đã gửi!');
+        } catch (e: any) {
+            setError('Lỗi: ' + (e.message || 'Không gửi được thông báo'));
+        } finally {
+            setIsTestingPush(false);
+        }
+    };
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -373,19 +405,39 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                 )}
             </div>
 
-            {/* Guide Section */}
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                    <h3 className="text-lg font-bold text-cyan-400 mb-1">Hướng dẫn sử dụng</h3>
-                    <p className="text-sm text-gray-400">Xem lại hướng dẫn cách khởi tạo lịch trình, ăn uống và tập luyện hiệu quả nhất.</p>
+
+
+            {/* Debug / Notification Section */}
+            <div className="bg-black/40 backdrop-blur-xl border border-amber-500/20 rounded-3xl p-6 md:p-8 shadow-xl">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="p-2.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl">
+                        <Bell className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">Thông Báo & Debug</h3>
+                        <p className="text-sm text-gray-400">Kiểm tra push notification</p>
+                    </div>
                 </div>
-                <button
-                    onClick={onViewGuide}
-                    className="px-6 py-3 shrink-0 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 hover:text-emerald-300 transition-all font-medium flex items-center gap-2"
-                >
-                    <BookOpen className="w-5 h-5" />
-                    <span className="font-semibold">Xem Hướng Dẫn</span>
-                </button>
+
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                        {isPushOn === null ? (
+                            <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                        ) : isPushOn ? (
+                            <><Bell className="w-4 h-4 text-emerald-400" /><span className="text-emerald-400">Đã đăng ký push</span></>
+                        ) : (
+                            <><BellOff className="w-4 h-4 text-gray-500" /><span className="text-gray-500">Chưa đăng ký push</span></>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleTestNotification}
+                        disabled={isTestingPush}
+                        className="px-5 py-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 hover:text-amber-300 transition-all font-medium flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isTestingPush ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                        Test Thông Báo
+                    </button>
+                </div>
             </div>
 
             {/* Logout Section */}
