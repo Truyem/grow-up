@@ -69,45 +69,62 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
     const handleTestNotification = async () => {
         setIsTestingPush(true);
         try {
-            // Request permission if not granted
-            if (!('Notification' in window)) {
-                setError('Trình duyệt không hỗ trợ thông báo.');
-                return;
-            }
+            // If window.Notification doesn't exist → native WebView (Capacitor)
+            // If window.Capacitor is present → also native
+            const isCapacitor = !('Notification' in window) || !!(window as any).Capacitor?.isNativePlatform?.();
 
-            let permission = Notification.permission;
-            if (permission === 'default') {
-                permission = await Notification.requestPermission();
-            }
-            if (permission !== 'granted') {
-                setError('Chưa cấp quyền thông báo. Vào Settings → App → cho phép thông báo.');
-                return;
-            }
-            setIsPushOn(true);
-
-            // Try service worker first, fallback to direct Notification
-            if ('serviceWorker' in navigator) {
-                try {
-                    const reg = await navigator.serviceWorker.ready;
-                    await reg.showNotification('🔔 Test Thông Báo', {
-                        body: 'Push notification hoạt động bình thường! 🎉',
-                        icon: '/icon.png',
-                        tag: 'test-notification',
-                    } as NotificationOptions);
-                } catch {
-                    // SW not available, use direct Notification
-                    new Notification('🔔 Test Thông Báo', {
-                        body: 'Notification hoạt động bình thường! 🎉',
-                    });
+            if (isCapacitor) {
+                // Dynamic import — only available in Capacitor runtime
+                const { LocalNotifications } = await import('@capacitor/local-notifications' as any);
+                // Request native permission
+                const { display } = await LocalNotifications.requestPermissions();
+                if (display !== 'granted') {
+                    setError('Chưa cấp quyền thông báo. Vào Settings → App → cho phép thông báo.');
+                    return;
                 }
-            } else {
-                new Notification('🔔 Test Thông Báo', {
-                    body: 'Notification hoạt động bình thường! 🎉',
+                setIsPushOn(true);
+                await LocalNotifications.schedule({
+                    notifications: [{
+                        id: Date.now(),
+                        title: '🔔 Test Thông Báo',
+                        body: 'Notification hoạt động bình thường! 🎉',
+                        schedule: { at: new Date(Date.now() + 500) },
+                        smallIcon: 'ic_launcher',
+                    }]
                 });
+            } else {
+                // --- Web browser fallback ---
+                if (!('Notification' in window)) {
+                    setError('Trình duyệt không hỗ trợ thông báo.');
+                    return;
+                }
+                let permission = Notification.permission;
+                if (permission === 'default') {
+                    permission = await Notification.requestPermission();
+                }
+                if (permission !== 'granted') {
+                    setError('Chưa cấp quyền thông báo.');
+                    return;
+                }
+                setIsPushOn(true);
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const reg = await navigator.serviceWorker.ready;
+                        await reg.showNotification('🔔 Test Thông Báo', {
+                            body: 'Push notification hoạt động bình thường! 🎉',
+                            icon: '/icon.png',
+                            tag: 'test-notification',
+                        } as NotificationOptions);
+                    } catch {
+                        new Notification('🔔 Test Thông Báo', { body: 'Hoạt động bình thường! 🎉' });
+                    }
+                } else {
+                    new Notification('🔔 Test Thông Báo', { body: 'Hoạt động bình thường! 🎉' });
+                }
+                // Try push subscription in background
+                subscribeToPush(user.id).catch(() => { });
             }
 
-            // Also try to save push subscription in background (non-blocking)
-            subscribeToPush(user.id).then(ok => setIsPushOn(ok || Notification.permission === 'granted')).catch(() => { });
             setMsg('Thông báo test đã gửi!');
         } catch (e: any) {
             setError('Lỗi: ' + (e.message || 'Không gửi được thông báo'));
