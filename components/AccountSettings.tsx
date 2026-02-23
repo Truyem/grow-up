@@ -77,18 +77,15 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                 // Use Capacitor bridge (injected by WebView runtime, no npm package needed)
                 const ln = (window as any).Capacitor?.Plugins?.LocalNotifications;
                 if (!ln) {
-                    setError('Plugin th\u00f4ng b\u00e1o kh\u00f4ng s\u1eb5n s\u00e0ng. Vui l\u00f2ng c\u00e0i l\u1ea1i app.');
+                    setError('Plugin thông báo không sẵn sàng. Vui lòng cài lại app.');
                     return;
                 }
-                const { display } = await ln.requestPermissions();
-                if (display !== 'granted') {
-                    setError('Chưa cấp quyền thông báo. Vào Settings → App → cho phép thông báo.');
-                    return;
-                }
+                // Skip requestPermissions() — R8 minification breaks Capacitor annotation lookup
+                // User must grant permission via Android Settings manually
                 setIsPushOn(true);
                 await ln.schedule({
                     notifications: [{
-                        id: Date.now(),
+                        id: Math.floor(Date.now() / 1000),
                         title: '🔔 Test Thông Báo',
                         body: 'Notification hoạt động bình thường! 🎉',
                         schedule: { at: new Date(Date.now() + 500) },
