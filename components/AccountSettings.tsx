@@ -74,16 +74,19 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
             const isCapacitor = !('Notification' in window) || !!(window as any).Capacitor?.isNativePlatform?.();
 
             if (isCapacitor) {
-                // Dynamic import — only available in Capacitor runtime
-                const { LocalNotifications } = await import('@capacitor/local-notifications' as any);
-                // Request native permission
-                const { display } = await LocalNotifications.requestPermissions();
+                // Use Capacitor bridge (injected by WebView runtime, no npm package needed)
+                const ln = (window as any).Capacitor?.Plugins?.LocalNotifications;
+                if (!ln) {
+                    setError('Plugin th\u00f4ng b\u00e1o kh\u00f4ng s\u1eb5n s\u00e0ng. Vui l\u00f2ng c\u00e0i l\u1ea1i app.');
+                    return;
+                }
+                const { display } = await ln.requestPermissions();
                 if (display !== 'granted') {
                     setError('Chưa cấp quyền thông báo. Vào Settings → App → cho phép thông báo.');
                     return;
                 }
                 setIsPushOn(true);
-                await LocalNotifications.schedule({
+                await ln.schedule({
                     notifications: [{
                         id: Date.now(),
                         title: '🔔 Test Thông Báo',
