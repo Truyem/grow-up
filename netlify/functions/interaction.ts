@@ -171,14 +171,6 @@ export default async (req: Request, context: Context) => {
             const label = SCHEDULE_LABELS[scheduleId] || scheduleId;
             const isDone = scheduleState[scheduleId];
 
-            // Tạo notification record để app có thể hiển thị nhật ký
-            await supabase.from('notifications').insert({
-                user_id: USER_SUPABASE_ID,
-                type: 'schedule_check',
-                title: isDone ? `✅ Hoàn thành: ${label}` : `↩️ Bỏ đánh dấu: ${label}`,
-                metadata: { scheduleId, dateKey, isDone },
-            });
-
             return new Response(JSON.stringify({
                 type: InteractionResponseType.UPDATE_MESSAGE,
                 data: {

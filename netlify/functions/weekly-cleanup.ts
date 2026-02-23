@@ -26,20 +26,8 @@ export default async (req: Request, context: Context) => {
 
     console.log(`[WeeklyCleanup] Đã xóa ${scheduleCount} row daily_schedules_logs`);
 
-    // Cũng dọn notifications cũ hơn 7 ngày
-    const { error: notifErr, count: notifCount } = await supabase
-        .from('notifications')
-        .delete({ count: 'exact' })
-        .lt('created_at', new Date(Date.now() + vnOffsetMs - 7 * 24 * 60 * 60 * 1000).toISOString());
-
-    if (notifErr) {
-        console.error('[WeeklyCleanup] Lỗi xóa notifications:', notifErr);
-    } else {
-        console.log(`[WeeklyCleanup] Đã xóa ${notifCount} row notifications`);
-    }
-
     return new Response(
-        `✅ Cleanup hoàn tất: xóa ${scheduleCount} lịch, ${notifCount ?? 0} notification cũ hơn 7 ngày.`,
+        `✅ Cleanup hoàn tất: xóa ${scheduleCount} record cũ hơn 7 ngày trong daily_schedules_logs.`,
         { status: 200 }
     );
 };
