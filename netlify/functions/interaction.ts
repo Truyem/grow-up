@@ -85,102 +85,107 @@ export default async (req: Request, context: Context) => {
         if (interaction.data.custom_id.startsWith("check_")) {
             const scheduleId = interaction.data.custom_id.replace("check_", "");
 
-            // To update supabase we need the user's ID. 
-            // We know the discord USER_ID, but the app uses a Supabase UUID.
-            // Wait, we can't easily map Discord ID to Supabase ID unless we have a link.
-            // As a quick fix, since the user is the only one using it, we could hardcode the user ID, 
-            // or we could fetch the first user from profiles/users table if it's a single-user app.
-            // Let's assume the user has a specific email or we can fetch the latest plan.
+            // Single-user app → dùng hardcode Supabase user_id
+            const USER_SUPABASE_ID = "8807b4b6-6462-471a-a99e-9d69ade70985";
 
-            // Actually, we can fetch the most recent plan regardless of user_id, since it's personal.
-            // Better: fetch where date is today.
-            const now = new Date();
-            const vnTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
-            const dateKey = `${vnTime.getFullYear()}-${String(vnTime.getMonth() + 1).padStart(2, '0')}-${String(vnTime.getDate()).padStart(2, '0')}`;
+            // Tính ngày VN bằng UTC+7 offset thủ công (đáng tin hơn toLocaleString trên serverless)
+            const vnOffsetMs = 7 * 60 * 60 * 1000;
+            const vnTime = new Date(Date.now() + vnOffsetMs);
+            const dateKey = `${vnTime.getUTCFullYear()}-${String(vnTime.getUTCMonth() + 1).padStart(2, '0')}-${String(vnTime.getUTCDate()).padStart(2, '0')}`;
 
-            const { data: plans, error: fetchErr } = await supabase
-                .from('daily_plans')
-                .select('*')
-                .eq('date', dateKey)
-                .limit(1);
+            console.log(`[Interaction] check_ button. scheduleId=${scheduleId}, dateKey=${dateKey}`);
 
-            if (fetchErr || !plans || plans.length === 0) {
-                return new Response(JSON.stringify({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: {
-                        content: "❌ Không tìm thấy lịch trình hôm nay trong hệ thống.",
-                        flags: 64 // Ephemeral
-                    }
-                }), { status: 200, headers: { "Content-Type": "application/json" } });
-            }
-
-            const planRow = plans[0];
-            const userId = planRow.user_id;
-            const progress = planRow.workout_progress || {};
-            const scheduleState = progress.scheduleState || {};
-
-            // Toggle
-            const isChecked = !scheduleState[scheduleId];
-            scheduleState[scheduleId] = isChecked;
-            progress.scheduleState = scheduleState;
-
-            const { error: updateErr } = await supabase
-                .from('daily_plans')
-                .update({ workout_progress: progress, updated_at: new Date().toISOString() })
-                .eq('id', planRow.id);
-
-            if (updateErr) {
-                console.error("Failed to update schedule status:", updateErr);
-            }
-
-            // Also update workout_logs so the history view has it
+            // Label mapping cho từng mục lịch sinh hoạt
             const SCHEDULE_LABELS: Record<string, string> = {
                 'smor-0': 'Thức dậy',
                 'smor-1': 'Vệ sinh cá nhân',
-                'smor-2': 'Uống nước (300ml)',
-                'smor-3': 'Skin care sáng',
-                'smor-4': 'Học bài',
-                'saft-0': 'Nghỉ trưa',
-                'saft-1': 'Học bài',
-                'seve-0': 'Vệ sinh cá nhân',
-                'seve-1': 'Skin care tối',
-                'seve-2': 'Ngủ'
+                'smor-2': 'Chuẩn bị ăn sáng / Caffeine 1',
+                'smor-3': 'Ăn sáng',
+                'smor-4': 'Đến phòng tập',
+                'smor-5': 'Về nhà / Caffeine 2',
+                'smor-6': 'Đi mua đồ ăn trưa',
+                'smor-7': 'Nấu ăn trưa',
+                'smor-8': 'Ăn trưa',
+                'smor-9': 'Nghỉ ngơi / Omega 3 lần 1',
+                'smor-10': 'Đi học',
+                'saft-0': 'Về nhà / Ngủ trưa / Magnesium 1',
+                'saft-1': 'Chuẩn bị bữa tối',
+                'saft-2': 'Bật nóng lạnh, cắm cơm',
+                'saft-3': 'Nấu ăn',
+                'saft-4': 'Ăn tối',
+                'saft-5': 'Tắm rửa',
+                'saft-6': 'Giặt quần áo / Omega 3 lần 2',
+                'saft-7': 'Ôn bài',
+                'saft-8': 'Tập Isolation tại nhà',
+                'saft-9': 'Giải trí / Creatine + Magnesium 2',
+                'saft-10': 'Screen-off',
+                'saft-11': 'Ngủ',
             };
 
-            const completedSchedule: string[] = [];
-            Object.entries(scheduleState).forEach(([key, checked]) => {
-                if (checked && SCHEDULE_LABELS[key]) {
-                    completedSchedule.push(SCHEDULE_LABELS[key]);
-                }
-            });
-
-            const { data: logData } = await supabase
+            // Lấy log hôm nay từ daily_schedules_logs
+            const { data: logData, error: logErr } = await supabase
                 .from('daily_schedules_logs')
-                .select('id, completed_schedule, timestamp')
-                .eq('user_id', userId)
+                .select('id, completed_schedule, schedule_state')
+                .eq('user_id', USER_SUPABASE_ID)
                 .eq('date', dateKey)
                 .limit(1);
 
-            if (logData && logData.length > 0) {
-                const logRow = logData[0];
+            if (logErr) {
+                console.error("[Interaction] Lỗi query daily_schedules_logs:", logErr);
+            }
 
+            // Lấy state hiện tại (object key → boolean)
+            let scheduleState: Record<string, boolean> = {};
+            let logRowId: string | null = null;
+
+            if (logData && logData.length > 0) {
+                logRowId = logData[0].id;
+                scheduleState = logData[0].schedule_state || {};
+            }
+
+            // Toggle trạng thái mục vừa bấm
+            scheduleState[scheduleId] = !scheduleState[scheduleId];
+
+            // Tạo mảng completed_schedule từ state
+            const completedSchedule: string[] = Object.entries(scheduleState)
+                .filter(([, checked]) => checked)
+                .map(([key]) => SCHEDULE_LABELS[key] || key);
+
+            if (logRowId) {
+                // Cập nhật row đã có
                 await supabase.from('daily_schedules_logs').update({
-                    completed_schedule: completedSchedule
-                }).eq('id', logRow.id);
+                    schedule_state: scheduleState,
+                    completed_schedule: completedSchedule,
+                }).eq('id', logRowId);
             } else {
+                // Tạo mới row cho hôm nay
                 await supabase.from('daily_schedules_logs').insert({
-                    user_id: userId,
+                    user_id: USER_SUPABASE_ID,
                     date: dateKey,
-                    timestamp: new Date().getTime(),
-                    completed_schedule: completedSchedule
+                    timestamp: Date.now(),
+                    schedule_state: scheduleState,
+                    completed_schedule: completedSchedule,
                 });
             }
+
+            const label = SCHEDULE_LABELS[scheduleId] || scheduleId;
+            const isDone = scheduleState[scheduleId];
+
+            // Tạo notification record để app có thể hiển thị nhật ký
+            await supabase.from('notifications').insert({
+                user_id: USER_SUPABASE_ID,
+                type: 'schedule_check',
+                title: isDone ? `✅ Hoàn thành: ${label}` : `↩️ Bỏ đánh dấu: ${label}`,
+                metadata: { scheduleId, dateKey, isDone },
+            });
 
             return new Response(JSON.stringify({
                 type: InteractionResponseType.UPDATE_MESSAGE,
                 data: {
-                    content: `✅ Đã đánh dấu hoàn thành mục lục!`,
-                    components: [] // remove the button after clicking
+                    content: isDone
+                        ? `✅ **${label}** — Đã hoàn thành!`
+                        : `↩️ **${label}** — Đã bỏ đánh dấu.`,
+                    components: []
                 }
             }), {
                 status: 200,
