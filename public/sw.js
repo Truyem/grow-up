@@ -1,82 +1,67 @@
-const CACHE_NAME = 'growup-v3';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
-
-const EXCLUDED_ORIGINS = [
-  'generativelanguage.googleapis.com',
-  'supabase.co'
-];
+// Service Worker for Web Push Notifications - GrowUp App
+const CACHE_NAME = 'growup-v1';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil(clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+// Handle Push Notification
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
 
-  if (event.request.method !== 'GET') return;
-  if (EXCLUDED_ORIGINS.some(origin => url.hostname.includes(origin))) return;
-
-  // Navigation (HTML): Stale-While-Revalidate
-  // 1. Return from cache immediately (FAST)
-  // 2. Fetch from network to update cache for NEXT time
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        const cachedResponse = await cache.match('/index.html');
-
-        // Background update
-        const networkFetch = fetch(event.request).then((res) => {
-          // Only cache valid responses
-          if (res.status === 200) {
-            cache.put(event.request, res.clone());
-          }
-          return res;
-        }).catch(() => {
-          // Network failure - just ignore, we served cache
-        });
-
-        // Return cache if available, else wait for network
-        return cachedResponse || networkFetch;
-      })
-    );
-    return;
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    data = {
+      title: 'GrowUp',
+      body: event.data.text(),
+    };
   }
 
-  // Static Assets: Cache First / Stale-While-Revalidate
-  event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cached = await cache.match(event.request);
+  const title = data.title || 'GrowUp 💪';
+  const options = {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'growup-notification',
+    renotify: true,
+    requireInteraction: false,
+    silent: false,
+    data: {
+      url: data.url || '/',
+      taskId: data.taskId || null,
+    },
+    actions: data.actions || [],
+  };
 
-      const fetched = fetch(event.request).then((res) => {
-        if (res.status === 200 && res.type === 'basic') {
-          cache.put(event.request, res.clone());
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Handle Notification Click
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing tab if open
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
         }
-        return res;
-      }).catch(() => { }); // Ignore network errors if we have cache
-
-      return cached || fetched;
+      }
+      // Open new tab
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

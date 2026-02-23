@@ -5,6 +5,16 @@
 [functions]
   directory = "netlify/functions"
 
+[build.environment]
+  VAPID_EMAIL = "mailto:admin@growup.app"
+
+# Allow service worker to control full scope
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Service-Worker-Allowed = "/"
+    Cache-Control = "no-cache"
+
 # Cache static assets for 1 year (immutable with hash in filename)
 [[headers]]
   for = "/assets/*"

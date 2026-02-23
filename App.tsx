@@ -69,6 +69,7 @@ const getCompletedScheduleText = (state?: Record<string, boolean>) => {
 import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
 import { debouncedSavePlan, savePlanToSupabase, loadPlanFromSupabase, deleteOldPlans, recordLoginHistory, markOffline } from './services/supabasePlanSync';
+import { subscribeToPush } from './services/pushNotification';
 
 
 import { Toast } from './components/ui/Toast';
@@ -610,6 +611,9 @@ export default function App() {
 
         // 4. Record login history
         recordLoginHistory(user.id).catch(console.error);
+
+        // 5. Register Web Push (non-blocking)
+        subscribeToPush(user.id).catch(console.error);
       };
 
       try {
