@@ -57,28 +57,57 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
         fetchHistory();
     }, [user.id]);
 
-    // Check push subscription status
+    // Check notification permission status
     useEffect(() => {
-        isPushSubscribed().then(setIsPushOn);
+        if ('Notification' in window) {
+            setIsPushOn(Notification.permission === 'granted');
+        } else {
+            setIsPushOn(false);
+        }
     }, []);
 
     const handleTestNotification = async () => {
         setIsTestingPush(true);
         try {
-            // Re-subscribe if needed
-            if (!isPushOn) {
-                const ok = await subscribeToPush(user.id);
-                setIsPushOn(ok);
-                if (!ok) { setError('Không thể đăng ký thông báo. Kiểm tra quyền trình duyệt.'); return; }
+            // Request permission if not granted
+            if (!('Notification' in window)) {
+                setError('Trình duyệt không hỗ trợ thông báo.');
+                return;
             }
-            // Fire a local notification via service worker
-            const reg = await navigator.serviceWorker.ready;
-            await reg.showNotification('🔔 Test Thông Báo', {
-                body: 'Push notification hoạt động bình thường! 🎉',
-                icon: '/icon.png',
-                badge: '/icon.png',
-                tag: 'test-notification',
-            } as NotificationOptions);
+
+            let permission = Notification.permission;
+            if (permission === 'default') {
+                permission = await Notification.requestPermission();
+            }
+            if (permission !== 'granted') {
+                setError('Chưa cấp quyền thông báo. Vào Settings → App → cho phép thông báo.');
+                return;
+            }
+            setIsPushOn(true);
+
+            // Try service worker first, fallback to direct Notification
+            if ('serviceWorker' in navigator) {
+                try {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification('🔔 Test Thông Báo', {
+                        body: 'Push notification hoạt động bình thường! 🎉',
+                        icon: '/icon.png',
+                        tag: 'test-notification',
+                    } as NotificationOptions);
+                } catch {
+                    // SW not available, use direct Notification
+                    new Notification('🔔 Test Thông Báo', {
+                        body: 'Notification hoạt động bình thường! 🎉',
+                    });
+                }
+            } else {
+                new Notification('🔔 Test Thông Báo', {
+                    body: 'Notification hoạt động bình thường! 🎉',
+                });
+            }
+
+            // Also try to save push subscription in background (non-blocking)
+            subscribeToPush(user.id).then(ok => setIsPushOn(ok || Notification.permission === 'granted')).catch(() => { });
             setMsg('Thông báo test đã gửi!');
         } catch (e: any) {
             setError('Lỗi: ' + (e.message || 'Không gửi được thông báo'));
