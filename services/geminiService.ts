@@ -6,13 +6,11 @@ const API_KEYS: string[] = (process.env.API_KEYS as unknown as string[]) || [];
 
 const MODELS = {
   WORKOUT: "gemini-3-flash-preview", // "Model 3" / High Intelligence
-  FOOD_SCAN: "gemma-3-27b-it",
   OVERVIEW: "gemini-2.5-flash",
-  MENU: "gemini-2.5-flash",
-  VISION: "gemini-1.5-flash",
-  FOOD_RECOGNITION: "gemini-2.5-flash-lite", // User requested "Gemini 2.5 Flash-Lite"
-  MACRO_CALC: "gemini-2.5-flash", // User requested "gemini-2.5-flash"
-  FOOD_SUGGEST: "gemini-2.5-flash", // Gợi ý thức ăn bổ sung khi tạo plan
+  MENU: "gemini-2.5-flash",      // gemini-1.5-flash bị 404, thay bằng 2.5-flash
+  FOOD_RECOGNITION: "gemini-2.5-flash-lite",
+  MACRO_CALC: "gemini-3.1-flash-lite-preview",
+  FOOD_SUGGEST: "gemini-flash-latest",
 };
 
 
