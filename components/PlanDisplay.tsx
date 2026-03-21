@@ -279,7 +279,24 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   );
 };
 
-const MemoExerciseItem = React.memo(ExerciseItem);
+const MemoExerciseItem = React.memo(ExerciseItem, (prev, next) => {
+  const prevSets = prev.exerciseLog?.sets || [];
+  const nextSets = next.exerciseLog?.sets || [];
+  const setsEqual = prevSets.length === nextSets.length &&
+    prevSets.every((set, i) => set.weight === nextSets[i]?.weight && set.reps === nextSets[i]?.reps);
+
+  return (
+    prev.exercise.name === next.exercise.name &&
+    prev.exercise.sets === next.exercise.sets &&
+    prev.exercise.reps === next.exercise.reps &&
+    prev.exercise.notes === next.exercise.notes &&
+    prev.exercise.equipment === next.exercise.equipment &&
+    prev.exercise.colorCode === next.exercise.colorCode &&
+    prev.exercise.isBFR === next.exercise.isBFR &&
+    prev.isChecked === next.isChecked &&
+    setsEqual
+  );
+});
 
 
 
@@ -314,7 +331,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   }
 
   // Combine all exercises to calculate progress
-  const allExercises = useMemo(() => [...currentWorkout.morning, ...currentWorkout.evening], [currentWorkout.morning, currentWorkout.evening]);
+  const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
   const totalExercises = allExercises.length;
 
   // Calculate checked based on composite keys "mor-X" and "eve-X"

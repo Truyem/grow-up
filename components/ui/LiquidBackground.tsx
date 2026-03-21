@@ -1,17 +1,23 @@
 import React, { useEffect, useRef } from 'react';
 
-const MAX_RENDER_DPR = 1.25;
+const MAX_BACKGROUND_DPR = 1.25;
+
+const shouldRenderLiquidBackground = () => {
+  if (typeof window === 'undefined') return true;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  return !(prefersReducedMotion || coarsePointer);
+};
 
 export const LiquidBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderEnabled = shouldRenderLiquidBackground();
 
   useEffect(() => {
+    if (!renderEnabled) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-    if (prefersReducedMotion || coarsePointer) return;
 
     const gl = canvas.getContext("webgl");
     if (!gl) return;
@@ -170,7 +176,7 @@ export const LiquidBackground = () => {
 
     const setSize = () => {
       if (canvas) {
-        const dpr = Math.min(window.devicePixelRatio || 1, MAX_RENDER_DPR);
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_BACKGROUND_DPR);
         canvas.width = Math.floor(window.innerWidth * dpr);
         canvas.height = Math.floor(window.innerHeight * dpr);
         canvas.style.width = '100vw';
@@ -206,18 +212,21 @@ export const LiquidBackground = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", setSize);
       cancelAnimationFrame(animationFrameId);
-      if (texture) gl.deleteTexture(texture);
-      if (buffer) gl.deleteBuffer(buffer);
-      if (program) gl.deleteProgram(program);
-      if (vs) gl.deleteShader(vs);
-      if (fs) gl.deleteShader(fs);
+      if (texture !== null) gl.deleteTexture(texture);
+      if (buffer !== null) gl.deleteBuffer(buffer);
+      if (program !== null) gl.deleteProgram(program);
+      if (vs !== null) gl.deleteShader(vs);
+      if (fs !== null) gl.deleteShader(fs);
     };
-  }, []);
+  }, [renderEnabled]);
+
+  if (!renderEnabled) return null;
 
   return (
     <canvas 
       ref={canvasRef} 
       className="fixed inset-0 w-full h-full z-0 pointer-events-none"
+      aria-hidden="true"
       style={{ width: '100vw', height: '100vh' }}
     />
   );

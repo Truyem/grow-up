@@ -10,7 +10,7 @@ const MODELS = {
   MENU: "gemini-2.5-flash",      // gemini-1.5-flash bị 404, thay bằng 2.5-flash
   FOOD_RECOGNITION: "gemini-2.5-flash-lite",
   MACRO_CALC: "gemini-3.1-flash-lite-preview",
-  FOOD_SUGGEST: "gemini-flash-latest",
+  FOOD_SUGGEST: "gemini-2.5-flash",
 };
 
 const WORKOUT_COMMON_RULES = `
@@ -35,6 +35,37 @@ const WORKOUT_COMMON_RULES = `
   - Quads, Hamstrings, Glutes, Calves
   - Abs - Upper, Abs - Lower, Obliques, Core
 `;
+
+type WorkoutPartResponse = {
+  date: string;
+  schedule: {
+    suggestedWorkoutTime: string;
+    suggestedSleepTime: string;
+    reasoning: string;
+  };
+  workout: {
+    summary: string;
+    detail: WorkoutLevel;
+  };
+};
+
+type NutritionPartResponse = {
+  nutrition: DailyPlan['nutrition'];
+};
+
+type AIOverviewResponse = {
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  recommendation: string;
+  motivationalQuote: string;
+  weeklyStats: {
+    workoutsCompleted: number;
+    totalExercises: number;
+    estimatedCaloriesBurned: number;
+    consistency: number;
+  };
+};
 
 
 // ... lines 30-450 ...
@@ -507,7 +538,7 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
 
 // --- SPLIT GENERATION PARTS ---
 
-const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], apiKey: string): Promise<any> => {
+const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], apiKey: string): Promise<WorkoutPartResponse> => {
   const ai = new GoogleGenAI({ apiKey });
   const model = MODELS.WORKOUT;
 
@@ -720,10 +751,10 @@ ${WORKOUT_COMMON_RULES}
 OUTPUT: JSON with fields date, schedule, workout.
 `;
 
-  return generateJsonResponse<any>(ai, model, prompt, schema, "WorkoutPart");
+  return generateJsonResponse<WorkoutPartResponse>(ai, model, prompt, schema, "WorkoutPart");
 };
 
-const generateNutritionPart = async (userData: UserInput, apiKey: string): Promise<any> => {
+const generateNutritionPart = async (userData: UserInput, apiKey: string): Promise<NutritionPartResponse> => {
   const ai = new GoogleGenAI({ apiKey });
   const model = MODELS.MENU;
 
@@ -791,7 +822,7 @@ GENERATE A 1-DAY MEAL PLAN.
 OUTPUT: JSON with field nutrition.
 `;
 
-  return generateJsonResponse<any>(ai, model, prompt, schema, "NutritionPart");
+  return generateJsonResponse<NutritionPartResponse>(ai, model, prompt, schema, "NutritionPart");
 };
 
 export const generateDailyPlan = async (
@@ -816,8 +847,8 @@ export const generateDailyPlan = async (
 
       // ... (rest of logic uses apiKey)
 
-      let workoutPart: any = {};
-      let nutritionPart: any = {};
+      let workoutPart: Partial<WorkoutPartResponse> = {};
+      let nutritionPart: Partial<NutritionPartResponse> = {};
 
       if (generationType === 'workout' || generationType === 'both') {
         workoutPart = await generateWorkoutPart(userData, history, apiKey);
@@ -980,7 +1011,7 @@ OUTPUT: JSON only.
 
   while (retriesLeft > 0) {
     try {
-      const parsed = await generateJsonResponse<any>(ai, model, prompt, schema, "AIOverview");
+      const parsed = await generateJsonResponse<AIOverviewResponse>(ai, model, prompt, schema, "AIOverview");
       return {
         ...parsed,
         strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
