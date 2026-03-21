@@ -7,6 +7,10 @@ export const LiquidBackground = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    if (prefersReducedMotion || coarsePointer) return;
+
     const gl = canvas.getContext("webgl");
     if (!gl) return;
 
@@ -164,8 +168,11 @@ export const LiquidBackground = () => {
 
     const setSize = () => {
       if (canvas) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
         gl.viewport(0, 0, canvas.width, canvas.height);
       }
     };
@@ -197,13 +204,18 @@ export const LiquidBackground = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", setSize);
       cancelAnimationFrame(animationFrameId);
+      gl.deleteTexture(texture);
+      gl.deleteBuffer(buffer);
+      gl.deleteProgram(program);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
     };
   }, []);
 
   return (
     <canvas 
       ref={canvasRef} 
-      className="fixed inset-0 w-full h-full z-0"
+      className="fixed inset-0 w-full h-full z-0 pointer-events-none"
       style={{ width: '100vw', height: '100vh' }}
     />
   );

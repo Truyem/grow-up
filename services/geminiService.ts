@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
@@ -12,6 +12,29 @@ const MODELS = {
   MACRO_CALC: "gemini-3.1-flash-lite-preview",
   FOOD_SUGGEST: "gemini-flash-latest",
 };
+
+const WORKOUT_COMMON_RULES = `
+### LANGUAGE & LOCALIZATION RULES
+- VIETNAMESE REQUIRED: Summary, Description, Reasoning in Vietnamese.
+- SUMMARY: concise, max 2 sentences, no repetition.
+- REASONING: technical and direct.
+- EXERCISE NAMES: MUST be in English.
+
+### STRICT OUTPUT RULES
+- Professional tone, concise content.
+- No quote lists, no repetitive phrases.
+
+### COLOR CODING & MUSCLE GROUPS
+- colorCode mapping: Blue=Chest, Red=Shoulder, Yellow=Back, Green=Triceps, Pink=Biceps, Purple=Legs, Orange=Abs/Cardio.
+- Use specific anatomical names for primaryMuscleGroups and secondaryMuscleGroups.
+- Allowed groups:
+  - Chest - Upper, Chest - Middle, Chest - Lower
+  - Front Delts, Side Delts, Rear Delts
+  - Lats, Upper Back, Lower Back, Traps
+  - Biceps, Triceps - Long Head, Triceps - Lateral Head, Triceps, Forearms
+  - Quads, Hamstrings, Glutes, Calves
+  - Abs - Upper, Abs - Lower, Obliques, Core
+`;
 
 
 // ... lines 30-450 ...
@@ -132,6 +155,24 @@ const cleanAndParseJSON = (text: string, context: string): any => {
     console.log(`Raw Text (${context}):`, preview);
     throw e; // Re-throw to trigger retry logic
   }
+};
+
+const generateJsonResponse = async <T>(
+  ai: GoogleGenAI,
+  model: string,
+  prompt: string,
+  schema: object,
+  context: string
+): Promise<T> => {
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: { responseMimeType: "application/json", responseSchema: schema as any },
+  });
+
+  const jsonText = response.text;
+  if (!jsonText) throw new Error(`Empty response: ${context}`);
+  return cleanAndParseJSON(jsonText, context) as T;
 };
 
 // --- DYNAMIC CALCULATIONS ---
@@ -657,60 +698,29 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   };
 
   const prompt = `
-    ACT AS A WORLD-CLASS PERSONAL TRAINER.
-    GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
-    TRAINING MODE: ${userData.trainingMode === 'home' ? 'HOME WORKOUT (GYM + CALIS HYBRID)' : 'CALISTHENICS/STREET WORKOUT'}.
-    
-    ${workoutInstructionBlock}
+ACT AS A WORLD-CLASS PERSONAL TRAINER.
+GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
+TRAINING MODE: ${userData.trainingMode === 'home' ? 'HOME WORKOUT (GYM + CALIS HYBRID)' : 'CALISTHENICS/STREET WORKOUT'}.
 
-    ### LANGUAGE & LOCALIZATION RULES
-    - **VIETNAMESE REQUIRED**: Summary, Description, Reasoning MUST be in **VIETNAMESE**.
-    - **SUMMARY**: concise (max 2 sentences). NO motivational rants. NO repetition.
-    - **REASONING**: strictly technical explanation of the split.
-    - **LANGUAGE**: Vietnamese (except technical terms like "Bench Press").
-    - **SCHEDULE**: reasonable times based on user habits.
-    - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press").
-    - **CONCISENESS**: Keep descriptions Short & Fast.
-    
-    ### STRICT OUTPUT RULES
-    - Do NOT include long lists of quotes (e.g. "Never give up", "Stay strong").
-    - Do NOT repeat phrases.
-    - Keep it professional and direct.
+${workoutInstructionBlock}
 
-    ### GENERAL WORKOUT RULES
-    - **INTENSITY**: ${userData.selectedIntensity}.
-    - **EQUIPMENT**: ${userData.equipment.join(', ')}.
-    - **STRICT EQUIPMENT CHECK**: ONLY use listed tools. Substitute missing with BODYWEIGHT.
-    - **ONE DUMBBELL RULE**: User only has ONE dumbbell unless "2x" specified.
-    - **CARDIO NAMING**: Append "(Cardio)" to Walking/Running.
+### GENERAL WORKOUT RULES
+- INTENSITY: ${userData.selectedIntensity}.
+- EQUIPMENT: ${userData.equipment.join(', ')}.
+- ONLY use listed tools. If missing, substitute with bodyweight.
+- Assume ONE dumbbell unless explicitly "2x".
+- Append "(Cardio)" to walking/running movement names.
 
-    ### COLOR CODING & MUSCLE GROUPS
-    - Assign 'colorCode' (Blue=Chest, Red=Shoulder, Yellow=Back, Green=Triceps, Pink=Biceps, Purple=Legs, Orange=Abs/Cardio).
-    - Specify 'primaryMuscleGroups' and 'secondaryMuscleGroups' using SPECIFIC anatomical names (e.g., "Chest - Upper", "Lats", "Front Delts").
-    - **Danh Sách Nhóm Cơ Chi Tiết (BẮT BUỘC SỬ DỤNG CHÍNH XÁC)**:
-      - Ngực: Chest - Upper, Chest - Middle, Chest - Lower
-      - Vai: Front Delts, Side Delts, Rear Delts
-      - Lưng: Lats, Upper Back, Lower Back, Traps
-      - Tay: Biceps, Triceps - Long Head, Triceps - Lateral Head, Triceps, Forearms
-      - Chân: Quads, Hamstrings, Glutes, Calves
-      - Bụng: Abs - Upper, Abs - Lower, Obliques, Core
+### USER CONTEXT
+- Sore Muscles: ${userData.soreMuscles.join(', ')}.
+- Fatigue: ${userData.fatigue}.
 
-    ### DATA INPUTS
-    - Sore Muscles: ${userData.soreMuscles.join(', ')}.
-    - Fatigue: ${userData.fatigue}.
+${WORKOUT_COMMON_RULES}
 
-    Generate JSON response with 'date', 'schedule', and 'workout' fields.
-  `;
+OUTPUT: JSON with fields date, schedule, workout.
+`;
 
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: schema },
-  });
-
-  const jsonText = response.text;
-  if (!jsonText) throw new Error("Empty workout response");
-  return cleanAndParseJSON(jsonText, "WorkoutPart");
+  return generateJsonResponse<any>(ai, model, prompt, schema, "WorkoutPart");
 };
 
 const generateNutritionPart = async (userData: UserInput, apiKey: string): Promise<any> => {
@@ -757,36 +767,31 @@ const generateNutritionPart = async (userData: UserInput, apiKey: string): Promi
   };
 
   const prompt = `
-    ACT AS A NUTRITIONIST.
-    GENERATE A 1-DAY MEAL PLAN.
-    
-    ### NUTRITION RULES (DYNAMIC MATH)
-    - **CALCULATED TARGET**: ${Math.round(target)} kcal.
-    - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
-    - **GOAL**: ${goalText}.
-    - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
-    - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
-    - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
-    - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
- 
+ACT AS A NUTRITIONIST.
+GENERATE A 1-DAY MEAL PLAN.
 
-    ### DATA INPUTS
-    - Weight: ${userData.weight}kg, Height: ${userData.height}cm.
-    - Food Consumed Today: ${userData.consumedFood.join(', ')} (Subtract these).
-    - Creatine: ${userData.useCreatine ? "YES" : "NO"}.
+### TARGETS
+- Calories: ${Math.round(target)} kcal
+- Protein: ${proteinTarget}g
+- Carbs: ${carbTarget}g
+- Fat: ${fatTarget}g
+- Goal: ${goalText}
 
-    Generate JSON response with 'nutrition' field.
-  `;
+### RULES
+- Use Vietnamese descriptions, concise.
+- Estimate macros per meal and keep daily totals close to targets.
+- Breakfast: no rice. Lunch/Dinner: rice allowed.
+- Meal names include time, e.g. "Bữa Sáng (07:00)".
 
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: schema },
-  });
+### USER DATA
+- Weight: ${userData.weight}kg, Height: ${userData.height}cm
+- Food consumed today: ${userData.consumedFood.join(', ')}
+- Creatine: ${userData.useCreatine ? "YES" : "NO"}
 
-  const jsonText = response.text;
-  if (!jsonText) throw new Error("Empty nutrition response");
-  return cleanAndParseJSON(jsonText, "NutritionPart");
+OUTPUT: JSON with field nutrition.
+`;
+
+  return generateJsonResponse<any>(ai, model, prompt, schema, "NutritionPart");
 };
 
 export const generateDailyPlan = async (
@@ -954,42 +959,28 @@ export const generateAIOverview = async (
   };
 
   const prompt = `
-ROLE: Huấn luyện viên cá nhân chuyên nghiệp, phân tích tiến trình tập luyện.
+ROLE: Huấn luyện viên cá nhân chuyên nghiệp.
+TASK: phân tích tiến trình tuần và trả về AI overview bằng tiếng Việt.
 
-CONTEXT: Lịch sử tập (7 ngày gần nhất):
-${JSON.stringify(historySummary, null, 2)}
-
-Tổng buổi tập: ${history.length}
-${userData ? `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? 'Tăng cơ' : 'Giảm mỡ'}` : ''}
-
-TASK: Phân tích tiến trình, tạo AI Overview bằng tiếng Việt.
+CONTEXT:
+- Lịch sử 7 ngày gần nhất: ${JSON.stringify(historySummary, null, 2)}
+- Tổng buổi tập: ${history.length}
+- Mục tiêu: ${userData ? (userData.nutritionGoal === 'bulking' ? 'Tăng cơ' : 'Giảm mỡ') : 'N/A'}
 
 RULES:
-- summary: 1-2 câu tóm tắt tiến trình tuần
-- strengths: 2-3 điểm mạnh (VD: "Tập đều đặn", "Focus compound movements")
-- improvements: 2-3 điểm cần cải thiện
-- recommendation: 1 gợi ý cụ thể cho tuần tới
-- motivationalQuote: Quote tiếng Việt từ David Goggins/bodybuilder nổi tiếng
-- weeklyStats: consistency = (workouts/7)*100
+- summary: 1-2 câu
+- strengths: 2-3 ý ngắn
+- improvements: 2-3 ý ngắn
+- recommendation: 1 gợi ý cụ thể
+- motivationalQuote: 1 câu ngắn tiếng Việt
+- weeklyStats.consistency = (workouts/7)*100
 
-OUTPUT: JSON format.
-  `;
+OUTPUT: JSON only.
+`;
 
   while (retriesLeft > 0) {
     try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
-      });
-
-      const jsonText = response.text;
-      if (!jsonText) throw new Error("Empty response");
-
-      const parsed = cleanAndParseJSON(jsonText, "AIOverview");
+      const parsed = await generateJsonResponse<any>(ai, model, prompt, schema, "AIOverview");
       return {
         ...parsed,
         strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
@@ -1041,20 +1032,21 @@ export const suggestNextExercises = async (
   const existingNames = existingExercises.map(e => e.name).join(", ");
 
   const prompt = `
-    ACT AS A PERSONAL TRAINER.
-    THE USER IS CURRENTLY DOING A WORKOUT SESSION (${section.toUpperCase()}).
-    
-    CURRENT EXERCISES IN THIS SESSION: ${existingNames}
-    USER GOAL: ${userData.nutritionGoal}
-    USER EQUIPMENT: ${userData.equipment.join(', ')}
-    
-    TASK: SUGGEST 1 NEW EXERCISE to add to this session.
-    It should complement the existing exercises (e.g., if they did Chest, maybe add Triceps or another Chest variation).
-    
-    OUTPUT FORMAT: JSON Array with 1 Exercise object.
-    
-    REQUIRED FIELDS: name (English), sets (number), reps (string), notes (Vietnamese, short motivation), colorCode, primaryMuscleGroups, secondaryMuscleGroups.
-  `;
+ACT AS A PERSONAL TRAINER.
+SESSION: ${section.toUpperCase()}.
+CURRENT EXERCISES: ${existingNames}
+GOAL: ${userData.nutritionGoal}
+EQUIPMENT: ${userData.equipment.join(', ')}
+
+TASK: suggest exactly 1 complementary exercise.
+- exercise name in English
+- notes in Vietnamese, short
+- include full exercise fields in schema
+
+${WORKOUT_COMMON_RULES}
+
+OUTPUT: JSON array with exactly 1 exercise.
+`;
 
   const schema = {
     type: Type.ARRAY,
@@ -1076,16 +1068,8 @@ export const suggestNextExercises = async (
 
   while (retriesLeft > 0) {
     try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: schema },
-      });
-
-      const jsonText = response.text;
-      if (!jsonText) throw new Error("Empty response");
-
-      return cleanAndParseJSON(jsonText, "SuggestExercise");
+      const parsed = await generateJsonResponse<Exercise[]>(ai, model, prompt, schema, "SuggestExercise");
+      return Array.isArray(parsed) ? parsed.slice(0, 1) : [];
     } catch (error) {
       console.error("Suggest Exercise Error:", error);
       if (isRateLimitError(error) && retriesLeft > 1) {
@@ -1232,15 +1216,7 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: macroModel,
-      contents: macroPrompt,
-      config: { responseMimeType: "application/json", responseSchema: macroSchema },
-    });
-
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty macro response");
-    return cleanAndParseJSON(jsonText, "FoodAnalysis");
+    return await generateJsonResponse<Meal>(ai, macroModel, macroPrompt, macroSchema, "FoodAnalysis");
   } catch (error) {
     console.error("Macro Calc Error:", error);
     throw error;
@@ -1289,16 +1265,7 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: { responseMimeType: "application/json", responseSchema: schema },
-    });
-
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty food analysis response");
-
-    const result = cleanAndParseJSON(jsonText, "FoodTextAnalysis");
+    const result = await generateJsonResponse<Meal>(ai, model, prompt, schema, "FoodTextAnalysis");
     console.log("Analyzed food text:", result);
     return result;
   } catch (error) {
@@ -1306,5 +1273,3 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
     throw error;
   }
 };
-
-

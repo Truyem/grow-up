@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
@@ -73,8 +73,10 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   const hasEquipment = !!exercise.equipment;
 
   // Initialize sets from exerciseLog or default based on exercise.sets
-  const currentSets: ExerciseSetLog[] = exerciseLog?.sets ||
-    Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0 }));
+  const currentSets: ExerciseSetLog[] = useMemo(
+    () => exerciseLog?.sets || Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0 })),
+    [exerciseLog?.sets, exercise.sets]
+  );
 
   const handleSetChange = (setIndex: number, field: 'weight' | 'reps', value: number) => {
     const updatedSets = [...currentSets];
@@ -108,7 +110,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
     });
   };
 
-  const totalVolume = currentSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+  const totalVolume = useMemo(() => currentSets.reduce((sum, s) => sum + (s.weight * s.reps), 0), [currentSets]);
 
   return (
     <div
@@ -277,6 +279,8 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   );
 };
 
+const MemoExerciseItem = React.memo(ExerciseItem);
+
 
 
 
@@ -310,7 +314,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   }
 
   // Combine all exercises to calculate progress
-  const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+  const allExercises = useMemo(() => [...currentWorkout.morning, ...currentWorkout.evening], [currentWorkout.morning, currentWorkout.evening]);
   const totalExercises = allExercises.length;
 
   // Calculate checked based on composite keys "mor-X" and "eve-X"
@@ -365,15 +369,15 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     }
   }, [checkedState, userNote, exerciseLogs, plan.date, isCompleted]);
 
-  const handleToggle = (key: string) => {
+  const handleToggle = useCallback((key: string) => {
     setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
 
-  const handleUpdateExerciseLog = (key: string, log: ExerciseLog) => {
+  const handleUpdateExerciseLog = useCallback((key: string, log: ExerciseLog) => {
     setExerciseLogs(prev => ({ ...prev, [key]: log }));
-  };
+  }, []);
 
-  const handleOpenYouTube = (exerciseName: string) => {
+  const handleOpenYouTube = useCallback((exerciseName: string) => {
     const query = encodeURIComponent(`${exerciseName}`);
 
     // Device Detection
@@ -387,9 +391,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
       // Desktop: Open www.youtube.com in new tab
       window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
     }
-  };
+  }, []);
 
-  const handleStartTimer = (exerciseName: string) => {
+  const handleStartTimer = useCallback((exerciseName: string) => {
     // Determine duration based on exercise type
     const lowerName = exerciseName.toLowerCase();
     if (lowerName.includes('đi bộ') || lowerName.includes('walking')) {
@@ -398,7 +402,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
       setTimerDuration(120); // Standard 2 mins rest for weights
     }
     setIsTimerOpen(true);
-  };
+  }, []);
 
   const handleComplete = () => {
     setIsCompleted(true);
@@ -483,7 +487,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
             const key = `${prefix}-${originalIndex}`;
             return (
-              <ExerciseItem
+              <MemoExerciseItem
                 key={key}
                 exercise={ex}
                 isChecked={!!checkedState[key]}
