@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
 
 // Multiple API keys are injected via vite.config.ts define into process.env.API_KEYS
@@ -161,13 +161,13 @@ const generateJsonResponse = async <T>(
   ai: GoogleGenAI,
   model: string,
   prompt: string,
-  schema: object,
+  schema: Schema,
   context: string
 ): Promise<T> => {
   const response = await ai.models.generateContent({
     model,
     contents: prompt,
-    config: { responseMimeType: "application/json", responseSchema: schema as any },
+    config: { responseMimeType: "application/json", responseSchema: schema },
   });
 
   const jsonText = response.text;

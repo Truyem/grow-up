@@ -75,7 +75,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
   // Initialize sets from exerciseLog or default based on exercise.sets
   const currentSets: ExerciseSetLog[] = useMemo(
     () => exerciseLog?.sets || Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0 })),
-    [exerciseLog?.sets, exercise.sets]
+    [exerciseLog, exercise.sets]
   );
 
   const handleSetChange = (setIndex: number, field: 'weight' | 'reps', value: number) => {

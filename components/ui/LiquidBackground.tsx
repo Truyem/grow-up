@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
+const MAX_RENDER_DPR = 1.25;
+
 export const LiquidBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -168,7 +170,7 @@ export const LiquidBackground = () => {
 
     const setSize = () => {
       if (canvas) {
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_RENDER_DPR);
         canvas.width = Math.floor(window.innerWidth * dpr);
         canvas.height = Math.floor(window.innerHeight * dpr);
         canvas.style.width = '100vw';
@@ -204,11 +206,11 @@ export const LiquidBackground = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", setSize);
       cancelAnimationFrame(animationFrameId);
-      gl.deleteTexture(texture);
-      gl.deleteBuffer(buffer);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
+      if (texture) gl.deleteTexture(texture);
+      if (buffer) gl.deleteBuffer(buffer);
+      if (program) gl.deleteProgram(program);
+      if (vs) gl.deleteShader(vs);
+      if (fs) gl.deleteShader(fs);
     };
   }, []);
 
