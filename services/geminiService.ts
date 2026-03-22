@@ -650,19 +650,53 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     workoutInstructionBlock = `
     ### WORKOUT MODE: CALISTHENICS & STREET WORKOUT
     TODAY IS: ${currentSplitName}. 
-    FOCUS: BODYWEIGHT MASTERY, SKILLS (Planche, Front Lever progs), and RELATIVE STRENGTH.
+    FOCUS: BODYWEIGHT MASTERY, SKILLS (Planche/Front Lever/Handstand/L-Sit), and RELATIVE STRENGTH.
     
     Reference Split (Flexible):
-    - Day 1: Push (Push-ups, Dips, Handstand work)
-    - Day 2: Pull (Pull-ups, Rows, Front Lever work)
-    - Day 3: Legs & Core (Squats, Lunges, L-Sits)
-    - Day 4: Skills & Isometrics
+    - Day 1: Push + Handstand foundation
+    - Day 2: Pull + Front Lever foundation
+    - Day 3: Legs & Core + L-Sit foundation
+    - Day 4: Skill Technique & Isometrics (low fatigue, high quality)
     - Day 5: Full Body Intensity
-    - Day 6: Cardio & Endurance
+    - Day 6: Cardio & Endurance + Mobility
     - Day 7: Active Recovery
+
+    ### SKILL-TREE UNLOCK SYSTEM (NO LEVEL SKIPPING)
+    Apply progressive-overload and coaching consensus principles: movement quality first, prerequisites first, then harder variation.
     
-    **DAILY ABS & CARDIO**: EVERY SINGLE DAY MUST include 1 Abs + 1 Cardio in Evening.
-    **REST DAY RULES**: Main Activity: "Walking (Cardio)" - 60 Minutes + Light Abs.
+    Skill tree nodes (use nearest appropriate node, NEVER skip):
+    - Handstand: Wall Plank -> Pike Hold -> Wall Handstand Hold -> Wall Shoulder Taps -> Freestanding Attempts
+    - Planche: Planche Lean -> Tuck Planche (band/assist) -> Advanced Tuck -> Straddle Planche Lean/Hold
+    - Front Lever: Scap Pulls + Tuck Hang -> Tuck Front Lever Hold -> Advanced Tuck -> One-Leg Front Lever -> Straddle Front Lever
+    - Pull Strength: Australian Row -> Band-Assisted Pull-up -> Strict Pull-up -> Chest-to-Bar Pull-up
+    - Push Strength: Incline Push-up -> Standard Push-up -> Decline/Ring Push-up -> Straight Bar Dip -> Korean Dip (advanced only)
+    - Core Compression: Hollow Hold -> Tuck L-Sit -> One-Leg L-Sit -> Full L-Sit -> V-Sit Prep
+
+    Unlock logic:
+    - Select 1 primary skill lane/day + 1 supporting lane/day based on split.
+    - Include at least 1 prerequisite drill and 1 main progression drill for the same lane.
+    - If fatigue is high or sore muscles overlap, regress exactly 1 node and reduce total sets.
+    - Prioritize scapular control, hollow body, and wrist/shoulder prep before advanced isometrics.
+
+    ### EXERCISE FILL RULES (CALISTHENICS)
+    - Morning must contain 6-8 exercises:
+      1) 1 prep drill (wrist/scap/shoulder),
+      2) 2 skill-progression drills (same lane),
+      3) 2 strength builders (push/pull/legs by split),
+      4) 1 core compression drill,
+      5) optional 0-2 accessory/prehab drills.
+    - Evening must contain exactly:
+      - 1 Abs drill
+      - 1 Cardio movement with "(Cardio)" suffix
+      - Optional 1 mobility/recovery drill when fatigue is Tired or Injured
+    - Use clear progression cues in notes (e.g., "unlock next node when hold >= 12s x 3 sets with clean form").
+    - Rest times:
+      - Skill isometric: 90-150s
+      - Strength: 60-120s
+      - Accessory/Core: 30-60s
+
+    **DAILY ABS & CARDIO**: EVERY DAY MUST include 1 Abs + 1 Cardio in Evening.
+    **REST DAY RULES**: Main Activity: "Walking (Cardio)" - 45-60 Minutes + mobility + light core activation.
     `;
   }
 
