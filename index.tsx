@@ -18,8 +18,13 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+const isDev = import.meta.env.DEV;
 root.render(
-  <React.StrictMode>
+  isDev ? (
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  ) : (
     <App />
-  </React.StrictMode>
+  )
 );

@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 
 // Suppress Recharts defaultProps warning
 const originalConsoleError = console.error;
@@ -15,13 +15,13 @@ import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
 import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Exercise, ExerciseLog } from './types';
 import { UserForm } from './components/UserForm';
-import { PlanDisplay } from './components/PlanDisplay';
-import { NutritionDisplay } from './components/NutritionDisplay';
+const PlanDisplay = React.lazy(() => import('./components/PlanDisplay').then(m => ({ default: m.PlanDisplay })));
+const NutritionDisplay = React.lazy(() => import('./components/NutritionDisplay').then(m => ({ default: m.NutritionDisplay })));
+const ScheduleView = React.lazy(() => import('./components/ScheduleView').then(m => ({ default: m.ScheduleView })));
 import { HistoryView } from './components/HistoryView';
-import { ScheduleView } from './components/ScheduleView';
 
 import { AuthPage } from './components/AuthPage';
-import { AccountSettings } from './components/AccountSettings';
+const AccountSettings = React.lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
 
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
 
@@ -1579,22 +1579,26 @@ export default function App() {
 
               {/* Render content based on View Mode + Generation Status */}
               {viewMode === 'settings' && session?.user ? (
-                <AccountSettings
-                  user={session.user}
-                  onLogout={() => supabase.auth.signOut()}
-                />
+                <Suspense fallback={<LoadingAnimation />}>
+                  <AccountSettings
+                    user={session.user}
+                    onLogout={() => supabase.auth.signOut()}
+                  />
+                </Suspense>
               ) : null}
 
               {viewMode === 'workout' && (
                 plan?.workout?.isGenerated ? (
-                  <PlanDisplay
-                    plan={plan}
-                    onReset={handleReset}
-                    onComplete={handleCompleteWorkout}
-                    onUpdatePlan={handleUpdatePlan}
-                    history={workoutHistory}
-                    userData={userData}
-                  />
+                  <Suspense fallback={<LoadingAnimation />}>
+                    <PlanDisplay
+                      plan={plan}
+                      onReset={handleReset}
+                      onComplete={handleCompleteWorkout}
+                      onUpdatePlan={handleUpdatePlan}
+                      history={workoutHistory}
+                      userData={userData}
+                    />
+                  </Suspense>
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-4">
                     <UserForm
@@ -1617,14 +1621,16 @@ export default function App() {
 
               {viewMode === 'nutrition' && (
                 plan?.nutrition?.isGenerated ? (
-                  <NutritionDisplay
-                    plan={plan}
-                    onReset={handleReset}
-                    onUpdatePlan={handleUpdatePlan}
+                  <Suspense fallback={<LoadingAnimation />}>
+                    <NutritionDisplay
+                      plan={plan}
+                      onReset={handleReset}
+                      onUpdatePlan={handleUpdatePlan}
 
-                    onCompleteNutrition={handleCompleteNutrition}
-                    userId={userData.id}
-                  />
+                      onCompleteNutrition={handleCompleteNutrition}
+                      userId={userData.id}
+                    />
+                  </Suspense>
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-4">
                     <UserForm
@@ -1656,10 +1662,12 @@ export default function App() {
               )}
 
               {viewMode === 'schedule' && (
-                <ScheduleView
-                  scheduleState={plan?.workoutProgress?.scheduleState}
-                  onToggleSchedule={handleToggleSchedule}
-                />
+                <Suspense fallback={<LoadingAnimation />}>
+                  <ScheduleView
+                    scheduleState={plan?.workoutProgress?.scheduleState}
+                    onToggleSchedule={handleToggleSchedule}
+                  />
+                </Suspense>
               )}
 
 
