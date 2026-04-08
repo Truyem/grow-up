@@ -18,7 +18,6 @@ import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
-import { ScheduleView } from './components/ScheduleView';
 import { AuthPage } from './components/AuthPage';
 
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
@@ -26,46 +25,6 @@ import { AccountSettings } from './components/AccountSettings';
 import { supabase } from './services/supabase';
 import { debouncedSavePlan } from './services/supabasePlanSync';
 
-
-const SCHEDULE_LABELS: Record<string, string> = {
-  'smor-0': 'Thức dậy',
-  'smor-1': 'Vệ sinh cá nhân',
-  'smor-2': 'Chuẩn bị ăn sáng',
-  'smor-3': 'Ăn sáng',
-  'smor-4': 'Đến phòng tập',
-  'smor-5': 'Tập luyện chính',
-  'smor-6': 'Về nhà',
-  'smor-7': 'Mua đồ ăn trưa',
-  'smor-8': 'Chuẩn bị đồ ăn',
-  'smor-9': 'Nấu ăn',
-  'smor-10': 'Ăn trưa',
-  'smor-11': 'Rửa bát, nghỉ ngơi',
-  'smor-12': 'Đến trường',
-  'saft-0': 'Về nhà rèn luyện',
-  'saft-1': 'Ngủ trưa',
-  'saft-2': 'Chuẩn bị bữa tối',
-  'saft-3': 'Bật nóng lạnh, cắm cơm',
-  'saft-4': 'Nấu ăn',
-  'saft-5': 'Ăn cơm',
-  'saft-6': 'Tắm rửa',
-  'saft-7': 'Giặt quần áo',
-  'saft-8': 'Ôn bài',
-  'saft-9': 'Tập Isolation (Nhẹ)',
-  'saft-10': 'Giải trí & Thực phẩm bổ sung',
-  'saft-11': 'Screen-off',
-  'saft-12': 'Đi ngủ',
-};
-
-const getCompletedScheduleText = (state?: Record<string, boolean>) => {
-  if (!state) return [];
-  const res: string[] = [];
-  Object.entries(state).forEach(([key, isChecked]) => {
-    if (isChecked && SCHEDULE_LABELS[key]) {
-      res.push(SCHEDULE_LABELS[key]);
-    }
-  });
-  return res;
-};
 
 import { Toast } from './components/ui/Toast';
 import { ApiStatusBadge } from './components/ui/ApiStatusBadge';
@@ -108,7 +67,7 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: ''
 };
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings' | 'schedule';
+type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
 
 
 // Helper to match the date format used in service
@@ -433,7 +392,6 @@ export default function App() {
       let completedList: string[] = [];
       let userNoteFromProgress = "";
       let savedTimestamp = Date.now();
-      let scheduleStateObj = {};
 
       // Try to get progress from localStorage (offline fallback) or plan data
       const savedProgressStr = localStorage.getItem('workout_progress');
@@ -454,7 +412,6 @@ export default function App() {
 
             userNoteFromProgress = progress.userNote || "";
             savedTimestamp = progress.lastUpdated || Date.now();
-            scheduleStateObj = progress.scheduleState || {};
           }
         } catch (e) {
           console.error("[AutoSave] Failed to parse progress", e);
@@ -466,13 +423,10 @@ export default function App() {
         ? userNoteFromProgress + " (Tự động lưu do qua ngày)"
         : "(Tự động lưu do qua ngày)";
 
-      const completedSchedule = getCompletedScheduleText(scheduleStateObj);
-
       const newItem: WorkoutHistoryItem = {
         date: cachedPlan.date,
         timestamp: savedTimestamp,
         levelSelected: cachedPlan.workout.detail.levelName,
-        completedSchedule,
         summary: cachedPlan.workout.summary,
         completedExercises: completedList,
         userNotes: finalNote,
@@ -613,10 +567,6 @@ export default function App() {
       setViewMode('settings');
       return;
     }
-    if (type === 'schedule') {
-      setViewMode('schedule');
-      return;
-    }
 
 
     setLoading(true);
@@ -645,7 +595,6 @@ export default function App() {
 
       if (generationType === 'workout') {
         finalPlan.workout = generatedPartial.workout;
-        finalPlan.schedule = generatedPartial.schedule; // Schedule is usually tied to workout
       }
 
       if (generationType === 'nutrition') {
@@ -770,7 +719,6 @@ export default function App() {
       levelSelected,
       summary,
       completedExercises,
-      completedSchedule: getCompletedScheduleText(plan?.workoutProgress?.scheduleState),
       userNotes: userNotes || "",
       exercisesSummary,
       exerciseLogs: exerciseLogs || undefined,
@@ -844,7 +792,6 @@ export default function App() {
         nutrition,
         weight: userData.weight,
         timestamp: Math.max(existingToday.timestamp, now.getTime()), // Keep latest timestamp
-        completedSchedule: existingToday.completedSchedule || getCompletedScheduleText(plan?.workoutProgress?.scheduleState)
       };
     } else {
       // Create new entry with only nutrition
@@ -856,8 +803,7 @@ export default function App() {
         completedExercises: [],
         exercisesSummary: 'Không có bài tập',
         nutrition,
-        weight: userData.weight,
-        completedSchedule: getCompletedScheduleText(plan?.workoutProgress?.scheduleState)
+        weight: userData.weight
       };
     }
 
@@ -967,106 +913,6 @@ export default function App() {
     // Sync to Supabase (debounced to avoid spamming on rapid toggles)
     if (session?.user) {
       debouncedSavePlan(session.user.id, updatedPlan);
-    }
-  };
-
-  const handleToggleSchedule = (id: string) => {
-    if (!plan) return;
-    const progress = plan.workoutProgress || { checkedState: {} };
-    const scheduleState = progress.scheduleState || {};
-    const newState = { ...scheduleState, [id]: !scheduleState[id] };
-
-    const updatedPlan = {
-      ...plan,
-      workoutProgress: {
-        ...progress,
-        scheduleState: newState
-      }
-    };
-
-    // Optimistic UI update
-    setPlan(updatedPlan);
-
-    // Save to local storage for offline fallback matching PlanDisplay's approach
-    const progressData = {
-      planDate: updatedPlan.date,
-      checkedState: progress.checkedState,
-      scheduleState: newState,
-      userNote: progress.userNote || '',
-      exerciseLogs: progress.exerciseLogs || {},
-      lastUpdated: Date.now()
-    };
-    localStorage.setItem('workout_progress', JSON.stringify(progressData));
-
-    // Save to Supabase (debounced save)
-    if (session?.user) {
-      debouncedSavePlan(session.user.id, updatedPlan);
-    }
-
-    // === Update workoutHistory as well to reflect schedule completion ===
-    const now = new Date();
-    const todayDateStr = getTodayString();
-    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const isSameDay = (ts: number) => {
-      const d = new Date(ts);
-      const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return dKey === todayKey;
-    };
-
-    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
-    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
-    const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
-
-    let itemToSave: WorkoutHistoryItem;
-
-    const completedSchedule = getCompletedScheduleText(newState);
-
-    if (existingToday) {
-      itemToSave = {
-        ...existingToday,
-        completedSchedule,
-        timestamp: Math.max(existingToday.timestamp, now.getTime())
-      };
-    } else {
-      itemToSave = {
-        date: todayDateStr,
-        timestamp: now.getTime(),
-        levelSelected: 'Chỉ lịch trình',
-        summary: 'Chỉ lưu lịch trình',
-        completedExercises: [],
-        exercisesSummary: 'Không có bài tập',
-        completedSchedule,
-        weight: userData.weight
-      };
-    }
-
-    const updatedHistory = [itemToSave, ...otherItems];
-    setWorkoutHistory(updatedHistory);
-
-    if (session?.user) {
-      const saveScheduleToSupabase = async () => {
-        const { data: existingData } = await supabase.from('daily_schedules_logs')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('date', todayKey)
-          .maybeSingle();
-
-        if (existingData) {
-          await supabase.from('daily_schedules_logs').update({
-            timestamp: now.getTime(),
-            completed_schedule: completedSchedule
-          }).eq('id', existingData.id);
-        } else {
-          await supabase.from('daily_schedules_logs').insert({
-            user_id: session.user.id,
-            date: todayKey,
-            timestamp: now.getTime(),
-            completed_schedule: completedSchedule
-          });
-        }
-      };
-      saveScheduleToSupabase().catch(console.error);
     }
   };
 
@@ -1242,16 +1088,6 @@ export default function App() {
                   isRefreshing={isRefreshing}
                 />
               )}
-
-              {viewMode === 'schedule' && (
-                <ScheduleView
-                  scheduleState={plan?.workoutProgress?.scheduleState}
-                  onToggleSchedule={handleToggleSchedule}
-                />
-              )}
-
-
-
 
               {/* Onboarding Tour */}
               {isTourOpen && (

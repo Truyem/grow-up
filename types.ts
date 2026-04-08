@@ -130,15 +130,8 @@ export interface WorkoutLevel {
   evening: Exercise[];
 }
 
-export interface Schedule {
-  suggestedWorkoutTime: string;
-  suggestedSleepTime: string;
-  reasoning: string;
-}
-
 export interface DailyPlan {
   date: string;
-  schedule: Schedule;
   workout: {
     summary: string;
     detail: WorkoutLevel;
@@ -155,7 +148,6 @@ export interface DailyPlan {
   };
   workoutProgress?: {
     checkedState: Record<string, boolean>;
-    scheduleState?: Record<string, boolean>; // New field for schedule progress
     userNote?: string;
     exerciseLogs?: Record<string, ExerciseLog>; // key = exercise key (e.g. "mor-0")
   };
@@ -181,7 +173,6 @@ export interface WorkoutHistoryItem {
 
   };
   weight?: number; // Recorded weight for that day
-  completedSchedule?: string[]; // Track the text of the completed schedule goals
 }
 
 // AI Overview - Insights from Gemini AI about workout progress
