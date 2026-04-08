@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Li
 import { Activity, Utensils, TrendingUp, Dumbbell, ChevronDown, ChevronUp } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { HumanBodyMuscleMap } from './HumanBodyMuscleMap';
-import { MuscleGroup, WorkoutHistoryItem, ExerciseLog } from '../../types';
+import { MuscleGroup, WorkoutHistoryItem, ExerciseLog, UserInput } from '../../types';
 
 interface ChartData {
     name: string;
@@ -24,6 +24,7 @@ interface StatsChartsProps {
     chartData: ChartData[];
     muscleDistribution: MuscleData[];
     history?: WorkoutHistoryItem[]; // Added history prop
+    userData?: UserInput; // Added userData prop
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -39,14 +40,48 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 {/* For Weight Tracking Charts */}
                 {data.volume !== undefined && <p className="text-emerald-400 text-xs">Volume: {data.volume.toLocaleString()} kg</p>}
                 {data.maxWeight !== undefined && <p className="text-cyan-400 text-xs">Max Weight: {data.maxWeight} kg</p>}
+                
+                {/* For Body Metrics Chart */}
+                {data.weight !== undefined && <p className="text-purple-400 text-xs">Cân nặng: {data.weight} kg</p>}
+                {data.bmi !== undefined && <p className="text-pink-400 text-xs">BMI: {data.bmi}</p>}
             </div>
         );
     }
     return null;
 };
 
-export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistribution, history = [] }) => {
+export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistribution, history = [], userData }) => {
     const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+
+    // Process history data for body metrics chart
+    const bodyMetricsData = useMemo(() => {
+        if (!history || history.length === 0 || !userData?.height) return [];
+
+        const sortedHistory = [...history]
+            .filter(item => item.weight)
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+        // Map to daily metrics
+        const metricsMap = new Map<string, { date: string, timestamp: number, weight: number, bmi: number }>();
+        
+        sortedHistory.forEach(item => {
+            if (item.weight) {
+                const d = new Date(item.timestamp);
+                const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+                const bmi = item.weight / Math.pow(userData.height / 100, 2);
+                
+                // Overwrite so we keep the latest on that day
+                metricsMap.set(dateStr, {
+                    date: dateStr,
+                    timestamp: item.timestamp,
+                    weight: item.weight,
+                    bmi: Number(bmi.toFixed(1))
+                });
+            }
+        });
+
+        return Array.from(metricsMap.values());
+    }, [history, userData]);
 
     // Process history data for weight tracking charts
     const exerciseTrends = useMemo(() => {
@@ -120,6 +155,45 @@ export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistr
                     </div>
                 </GlassCard>
             </div>
+
+            {/* BODY METRICS CHART */}
+            {bodyMetricsData.length > 0 && (
+                <GlassCard title="Chỉ số cơ thể (Cân nặng & BMI)" icon={<Activity className="w-5 h-5" />}>
+                    <div className="h-[250px] w-full mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={bodyMetricsData}>
+                                <defs>
+                                    <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#c084fc" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#c084fc" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorBmi" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f472b6" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#f472b6" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={5} />
+                                <YAxis yAxisId="left" domain={['auto', 'auto']} stroke="#c084fc" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} stroke="#f472b6" fontSize={10} tickLine={false} axisLine={false} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+                                <Area yAxisId="left" type="monotone" dataKey="weight" name="Cân nặng" stroke="#c084fc" fillOpacity={1} fill="url(#colorWeight)" strokeWidth={2} />
+                                <Area yAxisId="right" type="monotone" dataKey="bmi" name="BMI" stroke="#f472b6" fillOpacity={1} fill="url(#colorBmi)" strokeWidth={2} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-center gap-6 mt-2 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-purple-400" />
+                            <span className="text-gray-400">Cân nặng (kg)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-pink-400" />
+                            <span className="text-gray-400">BMI</span>
+                        </div>
+                    </div>
+                </GlassCard>
+            )}
 
             {muscleDistribution.length > 0 && (
                 <GlassCard title="Bản đồ cơ bắp" icon={<Activity className="w-5 h-5" />}>

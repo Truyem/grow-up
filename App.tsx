@@ -17,7 +17,6 @@ import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, In
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
-import { HistoryView } from './components/HistoryView';
 import { AuthPage } from './components/AuthPage';
 
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
@@ -891,7 +890,8 @@ export default function App() {
       summary: 'Ngày nghỉ do ốm hoặc bệnh - Streak được giữ nguyên',
       completedExercises: [],
       userNotes: 'Nghỉ ngơi để hồi phục sức khỏe',
-      exercisesSummary: 'Không tập (Ngày ốm)'
+      exercisesSummary: 'Không tập (Ngày ốm)',
+      weight: userData.weight
     };
 
     // Check if already marked sick today
@@ -1077,19 +1077,28 @@ export default function App() {
                     />
                   </div>
                 )
-              )}
+               )}
 
-              {viewMode === 'history' && (
-                <HistoryView
-                  history={workoutHistory}
-                  userData={userData}
-                  onDelete={handleDeleteHistoryItem}
-                  onRefresh={handleRefreshHistory}
-                  isRefreshing={isRefreshing}
-                />
-              )}
+               {viewMode === 'history' && (
+                 <div className="max-w-2xl mx-auto space-y-4">
+                   <UserForm
+                     userData={userData}
+                     setUserData={setUserData}
+                     userStats={userStats}
+                     onSubmit={handleGenerate}
+                     isLoading={loading}
+                     onSickDay={handleSickDay}
+                     history={workoutHistory}
+                     onDeleteHistory={handleDeleteHistoryItem}
+                     activeTab="history"
+                     onStartTracking={handleStartTracking}
+                     onRefreshHistory={handleRefreshHistory}
+                     isRefreshing={isRefreshing}
+                   />
+                 </div>
+               )}
 
-              {/* Onboarding Tour */}
+               {/* Onboarding Tour */}
               {isTourOpen && (
                 <OnboardingTour
                   steps={tourSteps}

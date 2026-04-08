@@ -304,7 +304,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             <div className="h-[200px] bg-white/5 rounded-xl" />
           </div>
         }>
-          <StatsCharts chartData={chartData} muscleDistribution={muscleDistribution} history={history} />
+          <StatsCharts chartData={chartData} muscleDistribution={muscleDistribution} history={history} userData={userData} />
         </Suspense>
       )}
 
@@ -467,11 +467,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                   <h4 className="font-bold text-white text-sm">
                     {selectedDay}/{calendarDate.month + 1} — {selectedDayItem.summary}
                   </h4>
-                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase mt-1
-                    ${selectedDayItem.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'}
-                  `}>
-                    {selectedDayItem.levelSelected}
-                  </span>
+                  <div className="flex flex-wrap gap-2 items-center mt-1">
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                      ${selectedDayItem.levelSelected.includes('Hard') ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'}
+                    `}>
+                      {selectedDayItem.levelSelected}
+                    </span>
+                    {selectedDayItem.weight && userData?.height && (
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">
+                        {selectedDayItem.weight} kg (BMI: {(selectedDayItem.weight / Math.pow(userData.height / 100, 2)).toFixed(1)})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={(e) => handleDeleteRequest(selectedDayItem.timestamp, e)}

@@ -172,6 +172,77 @@ const getCurrentDayPeriod = () => {
   return 'tối';
 };
 
+// Get average weight from last 7 days
+const getAverageWeight = (history: WorkoutHistoryItem[], days: number = 7): number => {
+  const weekAgo = Date.now() - days * 24 * 60 * 60 * 1000;
+  const recentRecords = history.filter(h => h.timestamp >= weekAgo && h.weight && h.weight > 0);
+  
+  if (recentRecords.length === 0) return 0;
+  
+  const totalWeight = recentRecords.reduce((sum, h) => sum + h.weight, 0);
+  return Math.round((totalWeight / recentRecords.length) * 10) / 10;
+};
+
+// Get weight trend (positive = gaining, negative = losing, 0 = stable)
+const getWeightTrend = (history: WorkoutHistoryItem[]): { trend: number; percentChange: number; direction: string } => {
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentRecords = history.filter(h => h.timestamp >= sevenDaysAgo && h.weight && h.weight > 0);
+  
+  if (recentRecords.length < 2) {
+    return { trend: 0, percentChange: 0, direction: 'ổn định' };
+  }
+  
+  // Sort by timestamp ascending to get first and last
+  const sorted = recentRecords.sort((a, b) => a.timestamp - b.timestamp);
+  const firstWeight = sorted[0].weight;
+  const lastWeight = sorted[sorted.length - 1].weight;
+  const trend = lastWeight - firstWeight;
+  const percentChange = (trend / firstWeight) * 100;
+  
+  let direction = 'ổn định';
+  if (trend > 0.5) direction = 'tăng';
+  if (trend < -0.5) direction = 'giảm';
+  
+  return { trend, percentChange: Math.round(percentChange * 100) / 100, direction };
+};
+
+// Evaluate food intake status
+const evaluateFoodIntake = (consumedFood: string[], targetCalories: number, recentMeals: string[]): { status: string; adjustment: string; reason: string } => {
+  const consumedCount = consumedFood.length;
+  const mealsPerDay = 4; // Target meals per day
+  const consumptionRatio = consumedCount / mealsPerDay;
+  
+  if (consumptionRatio < 0.5) {
+    return {
+      status: 'Ăn ít',
+      adjustment: '-10%',
+      reason: `Chỉ ăn ${consumedCount} bữa, cần tối thiểu 4 bữa. Giảm cường độ để tránh quá tải cơ thể.`
+    };
+  }
+  
+  if (consumptionRatio < 0.75) {
+    return {
+      status: 'Ăn vừa phải',
+      adjustment: '-5%',
+      reason: `Ăn ${consumedCount} bữa, chưa đủ ${mealsPerDay}. Giảm nhẹ cường độ.`
+    };
+  }
+  
+  if (consumptionRatio >= 1) {
+    return {
+      status: 'Ăn đủ',
+      adjustment: '+5%',
+      reason: `Ăn ${consumedCount} bữa ≥ ${mealsPerDay}. Có thể tăng cường độ.`
+    };
+  }
+  
+  return {
+    status: 'Ăn cân bằng',
+    adjustment: '0%',
+    reason: `Ăn ${consumedCount} bữa, cân bằng. Duy trì cường độ bình thường.`
+  };
+};
+
 // Helper to clean and parse JSON
 const cleanAndParseJSON = (text: string, context: string): any => {
   try {
@@ -526,6 +597,13 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   const dayPeriod = getCurrentDayPeriod();
   const { target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
   const proteinTarget = Math.round(userData.weight * (userData.nutritionGoal === 'bulking' ? 2.2 : 2.0));
+  
+  // Get weight trend analysis
+  const weightTrend = getWeightTrend(history);
+  const avgWeight = getAverageWeight(history, 7);
+  
+  // Get food intake assessment
+  const foodAssessment = evaluateFoodIntake(userData.consumedFood, target, []);
 
   const inferEquipmentFromExerciseName = (exerciseName: string): string[] => {
     const name = (exerciseName || '').toLowerCase();
@@ -552,6 +630,7 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
       level: h.levelSelected,
       completedExercises: h.completedExercises || [],
       exercisesSummary: h.exercisesSummary || '',
+      weight: h.weight,
       nutrition: {
         totalCalories: h.nutrition?.totalCalories || 0,
         totalProtein: h.nutrition?.totalProtein || 0,
@@ -585,13 +664,17 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     - Sore muscles: ${userData.soreMuscles.join(', ')}
     - Equipment: ${userData.equipment.join(', ')}
     - Cân nặng hiện tại: ${userData.weight}kg
+    - Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
+    - Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg, ${weightTrend.percentChange}%)
     - Calories mục tiêu hôm nay: ${target} kcal
     - Protein mục tiêu hôm nay: ${proteinTarget} g
     - Mục tiêu: ${userData.nutritionGoal}
     - Đã ăn hôm nay: ${userData.consumedFood.join(', ') || 'Chưa có dữ liệu'}
+    - Tình trạng ăn uống: ${foodAssessment.status} (${foodAssessment.reason})
+    - Điều chỉnh cương độ dựa trên thức ăn: ${foodAssessment.adjustment}
     - Thời điểm hiện tại: ${dayPeriod}
 
-    LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, calories, protein, dụng cụ):
+    LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, cân nặng, calories, protein, dụng cụ):
     ${JSON.stringify(history7Days, null, 2)}
 
     QUY TẮC CHỌN BÀI:
@@ -599,8 +682,15 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     - Mỗi bài phải có primaryMuscleGroups và secondaryMuscleGroups rõ ràng.
     - Dùng tiếng Anh cho tên bài tập.
     - Summary/description/reasoning viết tiếng Việt.
-    - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories và protein chưa?"
-    - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp.
+    - **NẾU XU HƯỚNG CÂN NẶNG GIẢM (${weightTrend.direction === 'giảm' ? 'ĐÚNG' : 'SAI'})**:
+      - Nếu đang giảm cân, ưu tiên bài tập volume vừa phải, tránh overtraining.
+      - Tập trọng lượng nhẹ hơn, tập nhiều reps hơn để tránh mất cơ.
+    - **NẾU ĂN ÍT (${foodAssessment.status === 'Ăn ít' ? 'ĐÚNG' : 'SAI'})**:
+      - Giảm volume workout, tối ưu recovery.
+      - Tập ngắn hơn, focus vào compound movements chính.
+      - Có thể giảm ${foodAssessment.adjustment} cường độ.
+    - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories (${target} kcal) và protein (${proteinTarget}g) chưa?"
+    - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp, và cảnh báo nếu cần tăng intake.
 
     Trả về DUY NHẤT JSON hợp lệ theo format:
     { "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [{ "name": "...", "sets": 0, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": false, "primaryMuscleGroups": ["..."], "secondaryMuscleGroups": ["..."] }], "evening": [] } } }
@@ -614,7 +704,22 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
   return cleanAndParseJSON(responseText, "WorkoutPart");
 };
 
-const generateNutritionPart = async (userData: UserInput): Promise<any> => {
+const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7): string[] => {
+  const weekAgo = Date.now() - days * 24 * 60 * 60 * 1000;
+  const recentMeals: string[] = [];
+  
+  history.forEach(item => {
+    if (item.timestamp >= weekAgo && item.nutrition?.meals) {
+      item.nutrition.meals.forEach(meal => {
+        recentMeals.push(meal.name);
+      });
+    }
+  });
+  
+  return recentMeals;
+};
+
+const generateNutritionPart = async (userData: UserInput, fullHistory: WorkoutHistoryItem[] = []): Promise<any> => {
   const model = MODELS.MENU;
 
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
@@ -625,28 +730,79 @@ const generateNutritionPart = async (userData: UserInput): Promise<any> => {
   const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
 
+  // Get time period for meal timing
+  const dayPeriod = getCurrentDayPeriod();
+  
+  // Get weight trend analysis
+  const weightTrend = getWeightTrend(fullHistory);
+  const avgWeight = getAverageWeight(fullHistory, 7);
+  
+  // Get food intake assessment
+  const foodAssessment = evaluateFoodIntake(userData.consumedFood, target, []);
+
+  // Extract meals from last 7 days to avoid duplication
+  const recentMeals = extractMealsFromHistory(fullHistory, 7);
+  const uniqueRecentMeals = Array.from(new Set(recentMeals));
+  const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join(', ') : 'none';
+  
+  // Adjust calorie target based on weight trend
+  let adjustedCalories = Math.round(target);
+  let calorieNote = '';
+  if (weightTrend.direction === 'giảm' && userData.nutritionGoal === 'bulking') {
+    adjustedCalories = Math.round(target * 1.05); // Add 5% if losing weight during bulk
+    calorieNote = ' (+5% vì cân nặng có xu hướng giảm)';
+  } else if (weightTrend.direction === 'tăng' && userData.nutritionGoal === 'cutting') {
+    adjustedCalories = Math.round(target * 0.95); // Reduce 5% if gaining during cut
+    calorieNote = ' (-5% vì cân nặng có xu hướng tăng)';
+  }
+
   const prompt = `
 ACT AS A NUTRITIONIST.
 Return ONLY valid JSON (no markdown).
 
-Targets:
-- Calories: ${Math.round(target)}
+CURRENT TIME & CONTEXT:
+- Thời điểm hiện tại: ${dayPeriod}
+- Ngày hôm nay: ${getCurrentDate()}
+
+BODY METRICS:
+- Cân nặng hiện tại: ${userData.weight}kg
+- Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
+- Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg)
+
+NUTRITIONAL TARGETS:
+- Calories: ${adjustedCalories}${calorieNote}
 - Protein(g): ${proteinTarget}
 - Carbs(g): ${carbTarget}
 - Fat(g): ${fatTarget}
 - Goal: ${goalText}
+- TDEE: ${Math.round(tdee)} kcal
+- Workout Burn Est: ${burn} kcal
 
-Inputs:
+USER INPUTS:
 - Weight: ${userData.weight}kg
 - Height: ${userData.height}cm
 - Food consumed today: ${userData.consumedFood.join(', ') || 'none'}
+- Tình trạng ăn uống: ${foodAssessment.status}
 - Creatine: ${userData.useCreatine ? "YES" : "NO"}
 
-Rules:
+MEALS CONSUMED IN LAST 7 DAYS (TO AVOID REPETITION):
+${recentMealsStr}
+
+RULES:
 - Vietnamese meal description, short and practical.
-- Breakfast: no rice. Lunch/dinner: rice allowed.
-- Include meal time in meal name.
-- Daily totals should be close to targets.
+- **Breakfast (Sáng)**: NO rice/bread. Use eggs, yogurt, oats, fruit, nuts.
+- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.
+- **Dinner (Chiều/Tối)**: Rice allowed but lighter than lunch. Lean protein preferred.
+- **Snacks**: If needed, light options like yogurt, fruit, nuts.
+- Include meal time in meal name (e.g., "Sáng: Trứng rán 2 quả").
+- Daily totals should be close to targets (±5% acceptable).
+- **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED IN LAST 7 DAYS" list. Create DIFFERENT, VARIED meals to keep diet interesting.
+- Prioritize meal variety and diversity to prevent boredom.
+- If meals from list are suggested, modify significantly (different cooking method, protein source, sides).
+- **WEIGHT AWARENESS**:
+  - ${weightTrend.direction === 'giảm' ? '⚠️ Weight is DECREASING: Prioritize protein, consider adding healthy fats to prevent muscle loss.' : ''}
+  - ${weightTrend.direction === 'tăng' ? '⚠️ Weight is INCREASING: Monitor portions if cutting, or celebrate if bulking!' : ''}
+- **FOOD INTAKE STATUS**: ${foodAssessment.reason}. ${foodAssessment.status === 'Ăn ít' ? 'Suggest smaller meals that are nutrient-dense.' : foodAssessment.status === 'Ăn đủ' ? 'Good intake so far, continue balanced meals.' : 'Ensure remaining meals are well-distributed.'}
 
 JSON schema:
 {
@@ -655,15 +811,15 @@ JSON schema:
     "totalProtein": number,
     "totalCarbs": number,
     "totalFat": number,
-    "advice": "string",
+    "advice": "string (Vietnamese, mention time-based meal tips, weight trend awareness, and when to eat based on current time)",
     "meals": [
       {
-        "name": "string",
+        "name": "string (include meal time: Sáng/Trưa/Chiều/Tối/Snack)",
         "calories": number,
         "protein": number,
         "carbs": number,
         "fat": number,
-        "description": "string"
+        "description": "string (Vietnamese, include portion sizes)"
       }
     ]
   }
@@ -697,7 +853,7 @@ export const generateDailyPlan = async (
     }
 
     if (generationType === 'nutrition' || generationType === 'both') {
-      nutritionPart = await generateNutritionPart(userData);
+      nutritionPart = await generateNutritionPart(userData, fullHistory);
     }
 
     const fallback = getFallbackPlan(userData);
