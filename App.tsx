@@ -356,9 +356,8 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync Data: Load from localStorage instead of Supabase
-  useEffect(() => {
-  useEffect(() => {
+   // Sync Data: Load from localStorage instead of Supabase
+   useEffect(() => {
     const newStreak = calculateWeeklyStreak(workoutHistory);
     if (newStreak !== userStats.streak) {
       setUserStats(prev => ({ ...prev, streak: newStreak }));
