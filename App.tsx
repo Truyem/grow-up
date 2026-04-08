@@ -19,6 +19,7 @@ import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
 import { HistoryView } from './components/HistoryView';
 import { ScheduleView } from './components/ScheduleView';
+import { AuthPage } from './components/AuthPage';
 
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
 import { AccountSettings } from './components/AccountSettings';
@@ -352,7 +353,7 @@ export default function App() {
 
   // Debug version to ensure HMR works
   useEffect(() => {
-    console.log("App Version: Local Storage Only (No Supabase)");
+    console.log("App Version: Using Supabase Authentication");
   }, []);
 
   // Update API status periodically
