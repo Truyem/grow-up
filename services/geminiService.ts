@@ -3,6 +3,7 @@ import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, Fati
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
+const GPT_OSS_MODEL = "@cf/openai/gpt-oss-120b";
 
 // Gemini API keys from environment (for food image analysis)
 // Multiple keys are injected via vite.config.ts
@@ -102,13 +103,14 @@ const callNemotronAPI = async (messages: Array<{ role: string; content: string }
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "x-model": GPT_OSS_MODEL
       },
       body: JSON.stringify({
-        model: "nemotron",
+        model: GPT_OSS_MODEL,
         messages: messages,
-        max_tokens: 4096,
-        temperature: 0.7,
+        max_tokens: 100000,
+        temperature: 0.2,
         plain_text: true
       })
     });
@@ -157,6 +159,14 @@ const getCurrentDate = () => {
   const now = new Date();
   const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   return `${days[now.getDay()]}, ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+};
+
+const getCurrentDayPeriod = () => {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'sáng';
+  if (hour < 14) return 'trưa';
+  if (hour < 18) return 'chiều';
+  return 'tối';
 };
 
 // Helper to clean and parse JSON
@@ -510,115 +520,87 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
 
 const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[]): Promise<any> => {
   const model = MODELS.WORKOUT;
+  const dayPeriod = getCurrentDayPeriod();
+  const { target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const proteinTarget = Math.round(userData.weight * (userData.nutritionGoal === 'bulking' ? 2.2 : 2.0));
 
-  // Determine Day Number (1-7)
-  // Determine Day Number based on completed workouts this week (Mon-Sun)
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  const currentDay = startOfWeek.getDay() || 7; // Mon=1, ... Sun=7
-  startOfWeek.setDate(now.getDate() - currentDay + 1);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const inferEquipmentFromExerciseName = (exerciseName: string): string[] => {
+    const name = (exerciseName || '').toLowerCase();
+    const equipment = new Set<string>();
+    if (name.includes('barbell')) equipment.add('Barbell');
+    if (name.includes('dumbbell') || name.includes('db ')) equipment.add('Dumbbell');
+    if (name.includes('cable')) equipment.add('Cable');
+    if (name.includes('machine')) equipment.add('Machine');
+    if (name.includes('bench')) equipment.add('Bench');
+    if (name.includes('pull-up') || name.includes('chin-up') || name.includes('bar')) equipment.add('Pull-up Bar');
+    if (name.includes('band')) equipment.add('Resistance Band');
+    if (name.includes('bodyweight') || name.includes('push-up') || name.includes('plank') || name.includes('burpee')) equipment.add('Bodyweight');
+    if (equipment.size === 0) equipment.add('Unknown');
+    return Array.from(equipment);
+  };
 
-  // Filter history for workouts completed on or after startOfWeek
-  const workoutsThisWeek = history.filter(h => h.timestamp >= startOfWeek.getTime()).length;
-  // Current day is (workouts completed + 1). If 0 completed, it's Day 1.
-  const currentDayNumber = (workoutsThisWeek % 7) + 1;
-  const dayNames = ["", "Day 1 (Push)", "Day 2 (Back/Biceps)", "Day 3 (Legs/Abs)", "Day 4 (Arms)", "Day 5 (Chest/Back)", "Day 6 (Shoulder/Arms)", "Day 7 (Rest/Walk)"];
-  const currentSplitName = dayNames[currentDayNumber];
-
-  let workoutInstructionBlock = "";
-  if (userData.trainingMode === 'gym') {
-    // DIRECTLY RETURN HARDCODED SCHEDULE
-    let schedule = GYM_SCHEDULE[currentDayNumber] || GYM_SCHEDULE[1];
-
-    // --- PERSONALIZATION LOGIC ---
-    // Make a deep copy to avoid mutating the constant
-    schedule = JSON.parse(JSON.stringify(schedule));
-
-    const health = userData.healthCondition || 'Good';
-    const intensity = userData.selectedIntensity || 'medium';
-
-    if (schedule.morning && schedule.morning.length > 0) {
-      schedule.morning = schedule.morning.map((ex: any) => {
-        let sets = ex.sets;
-        let note = "";
-
-        // 1. HEALTH CONDITION ADJUSTMENTS
-        if (health === 'Injured') {
-          sets = Math.max(2, sets - 1); // Reduce volume
-          note += " [CHẤN THƯƠNG: Tập nhẹ, focus form]";
-        } else if (health === 'Tired') {
-          sets = Math.max(2, sets - 1);
-          note += " [MỆT MỎI: Giảm volume]";
-        }
-
-        // 2. INTENSITY ADJUSTMENTS
-        if (intensity === 'hard' && health === 'Good') {
-          sets += 1; // Increase volume
-          note += " [HARDCORE: +1 Set]";
-        } else if (intensity === 'low') {
-          sets = Math.max(2, sets - 1);
-          note += " [LITE: Giảm nhẹ]";
-        }
-
-        return {
-          ...ex,
-          sets: sets,
-          notes: (ex.notes || "") + note
-        };
-      });
-    }
-
-    return {
-      workout: {
-        summary: `Hôm nay là ${schedule.levelName}. (Health: ${health}, Mode: ${intensity})`,
-        detail: schedule
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const history7Days = history
+    .filter((h) => h.timestamp >= sevenDaysAgo)
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 7)
+    .map((h) => ({
+      date: h.date,
+      level: h.levelSelected,
+      completedExercises: h.completedExercises || [],
+      exercisesSummary: h.exercisesSummary || '',
+      nutrition: {
+        totalCalories: h.nutrition?.totalCalories || 0,
+        totalProtein: h.nutrition?.totalProtein || 0,
       },
-      schedule: {
-        suggestedWorkoutTime: "17:30",
-        suggestedSleepTime: "23:00",
-        reasoning: "Lịch tập cố định 6 ngày."
-      }
-    };
-  } else if (userData.trainingMode === 'home') {
-    // HOME WORKOUT MODE - AI Generated (Gym + Calis Hybrid)
-    workoutInstructionBlock = `
-    ### WORKOUT MODE: HOME WORKOUT (GYM + CALISTHENICS HYBRID)
-    TODAY IS: ${currentSplitName}.
-    FOCUS: Target the SAME MUSCLE GROUPS as traditional gym workouts, but using HOME EQUIPMENT and BODYWEIGHT.
-    `;
-  } else {
-    workoutInstructionBlock = `
-    ### WORKOUT MODE: CALISTHENICS & STREET WORKOUT
-    TODAY IS: ${currentSplitName}. 
-    FOCUS: BODYWEIGHT MASTERY, SKILLS (Planche, Front Lever progs), and RELATIVE STRENGTH.
-    `;
-  }
+      exerciseLogs: (h.exerciseLogs || []).map((log) => ({
+        exerciseName: log.exerciseName,
+        inferredEquipment: inferEquipmentFromExerciseName(log.exerciseName),
+        totalVolume: log.totalVolume,
+        sets: (log.sets || []).map((s, idx) => ({
+          set: idx + 1,
+          kg: s.weight,
+          reps: s.reps,
+        })),
+      })),
+    }));
 
   const prompt = `
-    ACT AS A WORLD-CLASS PERSONAL TRAINER.
+    ACT AS A WORLD-CLASS PERSONAL TRAINER USING MODEL ${model}.
     GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
-    TRAINING MODE: ${userData.trainingMode === 'home' ? 'HOME WORKOUT (GYM + CALIS HYBRID)' : 'CALISTHENICS/STREET WORKOUT'}.
-    
-    ${workoutInstructionBlock}
 
-    ### LANGUAGE & LOCALIZATION RULES
-    - **VIETNAMESE REQUIRED**: Summary, Description, Reasoning MUST be in **VIETNAMESE**.
-    - **SUMMARY**: concise (max 2 sentences). NO motivational rants. NO repetition.
-    - **EXERCISE NAMES**: MUST be in **ENGLISH** (e.g., "Incline Bench Press").
-    
-    ### GENERAL WORKOUT RULES
-    - **INTENSITY**: ${userData.selectedIntensity}.
-    - **EQUIPMENT**: ${userData.equipment.join(', ')}.
-    - **STRICT EQUIPMENT CHECK**: ONLY use listed tools. Substitute missing with BODYWEIGHT.
-    - **ONE DUMBBELL RULE**: User only has ONE dumbbell unless "2x" specified.
+    BẮT BUỘC:
+    - KHÔNG dùng lịch cố định có sẵn.
+    - Dựa trên lịch sử 7 ngày gần nhất để tránh trùng nhóm cơ chưa hồi phục.
+    - Tự động progressive overload dựa trên dữ liệu set/reps/kg đã tập.
+    - Nếu dấu hiệu mệt/đau thì giảm tải hợp lý.
 
-    ### DATA INPUTS
-    - Sore Muscles: ${userData.soreMuscles.join(', ')}.
-    - Fatigue: ${userData.fatigue}.
+    DỮ LIỆU NGƯỜI DÙNG:
+    - Training mode: ${userData.trainingMode}
+    - Intensity: ${userData.selectedIntensity}
+    - Fatigue: ${userData.fatigue}
+    - Sore muscles: ${userData.soreMuscles.join(', ')}
+    - Equipment: ${userData.equipment.join(', ')}
+    - Cân nặng hiện tại: ${userData.weight}kg
+    - Calories mục tiêu hôm nay: ${target} kcal
+    - Protein mục tiêu hôm nay: ${proteinTarget} g
+    - Mục tiêu: ${userData.nutritionGoal}
+    - Đã ăn hôm nay: ${userData.consumedFood.join(', ') || 'Chưa có dữ liệu'}
+    - Thời điểm hiện tại: ${dayPeriod}
 
-    Generate JSON response with 'date', 'schedule', and 'workout' fields with exercises.
-    Format: { "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [...], "evening": [...] } } }
+    LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, calories, protein, dụng cụ):
+    ${JSON.stringify(history7Days, null, 2)}
+
+    QUY TẮC CHỌN BÀI:
+    - Không lặp nhóm cơ primary vừa tập nặng trong 48h gần nhất.
+    - Mỗi bài phải có primaryMuscleGroups và secondaryMuscleGroups rõ ràng.
+    - Dùng tiếng Anh cho tên bài tập.
+    - Summary/description/reasoning viết tiếng Việt.
+    - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories và protein chưa?"
+    - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp.
+
+    Trả về DUY NHẤT JSON hợp lệ theo format:
+    { "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [{ "name": "...", "sets": 0, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": false, "primaryMuscleGroups": ["..."], "secondaryMuscleGroups": ["..."] }], "evening": [] } } }
   `;
 
   const responseText = await callNemotronAPI([

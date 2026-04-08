@@ -1,0 +1,30 @@
+.illustration {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  display: block;
+}
+
+.muscle,
+.muscleContainer {
+  fill: rgba(148, 163, 184, 0.28);
+  transition: fill 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.empty {
+  fill: rgba(148, 163, 184, 0.14);
+}
+
+.enabled {
+  fill: rgba(59, 130, 246, 0.28);
+}
+
+.hover {
+  fill: rgba(96, 165, 250, 0.4);
+}
+
+.active {
+  fill: rgba(16, 185, 129, 0.62);
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.45));
+}
