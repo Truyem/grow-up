@@ -15,7 +15,7 @@ const MODELS = {
   OVERVIEW: "nemotron",
   MENU: "nemotron",
   FOOD_RECOGNITION: "gemini-2.5-flash-lite",
-  MACRO_CALC: "gemini-3.1-flash-lite-preview",
+  MACRO_CALC: "nemotron",
   FOOD_SUGGEST: "nemotron",
 };
 
@@ -97,7 +97,10 @@ const markGeminiKeyRateLimitedAndRotate = (): string | null => {
 };
 
 // Helper function to call Nemotron API
-const callNemotronAPI = async (messages: Array<{ role: string; content: string }>): Promise<string> => {
+const callNemotronAPI = async (
+  messages: Array<{ role: string; content: string }>,
+  options?: { maxTokens?: number; temperature?: number }
+): Promise<string> => {
   try {
     const response = await fetch(NEMOTRON_ENDPOINT, {
       method: "POST",
@@ -109,8 +112,8 @@ const callNemotronAPI = async (messages: Array<{ role: string; content: string }
       body: JSON.stringify({
         model: GPT_OSS_MODEL,
         messages: messages,
-        max_tokens: 100000,
-        temperature: 0.2,
+        max_tokens: options?.maxTokens ?? 100000,
+        temperature: options?.temperature ?? 0.2,
         plain_text: true
       })
     });
@@ -623,30 +626,53 @@ const generateNutritionPart = async (userData: UserInput): Promise<any> => {
   const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
 
   const prompt = `
-    ACT AS A NUTRITIONIST.
-    GENERATE A 1-DAY MEAL PLAN.
-    
-    ### NUTRITION RULES (DYNAMIC MATH)
-    - **CALCULATED TARGET**: ${Math.round(target)} kcal.
-    - **MACROS TARGET**: Protein: ${proteinTarget}g, Carbs: ${carbTarget}g, Fat: ${fatTarget}g.
-    - **GOAL**: ${goalText}.
-    - **MEAL DESCRIPTIONS**: MUST BE IN VIETNAMESE. Simple (e.g., "200g Ức gà + Cơm").
-    - **MEAL MACROS**: Estimate carbs/fat for EACH meal. Sum must match daily total.
-    - **CARBS**: Breakfast: NO RICE. Lunch/Dinner: Rice allowed.
-    - **FORMAT**: Meal names with time (e.g., "Bữa Sáng (07:00)").
+ACT AS A NUTRITIONIST.
+Return ONLY valid JSON (no markdown).
 
-    ### DATA INPUTS
-    - Weight: ${userData.weight}kg, Height: ${userData.height}cm.
-    - Food Consumed Today: ${userData.consumedFood.join(', ')} (Subtract these).
-    - Creatine: ${userData.useCreatine ? "YES" : "NO"}.
+Targets:
+- Calories: ${Math.round(target)}
+- Protein(g): ${proteinTarget}
+- Carbs(g): ${carbTarget}
+- Fat(g): ${fatTarget}
+- Goal: ${goalText}
 
-    Generate JSON response with 'nutrition' field containing meals array.
-    Format: { "nutrition": { "totalCalories": number, "totalProtein": number, "totalCarbs": number, "totalFat": number, "advice": "string", "meals": [{ "name": "string", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "string" }] } }
+Inputs:
+- Weight: ${userData.weight}kg
+- Height: ${userData.height}cm
+- Food consumed today: ${userData.consumedFood.join(', ') || 'none'}
+- Creatine: ${userData.useCreatine ? "YES" : "NO"}
+
+Rules:
+- Vietnamese meal description, short and practical.
+- Breakfast: no rice. Lunch/dinner: rice allowed.
+- Include meal time in meal name.
+- Daily totals should be close to targets.
+
+JSON schema:
+{
+  "nutrition": {
+    "totalCalories": number,
+    "totalProtein": number,
+    "totalCarbs": number,
+    "totalFat": number,
+    "advice": "string",
+    "meals": [
+      {
+        "name": "string",
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fat": number,
+        "description": "string"
+      }
+    ]
+  }
+}
   `;
 
   const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
-  ]);
+  ], { maxTokens: 50000, temperature: 0.2 });
 
   if (!responseText) throw new Error("Empty nutrition response");
   return cleanAndParseJSON(responseText, "NutritionPart");
@@ -959,22 +985,8 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
         throw error;
       }
 
-      // STEP 2: CALCULATE MACROS (Text -> JSON)
-      // Model: Gemini 3.1 Flash-Lite Preview
-      const macroModel = MODELS.MACRO_CALC;
-
-      const macroSchema = {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          calories: { type: Type.NUMBER },
-          protein: { type: Type.NUMBER },
-          carbs: { type: Type.NUMBER },
-          fat: { type: Type.NUMBER },
-          description: { type: Type.STRING },
-        }
-      };
-
+      // STEP 2: CALCULATE MACROS (Text -> JSON) using Nemotron
+      // Model: previously Gemini; switch to Nemotron for macro calc to avoid 3.1-preview issues
       const macroPrompt = `
         ACT AS A NUTRITIONIST.
         Based on this food description: "${foodDescription}"
@@ -990,15 +1002,11 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
       `;
 
       try {
-        const response = await ai.models.generateContent({
-          model: macroModel,
-          contents: macroPrompt,
-          config: { responseMimeType: "application/json", responseSchema: macroSchema },
-        });
-
-        const jsonText = response.text;
-        if (!jsonText) throw new Error("Empty macro response");
-        return cleanAndParseJSON(jsonText, "FoodAnalysis");
+        const responseText = await callNemotronAPI([
+          { role: "user", content: macroPrompt }
+        ]);
+        if (!responseText) throw new Error("Empty macro response");
+        return cleanAndParseJSON(responseText, "FoodAnalysis");
       } catch (error) {
         console.error("Macro Calc Error:", error);
         throw error;
