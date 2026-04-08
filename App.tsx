@@ -21,6 +21,9 @@ import { HistoryView } from './components/HistoryView';
 import { ScheduleView } from './components/ScheduleView';
 
 import { OnboardingTour, TourStep } from './components/OnboardingTour';
+import { AccountSettings } from './components/AccountSettings';
+import { supabase } from './services/supabase';
+import { debouncedSavePlan } from './services/supabasePlanSync';
 
 
 const SCHEDULE_LABELS: Record<string, string> = {
@@ -173,6 +176,10 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
+
+  // Authentication state
+  const [session, setSession] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Tour Configuration
   const tourSteps: TourStep[] = [
@@ -354,6 +361,40 @@ export default function App() {
       setApiStatus(getApiStatus());
     }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Initialize session from Supabase on mount
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setIsAuthChecking(true);
+      try {
+        // Get current session
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[Auth] Failed to get session:', error);
+          setSession(null);
+        } else {
+          setSession(currentSession);
+        }
+      } catch (err) {
+        console.error('[Auth] Auth initialization error:', err);
+        setSession(null);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
    // Sync Data: Load from localStorage instead of Supabase
