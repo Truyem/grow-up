@@ -131,7 +131,7 @@ const HumanBodyMuscleMap = ({
     >
       <path
         id='path14'
-        fill='#f5f5f5'
+        fill='black'
         stroke='black'
         strokeWidth='1'
         d='M 440.43,458.85
@@ -1674,7 +1674,7 @@ const HumanBodyMuscleMap = ({
       />
       <path
         id='path104'
-        fill='#f5f5f5'
+        fill='black'
         stroke='black'
         strokeWidth='1'
         d='M 163.05,461.45
