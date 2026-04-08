@@ -565,9 +565,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
                   // Map muscle group strings to MuscleGroup enum values
                   const mapMuscleString = (muscleStr: string): MuscleGroup | null => {
                     // Chest
-                    if (muscleStr.includes('Chest - Upper')) return MuscleGroup.ChestUpper;
-                    if (muscleStr.includes('Chest - Middle')) return MuscleGroup.ChestMiddle;
-                    if (muscleStr.includes('Chest - Lower')) return MuscleGroup.ChestLower;
+                    if (muscleStr.includes('Chest')) return MuscleGroup.Chest;
                     // Shoulders
                     if (muscleStr.includes('Front Delts')) return MuscleGroup.FrontDelts;
                     if (muscleStr.includes('Side Delts')) return MuscleGroup.SideDelts;

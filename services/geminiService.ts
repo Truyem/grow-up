@@ -263,7 +263,7 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
     morning: [
-      { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "OFFLINE MODE", primaryMuscleGroups: ["Front Delts", "Chest - Upper"], secondaryMuscleGroups: ["Triceps", "Core"] },
+       { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "OFFLINE MODE", primaryMuscleGroups: ["Front Delts", "Chest"], secondaryMuscleGroups: ["Triceps", "Core"] },
       { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
@@ -275,7 +275,7 @@ const getFallbackPlan = (userData: UserInput): DailyPlan => {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp + Daily Abs & Cardio.",
     morning: [
-      { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "OFFLINE MODE", primaryMuscleGroups: ["Chest - Middle"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
+       { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "OFFLINE MODE", primaryMuscleGroups: ["Chest"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
       { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
     evening: [
@@ -353,9 +353,9 @@ const GYM_SCHEDULE: Record<number, any> = {
     levelName: "Ngày 1: Upper Body Strength (Ngực/Lưng)",
     description: "Tập trung sức mạnh thân trên. Volume cao.",
     morning: [
-      { name: "Barbell Bench Press", sets: 4, reps: "8-10", primaryMuscleGroups: ["Chest - Middle", "Triceps"], notes: "Tăng tạ mỗi set" },
+       { name: "Barbell Bench Press", sets: 4, reps: "8-10", primaryMuscleGroups: ["Chest", "Triceps"], notes: "Tăng tạ mỗi set" },
       { name: "Bent Over Barbell Row", sets: 4, reps: "10-12", primaryMuscleGroups: ["Lats", "Upper Back"], notes: "Giữ lưng thẳng" },
-      { name: "Incline Dumbbell Press", sets: 4, reps: "10-12", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
+       { name: "Incline Dumbbell Press", sets: 4, reps: "10-12", primaryMuscleGroups: ["Chest", "Front Delts"] },
       { name: "Lat Pulldown (Wide Grip)", sets: 4, reps: "12-15", primaryMuscleGroups: ["Lats"] },
       { name: "Dumbbell Lateral Raise", sets: 4, reps: "15-20", primaryMuscleGroups: ["Side Delts"], notes: "Dropset set cuối" },
       { name: "Face Pulls", sets: 4, reps: "15-20", primaryMuscleGroups: ["Rear Delts", "Traps"] }
@@ -435,12 +435,12 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
     levelName: "Ngày 1: Push Day (Ngực, Vai, Tay sau)",
     description: "Đẩy tại nhà - kết hợp tạ đơn và bodyweight.",
     morning: [
-      { name: "Push-up (Wide Grip)", sets: 4, reps: "12-15", equipment: "None", primaryMuscleGroups: ["Chest - Middle", "Triceps"] },
-      { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Triceps - Long Head"] },
+       { name: "Push-up (Wide Grip)", sets: 4, reps: "12-15", equipment: "None", primaryMuscleGroups: ["Chest", "Triceps"] },
+       { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest", "Triceps - Long Head"] },
       { name: "Pike Push-up", sets: 3, reps: "10-12", equipment: "None", primaryMuscleGroups: ["Front Delts", "Triceps"] },
       { name: "Dumbbell Shoulder Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Front Delts", "Side Delts"] },
       { name: "Dumbbell Lateral Raise", sets: 3, reps: "15-20", equipment: "Tạ đơn", primaryMuscleGroups: ["Side Delts"] },
-      { name: "Diamond Push-up", sets: 3, reps: "10-12", equipment: "None", primaryMuscleGroups: ["Triceps - Lateral Head", "Chest - Middle"] }
+       { name: "Diamond Push-up", sets: 3, reps: "10-12", equipment: "None", primaryMuscleGroups: ["Triceps - Lateral Head", "Chest"] }
     ],
     evening: []
   },
@@ -474,8 +474,8 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
     levelName: "Ngày 4: Upper Body (Full)",
     description: "Toàn thân trên - cường độ trung bình.",
     morning: [
-      { name: "Incline Push-up (Chân cao)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Chest - Upper", "Front Delts"] },
-      { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Triceps"] },
+       { name: "Incline Push-up (Chân cao)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Chest", "Front Delts"] },
+       { name: "Dumbbell Floor Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest", "Triceps"] },
       { name: "Dumbbell Row (Single Arm)", sets: 3, reps: "10-12/arm", equipment: "Tạ đơn", primaryMuscleGroups: ["Lats", "Upper Back"] },
       { name: "Arnold Press", sets: 3, reps: "10-12", equipment: "Tạ đơn", primaryMuscleGroups: ["Front Delts", "Side Delts"] },
       { name: "Dumbbell Skull Crusher", sets: 3, reps: "12-15", equipment: "Tạ đơn", primaryMuscleGroups: ["Triceps - Long Head"] },
@@ -501,9 +501,9 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
     description: "Circuit training - toàn thân, cường độ cao.",
     morning: [
       { name: "Dumbbell Thruster", sets: 3, reps: "12", equipment: "Tạ đơn", primaryMuscleGroups: ["Quads", "Front Delts"] },
-      { name: "Push-up to Renegade Row", sets: 3, reps: "8/arm", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest - Middle", "Lats"] },
+       { name: "Push-up to Renegade Row", sets: 3, reps: "8/arm", equipment: "Tạ đơn", primaryMuscleGroups: ["Chest", "Lats"] },
       { name: "Dumbbell Swing", sets: 3, reps: "15", equipment: "Tạ đơn", primaryMuscleGroups: ["Glutes", "Hamstrings"] },
-      { name: "Dips (Ghế/Sàn)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Triceps", "Chest - Lower"] },
+       { name: "Dips (Ghế/Sàn)", sets: 3, reps: "12-15", equipment: "Ghế", primaryMuscleGroups: ["Triceps", "Chest"] },
       { name: "Plank to Push-up", sets: 3, reps: "10", equipment: "None", primaryMuscleGroups: ["Core", "Triceps"] },
       { name: "Jumping Jacks", sets: 3, reps: "50", equipment: "None", primaryMuscleGroups: ["Cardio", "Full Body"] }
     ],

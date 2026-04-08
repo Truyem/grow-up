@@ -8,9 +8,7 @@ export enum FatigueLevel {
 
 export enum MuscleGroup {
   // Chest (Ngực)
-  ChestUpper = 'Ngực trên',
-  ChestMiddle = 'Ngực giữa',
-  ChestLower = 'Ngực dưới',
+  Chest = 'Ngực',
 
   // Shoulders (Vai)
   FrontDelts = 'Vai trước',
@@ -109,7 +107,7 @@ export interface Exercise {
   equipment?: string;
   colorCode?: ExerciseColor;
   isBFR?: boolean;
-  primaryMuscleGroups?: string[];    // Main muscles worked (e.g., "Chest - Upper", "Triceps")
+   primaryMuscleGroups?: string[];    // Main muscles worked (e.g., "Chest", "Triceps")
   secondaryMuscleGroups?: string[];  // Supporting muscles
 }
 

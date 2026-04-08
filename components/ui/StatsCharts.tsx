@@ -130,7 +130,7 @@ export const StatsCharts: React.FC<StatsChartsProps> = ({ chartData, muscleDistr
                                     selectedMuscles={(() => {
                                         const muscleSet = new Set<MuscleGroup>();
                                         muscleDistribution.forEach(muscle => {
-                                            if (muscle.name === 'Ngực') { muscleSet.add(MuscleGroup.ChestUpper); muscleSet.add(MuscleGroup.ChestMiddle); muscleSet.add(MuscleGroup.ChestLower); }
+                                            if (muscle.name === 'Ngực') { muscleSet.add(MuscleGroup.Chest); }
                                             else if (muscle.name === 'Vai') { muscleSet.add(MuscleGroup.FrontDelts); muscleSet.add(MuscleGroup.SideDelts); muscleSet.add(MuscleGroup.RearDelts); }
                                             else if (muscle.name === 'Lưng') { muscleSet.add(MuscleGroup.Lats); muscleSet.add(MuscleGroup.UpperBack); muscleSet.add(MuscleGroup.LowerBack); muscleSet.add(MuscleGroup.Traps); }
                                             else if (muscle.name === 'Tay') { muscleSet.add(MuscleGroup.Biceps); muscleSet.add(MuscleGroup.TricepsLong); muscleSet.add(MuscleGroup.TricepsLateral); muscleSet.add(MuscleGroup.Forearms); }

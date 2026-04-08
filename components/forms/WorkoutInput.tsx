@@ -186,8 +186,8 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                     </button>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 min-[400px]:gap-3">
-                        {Object.entries({
-                            'Ngực': [MuscleGroup.ChestUpper, MuscleGroup.ChestMiddle, MuscleGroup.ChestLower],
+                         {Object.entries({
+                            'Ngực': [MuscleGroup.Chest],
                             'Vai': [MuscleGroup.FrontDelts, MuscleGroup.SideDelts, MuscleGroup.RearDelts],
                             'Lưng': [MuscleGroup.UpperBack, MuscleGroup.Lats, MuscleGroup.LowerBack, MuscleGroup.Traps],
                             'Tay': [MuscleGroup.Biceps, MuscleGroup.TricepsLong, MuscleGroup.TricepsLateral, MuscleGroup.Forearms],
