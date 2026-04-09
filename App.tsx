@@ -958,18 +958,18 @@ export default function App() {
             {/* Mobile Background */}
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
-              style={{ backgroundImage: `url(${wallpaperMb})`, opacity: 0.3 }}
+              style={{ backgroundImage: `url(${wallpaperMb})` }}
             />
             {/* Desktop Background */}
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
-              style={{ backgroundImage: `url(${wallpaper})`, opacity: 0.3 }}
+              style={{ backgroundImage: `url(${wallpaper})` }}
             />
-            {/* Enhanced overlay to emphasize liquid glass - increased opacity from 40% to 60% */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px]" />
+            {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
             {/* Gradient overlay for better text readability at the bottom */}
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-950/95 via-gray-900/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent" />
           </div>
 
           {/* Content Layer */}
@@ -977,7 +977,7 @@ export default function App() {
 
             {/* Header - Global for both Input and Plan views */}
             <div className="text-center mb-10 space-y-3 animate-fade-in relative transition-all duration-300">
-              <div className="inline-flex items-center justify-center p-3 bg-white/8 rounded-full mb-2 border border-white/15 shadow-lg backdrop-blur-md hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-all duration-300">
+              <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
                 <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
@@ -988,7 +988,7 @@ export default function App() {
                 <button
                   id="tour-settings"
                   onClick={() => setViewMode('settings')}
-                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 backdrop-blur-sm transition-all"
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
                 >
                   <span className="text-cyan-400 font-semibold group-hover:text-cyan-300">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
                   <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
@@ -999,7 +999,7 @@ export default function App() {
                 <button
                   id="tour-guide"
                   onClick={() => setViewMode('history')}
-                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 backdrop-blur-sm transition-all"
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
                 >
                   <span className="group-hover:text-cyan-300">Lịch sử</span>
                   <History className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />

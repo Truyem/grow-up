@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { LiquidGlassContainer } from './ui/LiquidGlassContainer';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 import { AddExerciseModal } from './AddExerciseModal';
@@ -675,14 +674,15 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
         defaultDuration={timerDuration}
       />
 
-      <LiquidGlassContainer intensity="medium" className="p-8 space-y-6">
-        {/* Top Header Removed - Using App Global Header */}
 
 
-        {/* TIME OPTIMIZATION CARD REMOVED */}
+      {/* Top Header Removed - Using App Global Header */}
 
 
-        <div className="max-w-4xl mx-auto space-y-6">
+      {/* TIME OPTIMIZATION CARD REMOVED */}
+
+
+      <div className="max-w-4xl mx-auto space-y-6">
         <GlassCard
           title={`Bài Tập: ${currentWorkout.levelName}`}
           icon={<Flame className="w-6 h-6" />}
@@ -920,7 +920,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
           </div>
         </button>
       </div>
-      </LiquidGlassContainer>
     </div >
   );
 };

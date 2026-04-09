@@ -3,7 +3,6 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { DailyPlan, Meal } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { LiquidGlassContainer } from './ui/LiquidGlassContainer';
 import { Utensils, RefreshCw, Check, CheckCircle2, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 
@@ -666,7 +665,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                     onClose={() => setShowCamera(false)}
                 />
             ) : (
-                <LiquidGlassContainer intensity="medium" className="p-8 space-y-8">
+                <>
                     {/* Header Section */}
                     <div className="text-center space-y-4">
                         <>
@@ -861,7 +860,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                             </button>
                         </div>
                     </div>
-                </LiquidGlassContainer>
+                </>
             )
             }
         </div >
