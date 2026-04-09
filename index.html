@@ -61,17 +61,15 @@
       <style>
         @keyframes progress-loading {
           0% {
-            transform: translateX(-100%);
-            width: 20%;
+            transform: translateX(-100%) scaleX(0.2);
           }
 
           50% {
-            width: 60%;
+            transform: translateX(0%) scaleX(0.6);
           }
 
           100% {
-            transform: translateX(100%);
-            width: 20%;
+            transform: translateX(100%) scaleX(0.2);
           }
         }
 
@@ -285,6 +283,8 @@
 
         .h-full {
           height: 100%;
+          width: 100%;
+          transform-origin: left;
         }
 
         .shadow-\[0_0_10px_cyan\] {

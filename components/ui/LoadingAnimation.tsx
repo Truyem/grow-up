@@ -62,7 +62,7 @@ export const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ streamingTex
 
                         {/* Ultra-thin Progress Line */}
                         <div className="w-32 h-[1px] bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading" />
+                            <div className="h-full w-full origin-left bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading" />
                         </div>
                     </>
                 )}
@@ -86,9 +86,9 @@ export const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ streamingTex
 
             <style>{`
                 @keyframes progress-loading {
-                    0% { transform: translateX(-100%); width: 20%; }
-                    50% { width: 60%; }
-                    100% { transform: translateX(100%); width: 20%; }
+                    0% { transform: translateX(-100%) scaleX(0.2); }
+                    50% { transform: translateX(0%) scaleX(0.6); }
+                    100% { transform: translateX(100%) scaleX(0.2); }
                 }
                 @keyframes fade-in-up {
                     0% { opacity: 0; transform: translateY(5px); }
