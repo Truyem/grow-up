@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 
 // Suppress Recharts defaultProps warning
 const originalConsoleError = console.error;
@@ -12,12 +12,12 @@ console.error = (...args: any[]) => {
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
 
-import { UserForm } from './components/UserForm';
-import { PlanDisplay } from './components/PlanDisplay';
-import { NutritionDisplay } from './components/NutritionDisplay';
-import { AuthPage } from './components/AuthPage';
-import { OnboardingTour } from './components/OnboardingTour';
-import { AccountSettings } from './components/AccountSettings';
+const UserForm = lazy(() => import('./components/UserForm').then(m => ({ default: m.UserForm })));
+const PlanDisplay = lazy(() => import('./components/PlanDisplay').then(m => ({ default: m.PlanDisplay })));
+const NutritionDisplay = lazy(() => import('./components/NutritionDisplay').then(m => ({ default: m.NutritionDisplay })));
+const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const OnboardingTour = lazy(() => import('./components/OnboardingTour').then(m => ({ default: m.OnboardingTour })));
+const AccountSettings = lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
 
 import { Toast } from './components/ui/Toast';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
@@ -162,7 +162,9 @@ export default function App() {
         {isLoading && <LoadingAnimation streamingText={isStreaming ? streamingText : undefined} />}
 
         {!isAuthChecking && !session ? (
-          <AuthPage />
+          <Suspense fallback={<LoadingAnimation />}>
+            <AuthPage />
+          </Suspense>
         ) : (
           <>
             {/* Optimized Background Layer */}
@@ -214,55 +216,69 @@ export default function App() {
                 </div>
 
                 {viewMode === 'settings' && session?.user ? (
-                  <AccountSettings
-                    user={session.user}
-                    onLogout={signOut}
-                  />
+                  <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                    <AccountSettings
+                      user={session.user}
+                      onLogout={signOut}
+                    />
+                  </Suspense>
                 ) : null}
 
                 {viewMode === 'workout' && (
                   plan?.workout?.isGenerated ? (
-                    <PlanDisplay
-                      plan={plan}
-                      onReset={handleReset}
-                      onComplete={handleCompleteWorkout}
-                      onUpdatePlan={handleUpdatePlan}
-                    />
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                      <PlanDisplay
+                        plan={plan}
+                        onReset={handleReset}
+                        onComplete={handleCompleteWorkout}
+                        onUpdatePlan={handleUpdatePlan}
+                      />
+                    </Suspense>
                   ) : (
                     <div className="max-w-2xl mx-auto space-y-4">
-                      <UserForm activeTab="workout" />
+                      <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                        <UserForm activeTab="workout" />
+                      </Suspense>
                     </div>
                   )
                 )}
 
                 {viewMode === 'nutrition' && (
                   plan?.nutrition?.isGenerated ? (
-                    <NutritionDisplay
-                      plan={plan}
-                      onReset={handleReset}
-                      onUpdatePlan={handleUpdatePlan}
-                      onCompleteNutrition={handleCompleteNutrition}
-                    />
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                      <NutritionDisplay
+                        plan={plan}
+                        onReset={handleReset}
+                        onUpdatePlan={handleUpdatePlan}
+                        onCompleteNutrition={handleCompleteNutrition}
+                      />
+                    </Suspense>
                   ) : (
                     <div className="max-w-2xl mx-auto space-y-4">
-                      <UserForm activeTab="nutrition" />
+                      <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                        <UserForm activeTab="nutrition" />
+                      </Suspense>
                     </div>
                   )
                 )}
 
                 {viewMode === 'history' && (
                   <div className="max-w-2xl mx-auto space-y-4">
-                    <UserForm activeTab="history" />
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
+                      <UserForm activeTab="history" />
+                    </Suspense>
                   </div>
                 )}
 
                 {isTourOpen && (
-                  <OnboardingTour
-                    steps={tourSteps}
-                    isOpen={isTourOpen}
-                    onComplete={handleTourComplete}
-                    onSkip={handleTourComplete}
-                  />
+                  <Suspense fallback={null}>
+                    <OnboardingTour
+                      steps={tourSteps}
+                      isOpen={isTourOpen}
+                      onComplete={handleTourComplete}
+                      onSkip={handleTourComplete}
+                    />
+                  </Suspense>
                 )}
               </div>
             </div>
