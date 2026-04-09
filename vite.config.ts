@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
             open: true,
         },
         build: {
-            outDir: 'dist',
+            outDir: 'build_temp2',
             modulePreload: false,
             // Optimize chunk splitting for better caching
             rollupOptions: {

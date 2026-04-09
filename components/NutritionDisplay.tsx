@@ -5,6 +5,7 @@ import { DailyPlan, Meal } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { Utensils, RefreshCw, Check, CheckCircle2, Flame, Beef, Wheat, Droplets, X, Camera, ScanLine, Loader2, Zap, ZapOff, Image as ImageIcon, Trash2, Video } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
+import { fridgeService } from '../services/fridgeService';
 
 
 interface NutritionDisplayProps {
@@ -524,12 +525,43 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
     // Cleanup stream in case component unmounts while camera is open (though handled in modal)
 
-    const toggleMeal = (mealName: string) => {
+    const toggleMeal = async (mealName: string) => {
+        const meal = plan.nutrition.meals.find(m => m.name === mealName);
+        if (!meal) return;
+
+        const isNowConsumed = !meal.consumed;
+        let isDeducted = meal.fridgeDeducted;
+
+        // Automatically deduct from Fridge logic
+        if (isNowConsumed && meal.usedFridgeItems && !meal.fridgeDeducted) {
+            try {
+                const currentFridgeItems = await fridgeService.getFridgeItems();
+                for (const d of meal.usedFridgeItems) {
+                    const item = currentFridgeItems.find(i => i.id === d.id);
+                    if (item) {
+                        const newQuantity = item.quantity - d.amountUsed;
+                        if (newQuantity <= 0) {
+                            await fridgeService.deleteFridgeItem(d.id);
+                        } else {
+                            await fridgeService.updateFridgeItem(d.id, { quantity: newQuantity });
+                        }
+                    }
+                }
+                isDeducted = true;
+            } catch (error) {
+                console.error("Failed to deduct fridge items:", error);
+            }
+        }
+
         const updatedPlan = { ...plan };
         updatedPlan.nutrition = {
             ...updatedPlan.nutrition,
             meals: updatedPlan.nutrition.meals.map(m =>
-                m.name === mealName ? { ...m, consumed: !m.consumed } : m
+                m.name === mealName ? { 
+                    ...m, 
+                    consumed: isNowConsumed,
+                    fridgeDeducted: isDeducted
+                } : m
             )
         };
         onUpdatePlan(updatedPlan);
@@ -589,7 +621,8 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
     // Calculate consumed totals
     const consumed = useMemo(() => {
-        return plan.nutrition.meals.reduce((acc, meal) => {
+        const meals = plan?.nutrition?.meals || [];
+        return meals.reduce((acc, meal) => {
             if (meal.consumed) {
                 return {
                     calories: acc.calories + (meal.calories || 0),
@@ -600,7 +633,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
             }
             return acc;
         }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    }, [plan.nutrition.meals]);
+    }, [plan?.nutrition?.meals]);
 
     // Handle manual food text analysis
     const handleManualFoodAnalysis = async () => {
@@ -621,6 +654,9 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
 
             // Update Plan
             const updatedPlan = { ...plan };
+            if (!updatedPlan.nutrition) updatedPlan.nutrition = {} as any;
+            if (!updatedPlan.nutrition.meals) updatedPlan.nutrition.meals = [];
+
             updatedPlan.nutrition.meals = [...updatedPlan.nutrition.meals, newMeal];
 
             // Update totals
@@ -757,7 +793,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                             <div className="relative z-10 grid grid-cols-2 gap-8 md:gap-12 justify-items-center">
                                 <CircularProgress
                                     value={consumed.calories}
-                                    max={plan.nutrition.totalCalories}
+                                    max={plan?.nutrition?.totalCalories || 0}
                                     color="#ef4444" // Red for Calories/Energy
                                     label="Calories"
                                     unit="kcal"
@@ -765,7 +801,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                 />
                                 <CircularProgress
                                     value={consumed.protein}
-                                    max={plan.nutrition.totalProtein}
+                                    max={plan?.nutrition?.totalProtein || 0}
                                     color="#3b82f6" // Blue for Protein
                                     label="Protein"
                                     unit="g"
@@ -773,7 +809,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                 />
                                 <CircularProgress
                                     value={consumed.carbs}
-                                    max={plan.nutrition.totalCarbs || 0}
+                                    max={plan?.nutrition?.totalCarbs || 0}
                                     color="#f59e0b" // Orange for Carbs
                                     label="Carbs"
                                     unit="g"
@@ -781,7 +817,7 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                 />
                                 <CircularProgress
                                     value={consumed.fat}
-                                    max={plan.nutrition.totalFat || 0}
+                                    max={plan?.nutrition?.totalFat || 0}
                                     color="#eab308" // Yellow for Fat
                                     label="Fat"
                                     unit="g"
@@ -798,12 +834,12 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                                     Thực Đơn
                                 </h3>
                                 <div className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                                    {plan.nutrition.meals.filter(m => m.consumed).length}/{plan.nutrition.meals.length} Hoàn thành
+                                    {(plan?.nutrition?.meals || []).filter(m => m.consumed).length}/{(plan?.nutrition?.meals || []).length} Hoàn thành
                                 </div>
                             </div>
 
                             <div className="grid gap-3">
-                                {plan.nutrition.meals.map((meal, index) => (
+                                {(plan?.nutrition?.meals || []).map((meal, index) => (
                                     <MealItem
                                         key={index}
                                         meal={meal}

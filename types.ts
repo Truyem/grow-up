@@ -138,6 +138,8 @@ export interface Meal {
   carbs?: number;
   fat?: number;
   consumed?: boolean;
+  usedFridgeItems?: { id: string; amountUsed: number }[];
+  fridgeDeducted?: boolean;
 }
 
 export interface FridgeItem {

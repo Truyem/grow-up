@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry, FridgeItem } from "../types";
 import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
+import { fridgeService } from './fridgeService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
@@ -113,7 +114,7 @@ const callNemotronAPI = async (
       body: JSON.stringify({
         model: GPT_OSS_MODEL,
         messages: messages,
-        max_tokens: options?.maxTokens ?? 100000,
+        max_tokens: options?.maxTokens ?? 50000,
         temperature: options?.temperature ?? 0.2,
         plain_text: true,
         stream: false
@@ -747,7 +748,7 @@ const generateWorkoutPart = async (
 
   const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
-  ], { maxTokens: 50000, temperature: 0.2 });
+    ], { maxTokens: 50000, temperature: 0.2 });
 
   if (!responseText) throw new Error("Empty workout response");
     const parsed = cleanAndParseJSON(responseText, "WorkoutPart");
@@ -769,136 +770,224 @@ const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7
   return recentMeals;
 };
 
+const generateMealForTime = async (
+  mealName: string,
+  targetCalories: number,
+  targetProtein: number,
+  targetCarbs: number,
+  targetFat: number,
+  recentMealsStr: string,
+  dayPeriod: string,
+  weightTrendDirection: string,
+  foodAssessment: any,
+  extraRules: string,
+  fridgeItems: any[]
+): Promise<{ meals: any[], usedFridgeItems: { id: string, amountUsed: number }[] }> => {
+  const fridgeStr = fridgeItems.length > 0
+    ? fridgeItems.map(f => `- [ID: ${f.id}] ${f.name} (${f.quantity}${f.unit})`).join('\n')
+    : "Trống";
+
+  const prompt = `
+ACT AS A NUTRITIONIST.
+Return ONLY valid JSON (no markdown).
+
+MEAL: ${mealName}
+TARGETS FOR THIS MEAL:
+- Calories: ~${targetCalories} kcal
+- Protein: ~${targetProtein} g
+- Carbs: ~${targetCarbs} g
+- Fat: ~${targetFat} g
+
+CONTEXT:
+- Thời điểm: ${dayPeriod}
+- Xu hướng cân nặng: ${weightTrendDirection}
+
+FRIDGE INVENTORY (Nguyên liệu đang có trong tủ lạnh):
+${fridgeStr}
+
+MEALS CONSUMED RECENTLY (DO NOT REPEAT):
+${recentMealsStr}
+
+RULES:
+- MỖI MEAL PHẢI CÓ TỐI ĐA 2-3 MÓN/THÀNH PHẦN.
+- **VERY IMPORTANT**: ƯU TIÊN SỬ DỤNG CÁC NGUYÊN LIỆU TRONG FRIDGE INVENTORY ĐỂ LÊN THỰC ĐƠN.
+- Nếu bạn sử dụng nguyên liệu từ FRIDGE INVENTORY, hãy trừ số lượng đi và liệt kê vào mảng "usedFridgeItems" (sử dụng đúng ID được cung cấp).
+${extraRules}
+- **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
+
+YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
+\`\`\`json
+{
+  "meals": [
+    {
+      "name": "string (VD: Sáng: Phở bò)",
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number,
+      "description": "string"
+    }
+  ],
+  "usedFridgeItems": [
+    { "id": "string (ID của món trong tủ lạnh)", "amountUsed": number }
+  ]
+}
+\`\`\`
+  `;
+
+  const responseText = await callNemotronAPI([
+    { role: "user", content: prompt }
+    ], { maxTokens: 50000, temperature: 0.2 });
+
+  if (!responseText) throw new Error(`Empty response for ${mealName}`);
+  return cleanAndParseJSON(responseText, `NutritionPart_${mealName}`);
+};
+
 const generateNutritionPart = async (
   userData: UserInput,
   fullHistory: WorkoutHistoryItem[] = [],
   sleepRecovery7Days: SleepRecoveryEntry[],
   onProgress?: (text: string) => void
 ): Promise<any> => {
-  const model = MODELS.MENU;
-
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
   const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0;
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
   const fatTarget = Math.round(userData.weight * 0.9);
   const caloriesFromProtFat = (proteinTarget * 4) + (fatTarget * 9);
   const carbTarget = Math.max(0, Math.round((target - caloriesFromProtFat) / 4));
-  const goalText = userData.nutritionGoal === 'bulking' ? "BULKING (Tăng cân)" : "CUTTING (Giảm cân)";
 
-  // Get time period for meal timing
   const dayPeriod = getCurrentDayPeriod();
-  
-  // Get weight trend analysis
   const weightTrend = getWeightTrend(fullHistory);
-  const avgWeight = getAverageWeight(fullHistory, 7);
-  
-  // Get food intake assessment
   const foodAssessment = evaluateFoodIntake(userData.consumedFood, target, []);
 
-  // Extract meals from last 7 days to avoid duplication
+  // Fetch fridge items to pass to AI
+  let localFridgeItems: any[] = [];
+  try {
+    localFridgeItems = await fridgeService.getFridgeItems();
+  } catch (error) {
+    console.error("Failed to load fridge items for nutrition generation", error);
+  }
+
+  // Helper function to deduct local fridge items based on AI response
+  const applyDeductions = (items: any[], used: {id: string, amountUsed: number}[] = []) => {
+    if (!used || !Array.isArray(used)) return items;
+    let newItems = [...items];
+    used.forEach(u => {
+      const idx = newItems.findIndex(i => i.id === u.id);
+      if (idx !== -1) {
+        const deductedAmount = newItems[idx].quantity - u.amountUsed;
+        newItems[idx] = { ...newItems[idx], quantity: Math.max(0, deductedAmount) };
+        if (newItems[idx].quantity <= 0) newItems.splice(idx, 1);
+      }
+    });
+    return newItems;
+  };
+
   const recentMeals = extractMealsFromHistory(fullHistory, 7);
   const uniqueRecentMeals = Array.from(new Set(recentMeals));
   const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join(', ') : 'none';
 
-  const avgSleepHours = sleepRecovery7Days.length > 0
-    ? Number((sleepRecovery7Days.reduce((sum: number, s) => sum + (Number(s.sleepHours) || 0), 0) / sleepRecovery7Days.length).toFixed(1))
-    : null;
-  
-  // Adjust calorie target based on weight trend
   let adjustedCalories = Math.round(target);
-  let calorieNote = '';
   if (weightTrend.direction === 'giảm' && userData.nutritionGoal === 'bulking') {
-    adjustedCalories = Math.round(target * 1.05); // Add 5% if losing weight during bulk
-    calorieNote = ' (+5% vì cân nặng có xu hướng giảm)';
+    adjustedCalories = Math.round(target * 1.05);
   } else if (weightTrend.direction === 'tăng' && userData.nutritionGoal === 'cutting') {
-    adjustedCalories = Math.round(target * 0.95); // Reduce 5% if gaining during cut
-    calorieNote = ' (-5% vì cân nặng có xu hướng tăng)';
+    adjustedCalories = Math.round(target * 0.95);
   }
 
-  const prompt = `
-ACT AS A NUTRITIONIST.
-Return ONLY valid JSON (no markdown).
+  // Split targets: Breakfast (30%), Lunch (40%), Dinner (30%)
+  const breakfastTargets = {
+    cal: Math.round(adjustedCalories * 0.30), pro: Math.round(proteinTarget * 0.30), carb: Math.round(carbTarget * 0.30), fat: Math.round(fatTarget * 0.30)
+  };
+  const lunchTargets = {
+    cal: Math.round(adjustedCalories * 0.40), pro: Math.round(proteinTarget * 0.40), carb: Math.round(carbTarget * 0.40), fat: Math.round(fatTarget * 0.40)
+  };
+  const dinnerTargets = {
+    cal: adjustedCalories - breakfastTargets.cal - lunchTargets.cal,
+    pro: proteinTarget - breakfastTargets.pro - lunchTargets.pro,
+    carb: carbTarget - breakfastTargets.carb - lunchTargets.carb,
+    fat: fatTarget - breakfastTargets.fat - lunchTargets.fat
+  };
 
-CURRENT TIME & CONTEXT:
-- Thời điểm hiện tại: ${dayPeriod}
-- Ngày hôm nay: ${getCurrentDate()}
+  try {
+    if (onProgress) onProgress("Đang tính toán thực đơn Sáng, Trưa, Tối...");
+    
+    const breakfastPromise = generateMealForTime(
+      "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
+      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Breakfast (Sáng)**: NO rice/bread if cutting. Use eggs, yogurt, oats, fruit, nuts.",
+      localFridgeItems
+    );
 
-BODY METRICS:
-- Tuổi: ${userData.age || 18}
-- Cân nặng hiện tại: ${userData.weight}kg
-- Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
-- Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg)
-- Dữ liệu giấc ngủ 7 ngày: ${JSON.stringify(sleepRecovery7Days)}
-- Số giờ ngủ trung bình 7 ngày: ${avgSleepHours ?? 'Chưa có dữ liệu'}
+    const lunchPromise = generateMealForTime(
+      "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
+      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.",
+      localFridgeItems
+    );
 
-NUTRITIONAL TARGETS:
-- Calories: ${adjustedCalories}${calorieNote}
-- Protein(g): ${proteinTarget}
-- Carbs(g): ${carbTarget}
-- Fat(g): ${fatTarget}
-- Goal: ${goalText}
-- TDEE: ${Math.round(tdee)} kcal
-- Workout Burn Est: ${burn} kcal
+    const dinnerPromise = generateMealForTime(
+      "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
+      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Dinner (Tối)**: Rice allowed but lighter than lunch. Lean protein preferred. NO snacks.",
+      localFridgeItems
+    );
 
-USER INPUTS:
-- Weight: ${userData.weight}kg
-- Height: ${userData.height}cm
-- Food consumed today: ${userData.consumedFood.join(', ') || 'none'}
-- Tình trạng ăn uống: ${foodAssessment.status}
+    const [breakfastData, lunchData, dinnerData] = await Promise.all([breakfastPromise, lunchPromise, dinnerPromise]);
 
-MEALS CONSUMED IN LAST 7 DAYS (TO AVOID REPETITION):
-${recentMealsStr}
+    // Apply all deductions to update localFridgeItems for the optional extra meal
+    let remainingFridgeItems = applyDeductions(localFridgeItems, breakfastData.usedFridgeItems);
+    remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
+    remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
 
-RULES:
-- Vietnamese meal description, short and practical.
-- **Breakfast (Sáng)**: NO rice/bread. Use eggs, yogurt, oats, fruit, nuts.
-- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.
-- **Dinner (Chiều/Tối)**: Rice allowed but lighter than lunch. Lean protein preferred.
-- **Snacks**: If needed, light options like yogurt, fruit, nuts.
-- Include meal time in meal name (e.g., "Sáng: Trứng rán 2 quả").
-- Daily totals should be close to targets (±5% acceptable).
-- **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED IN LAST 7 DAYS" list. Create DIFFERENT, VARIED meals to keep diet interesting.
-- Prioritize meal variety and diversity to prevent boredom.
-- If meals from list are suggested, modify significantly (different cooking method, protein source, sides).
-- **WEIGHT AWARENESS**:
-  - ${weightTrend.direction === 'giảm' ? '⚠️ Weight is DECREASING: Prioritize protein, consider adding healthy fats to prevent muscle loss.' : ''}
-  - ${weightTrend.direction === 'tăng' ? '⚠️ Weight is INCREASING: Monitor portions if cutting, or celebrate if bulking!' : ''}
-- **FOOD INTAKE STATUS**: ${foodAssessment.reason}. ${foodAssessment.status === 'Ăn ít' ? 'Suggest smaller meals that are nutrient-dense.' : foodAssessment.status === 'Ăn đủ' ? 'Good intake so far, continue balanced meals.' : 'Ensure remaining meals are well-distributed.'}
+    // Ensure we parse correctly if AI wraps in extra arrays
+    const parseMealsWithDeductions = (m: any, used: any[]) => {
+      const arr = Array.isArray(m) ? m : [];
+      if (arr.length > 0 && used && used.length > 0) {
+        // Attach all deductions for this meal block to the first item
+        arr[0] = { ...arr[0], usedFridgeItems: used };
+      }
+      return arr;
+    };
 
-YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
-CHỈ XUẤT RA ĐÚNG 1 MẢNG JSON CÓ 1 OBJECT (KHÔNG giải thích, KHÔNG chào hỏi, KHÔNG có văn bản nào khác ngoài JSON):
-\`\`\`json
-[
-  {
-    "nutrition": {
-      "totalCalories": number,
-      "totalProtein": number,
-      "totalCarbs": number,
-      "totalFat": number,
-      "advice": "string (Vietnamese, mention time-based meal tips, weight trend awareness, and when to eat based on current time)",
-      "meals": [
-        {
-          "name": "string (include meal time: Sáng/Trưa/Chiều/Tối/Snack)",
-          "calories": number,
-          "protein": number,
-          "carbs": number,
-          "fat": number,
-          "description": "string (Vietnamese, include portion sizes)"
-        }
-      ]
+    let allMeals = [
+      ...parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems),
+      ...parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems),
+      ...parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems)
+    ].flat().filter(m => m && m.name);
+
+    // API call to calculate missing calories/protein and adjust if needed
+    if (onProgress) onProgress("Đang kiểm tra tổng calo/protein...");
+    const currentCal = allMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
+    const currentPro = allMeals.reduce((acc, m) => acc + (m.protein || 0), 0);
+
+    if (currentCal < adjustedCalories * 0.9 || currentPro < proteinTarget * 0.9) {
+      if (onProgress) onProgress("Đang thêm bữa phụ bù đắp dinh dưỡng...");
+      const missingCal = Math.max(0, adjustedCalories - currentCal);
+      const missingPro = Math.max(0, proteinTarget - currentPro);
+      
+      const extraMealData = await generateMealForTime(
+        "Bữa Phụ", missingCal, missingPro, Math.round(missingCal / 8), Math.round(missingCal / 18),
+        recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
+        "- Tạo MỘT bữa phụ cực nhanh gọn để bù đắp lượng protein/calo còn thiếu.",
+        remainingFridgeItems
+      );
+      allMeals = [...allMeals, ...parseMealsWithDeductions(extraMealData.meals, extraMealData.usedFridgeItems)].flat().filter(m => m && m.name);
     }
+
+    return {
+      nutrition: {
+        totalCalories: adjustedCalories,
+        totalProtein: proteinTarget,
+        totalCarbs: carbTarget,
+        totalFat: fatTarget,
+        advice: `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? "Tăng cân" : "Giảm cân"}. AI đã lên món ưu tiên nguyên liệu trong tủ lạnh. ${weightTrend.direction === 'giảm' ? '⚠️ Đang giảm cân.' : ''}`,
+        meals: allMeals
+      }
+    };
+  } catch (error) {
+    console.error("Partial meal generation failed, using fallback", error);
+    throw error;
   }
-]
-\`\`\`
-  `;
-
-  const responseText = await callNemotronAPI([
-    { role: "user", content: prompt }
-  ], { maxTokens: 50000, temperature: 0.2 });
-
-  if (!responseText) throw new Error("Empty nutrition response");
-    const parsed = cleanAndParseJSON(responseText, "NutritionPart");
-    return Array.isArray(parsed) ? parsed[0] : parsed;
 };
 
 export const generateDailyPlan = async (
@@ -1046,7 +1135,7 @@ Generate JSON response ONLY as a JSON Array with exactly 1 object inside: [{ "su
 
     const responseText = await callNemotronAPI([
       { role: "user", content: prompt }
-    ]);
+    ], { maxTokens: 50000 });
 
     if (!responseText) throw new Error("Empty response");
 
@@ -1125,7 +1214,7 @@ export const suggestNextExercises = async (
 
     const responseText = await callNemotronAPI([
       { role: "user", content: prompt }
-    ]);
+    ], { maxTokens: 50000 });
 
     if (!responseText) throw new Error("Empty response");
 
@@ -1194,7 +1283,7 @@ export const suggestAlternativeExercise = async (
 
     const responseText = await callNemotronAPI([
       { role: "user", content: prompt }
-    ]);
+    ], { maxTokens: 50000 });
 
     if (!responseText) throw new Error("Empty response");
 
@@ -1391,7 +1480,7 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
   try {
     const responseText = await callNemotronAPI([
       { role: "user", content: prompt }
-    ]);
+    ], { maxTokens: 50000 });
 
     if (!responseText) throw new Error("Empty food analysis response");
 
