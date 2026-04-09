@@ -44,6 +44,8 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
 
   // Local state for weight input to handle commas/dots
   const [weightInput, setWeightInput] = useState(userData.weight.toString());
+  const [sleepStart, setSleepStart] = useState('23:00');
+  const [sleepEnd, setSleepEnd] = useState('07:00');
 
   useEffect(() => {
     if (Math.abs(parseFloat(weightInput.replace(',', '.')) - userData.weight) > 0.01) {
@@ -127,8 +129,9 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
           <SleepRecoveryCard
             entries={sleepRecovery}
             onAddEntry={() => {}} // No longer used directly here
-            onSleepChange={(sleepStart, sleepEnd) => {
-              saveSleep(sleepStart, sleepEnd).catch(() => showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error'));
+            onSleepChange={(start, end) => {
+              setSleepStart(start);
+              setSleepEnd(end);
             }}
             suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
           />
@@ -224,6 +227,9 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
             <button
               id="tour-generate-btn"
               onClick={() => {
+                saveSleep(sleepStart, sleepEnd).catch((e) => {
+                  console.error('Lỗi khi lưu giấc ngủ:', e);
+                });
                 generatePlan('workout').catch(() => {
                   showToast('Không thể tạo kế hoạch khi đang offline.', 'error');
                 });

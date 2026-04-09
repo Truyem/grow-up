@@ -64,16 +64,24 @@ export const savePlanToSupabase = async (
         // Remove workoutProgress from plan_data to avoid duplication
         const { workoutProgress: _wp, ...cleanPlan } = plan as any;
 
-        const { error } = await supabase.from('daily_plans').upsert(
-            {
-                user_id: userId,
-                date: dateKey,
-                plan_data: cleanPlan,
-                workout_progress: progressToSave,
-                updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id,date' }
-        );
+        // Xóa tất cả các bản ghi cũ của ngày này để ghi đè bản mới nhất
+        const { error: deleteError } = await supabase
+            .from('daily_plans')
+            .delete()
+            .eq('user_id', userId)
+            .eq('date', dateKey);
+
+        if (deleteError) {
+            console.error('[PlanSync] Delete existing plan error:', deleteError);
+        }
+
+        const { error } = await supabase.from('daily_plans').insert({
+            user_id: userId,
+            date: dateKey,
+            plan_data: cleanPlan,
+            workout_progress: progressToSave,
+            updated_at: new Date().toISOString(),
+        });
 
         if (error) {
             console.error('[PlanSync] Save error:', error);
@@ -396,9 +404,22 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
             data: item,
         }));
 
+        const dates = [...new Set(rows.map((r) => r.date))];
+
+        // Xóa tất cả các bản ghi cũ của các ngày này để ghi đè bản mới nhất
+        const { error: deleteError } = await supabase
+            .from('workout_logs')
+            .delete()
+            .eq('user_id', userId)
+            .in('date', dates);
+
+        if (deleteError) {
+            console.error('[HistorySync] delete existing logs error:', deleteError);
+        }
+
         const { error } = await supabase
             .from('workout_logs')
-            .upsert(rows, { onConflict: 'user_id,date' });
+            .insert(rows);
 
         if (error) {
             // Graceful fallback if table is missing in this project
@@ -473,16 +494,42 @@ export const deletePlanByDate = async (userId: string, dateKey: string): Promise
 export const upsertWorkoutHistoryItemToSupabase = async (userId: string, item: WorkoutHistoryItem): Promise<boolean> => {
     try {
         const dateKey = parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0];
+        const currentRecordType = item.recordType || 'workout'; // Mặc định là workout nếu không có
+        
+        // Lấy các bản ghi trong ngày
+        const { data: existingRecords } = await supabase
+            .from('workout_logs')
+            .select('id, data')
+            .eq('user_id', userId)
+            .eq('date', dateKey);
+
+        if (existingRecords && existingRecords.length > 0) {
+            // Chỉ xóa những bản ghi CÙNG NGÀY và CÙNG LOẠI (sleep vs workout/nutrition)
+            // Tránh việc lưu Sleep lại vô tình xóa mất Workout của ngày hôm đó
+            const idsToDelete = existingRecords.filter(row => {
+                const rowType = row.data?.recordType || 'workout';
+                return rowType === currentRecordType;
+            }).map(row => row.id);
+
+            if (idsToDelete.length > 0) {
+                const { error: deleteError } = await supabase
+                    .from('workout_logs')
+                    .delete()
+                    .in('id', idsToDelete);
+                
+                if (deleteError) {
+                    console.error('[HistorySync] delete existing logs error:', deleteError);
+                }
+            }
+        }
+
         const { error } = await supabase
             .from('workout_logs')
-            .upsert(
-                {
-                    user_id: userId,
-                    date: dateKey,
-                    data: item,
-                },
-                { onConflict: 'user_id,date' }
-            );
+            .insert({
+                user_id: userId,
+                date: dateKey,
+                data: item,
+            });
 
         if (error) {
             const code = (error as any)?.code;
@@ -490,13 +537,13 @@ export const upsertWorkoutHistoryItemToSupabase = async (userId: string, item: W
                 console.warn('[HistorySync] workout_logs table/columns not available. Skipping save.');
                 return false;
             }
-            console.error('[HistorySync] upsert item error:', error);
+            console.error('[HistorySync] insert item error:', error);
             return false;
         }
 
         return true;
     } catch (err) {
-        console.error('[HistorySync] upsert item unexpected error:', err);
+        console.error('[HistorySync] overwrite item unexpected error:', err);
         return false;
     }
 };
@@ -542,18 +589,25 @@ export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<Wo
 
         const history = (data || [])
             .map((row: any) => row?.data)
-            .filter((item: any) => item && typeof item.timestamp === 'number' && item.recordType !== 'sleep');
+            .filter((item: any) => item && typeof item.timestamp === 'number');
 
-        const dedupByDate = new Map<string, WorkoutHistoryItem>();
+        // Chỉ phân loại trùng lặp DỰA TRÊN NGÀY + LOẠI BẢN GHI (sleep vs workout)
+        // để không bị ghi đè sleep vào workout
+        const dedupByDateAndType = new Map<string, WorkoutHistoryItem>();
         history.forEach((item: WorkoutHistoryItem) => {
-            const key = parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0];
-            const existing = dedupByDate.get(key);
+            const keyDate = parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0];
+            const recordType = item.recordType || 'workout';
+            const compoundKey = `${keyDate}_${recordType}`;
+            
+            const existing = dedupByDateAndType.get(compoundKey);
             if (!existing || item.timestamp > existing.timestamp) {
-                dedupByDate.set(key, item);
+                dedupByDateAndType.set(compoundKey, item);
             }
         });
 
-        return Array.from(dedupByDate.values()).sort((a, b) => b.timestamp - a.timestamp);
+        // Tách riêng workout để hiển thị (do code cũ yêu cầu)
+        // Những hàm như loadSleepRecoveryFromSupabase sẽ cần dùng đến cả sleep
+        return Array.from(dedupByDateAndType.values()).sort((a, b) => b.timestamp - a.timestamp);
     } catch (err) {
         console.error('[HistorySync] load history unexpected error:', err);
         return [];

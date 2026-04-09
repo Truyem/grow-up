@@ -201,6 +201,8 @@ export interface WorkoutHistoryItem {
   weight?: number; // Recorded weight for that day
   sleepHours?: number;
   sleepQuality?: SleepQuality;
+  sleepStart?: string;
+  sleepEnd?: string;
 }
 
 export interface PersonalRecord {
@@ -215,13 +217,13 @@ export interface PersonalRecord {
 export type SleepQuality = 'bad' | 'average' | 'good';
 
 export interface SleepRecoveryEntry {
-  id: string;
+  id?: string;
   timestamp: number;
   date: string;
-  sleepStart: string;
-  sleepEnd: string;
-  sleepHours: number;
-  sleepQuality: SleepQuality;
+  sleepStart?: string;
+  sleepEnd?: string;
+  sleepHours?: number;
+  sleepQuality?: SleepQuality;
 }
 
 export interface AchievementBadge {

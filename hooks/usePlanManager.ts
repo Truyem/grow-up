@@ -20,6 +20,7 @@ export interface UsePlanManagerReturn {
   handleReset: (type: 'workout' | 'nutrition') => void;
   handleStartTracking: () => void;
   handleUpdatePlan: (updatedPlan: DailyPlan) => void;
+  handleRefreshPlan: () => Promise<void>;
 }
 
 /**
@@ -102,19 +103,10 @@ export function usePlanManager(
       return;
     }
 
-    let finalPlan: DailyPlan;
-    if (!plan) {
-      finalPlan = generatedPartial;
-    } else {
-      finalPlan = { ...plan };
-      if (generationType === 'workout') {
-        finalPlan.workout = generatedPartial.workout;
-      }
-      if (generationType === 'nutrition') {
-        finalPlan.nutrition = generatedPartial.nutrition;
-      }
-      finalPlan.date = generatedPartial.date || plan.date;
-    }
+    let finalPlan: DailyPlan = generatedPartial;
+    
+    // Nếu có dữ liệu đã lưu (ví dụ userData.consumedFood), có thể xóa ở đây nếu cần.
+    // Xoá hoàn toàn dữ liệu kế hoạch cũ bằng cách ghi đè trực tiếp bằng kế hoạch mới được sinh ra.
 
     if (generationType === 'workout') {
       finalPlan = enrichWorkoutWithWarmupCooldown(finalPlan, userData);
@@ -210,6 +202,28 @@ export function usePlanManager(
     debouncedSavePlan(userId, updatedPlan);
   }, [showToast, userId]);
 
+  const handleRefreshPlan = useCallback(async () => {
+    if (!userId || !online) return;
+    setLoading(true);
+    try {
+      const { plan: cloudPlan, workoutProgress } = await loadPlanFromSupabase(userId);
+      if (!cloudPlan) {
+        setPlan(null);
+      } else {
+        setPlan({
+          ...cloudPlan,
+          workoutProgress: workoutProgress && typeof workoutProgress === 'object' && 'checkedState' in workoutProgress
+            ? workoutProgress as { checkedState: Record<string, boolean>; userNote?: string; exerciseLogs?: Record<string, ExerciseLog> }
+            : cloudPlan.workoutProgress,
+        });
+      }
+    } catch (e) {
+      console.error('[PlanManager] Refresh plan error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, online]);
+
   return {
     plan,
     setPlan,
@@ -222,5 +236,6 @@ export function usePlanManager(
     handleReset,
     handleStartTracking,
     handleUpdatePlan,
+    handleRefreshPlan,
   };
 }

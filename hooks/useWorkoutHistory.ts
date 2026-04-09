@@ -101,7 +101,8 @@ export function useWorkoutHistory(
     (async () => {
       const history = await loadWorkoutHistoryFromSupabase(userId);
       if (isCancelled) return;
-      setWorkoutHistory(history);
+      // Trong component UI, lịch sử hiển thị chỉ tính 'workout', 'nutrition' (không lấy 'sleep')
+      setWorkoutHistory(history.filter(item => item.recordType !== 'sleep'));
     })();
 
     return () => {
@@ -170,8 +171,8 @@ export function useWorkoutHistory(
 
     const savedHistory = await upsertWorkoutHistoryItemToSupabase(userId, itemToSave);
     if (!savedHistory) {
-      showToast('Không thể lưu lịch sử tập lên máy chủ.', 'error');
-      throw new Error('SAVE_FAILED');
+      showToast('Đã có dữ liệu tập luyện trong ngày, vui lòng tạo lịch tập mới để lưu!', 'error');
+      throw new Error('SAVE_FAILED_DUPLICATE');
     }
 
     const updatedHistory = [itemToSave, ...otherItems];
@@ -241,7 +242,7 @@ export function useWorkoutHistory(
 
     const savedHistory = await upsertWorkoutHistoryItemToSupabase(userId, itemToSave);
     if (!savedHistory) {
-      showToast('Không thể lưu nhật ký dinh dưỡng lên máy chủ.', 'error');
+      showToast('Đã có dữ liệu tập luyện trong ngày, vui lòng tạo lịch tập mới để lưu!', 'error');
       return;
     }
 
@@ -286,7 +287,7 @@ export function useWorkoutHistory(
     setIsRefreshing(true);
     try {
       const finalHistory = await loadWorkoutHistoryFromSupabase(userId);
-      setWorkoutHistory(finalHistory);
+      setWorkoutHistory(finalHistory.filter(item => item.recordType !== 'sleep'));
       showToast("Đã làm mới lịch sử thành công!");
     } catch (err) {
       console.error("Refresh error:", err);
@@ -326,7 +327,7 @@ export function useWorkoutHistory(
       const newHistory = [sickDayEntry, ...workoutHistory];
       const saved = await upsertWorkoutHistoryItemToSupabase(userId, sickDayEntry);
       if (!saved) {
-        showToast('Không thể lưu ngày ốm lên máy chủ.', 'error');
+        showToast('Đã có dữ liệu tập luyện trong ngày, vui lòng tạo ngày mới để lưu!', 'error');
         return;
       }
       setWorkoutHistory(newHistory);
@@ -344,7 +345,7 @@ export function useWorkoutHistory(
       return;
     }
     const refreshed = await loadWorkoutHistoryFromSupabase(userId);
-    setWorkoutHistory(refreshed);
+    setWorkoutHistory(refreshed.filter(item => item.recordType !== 'sleep'));
   }, [showToast, userId]);
 
   return {

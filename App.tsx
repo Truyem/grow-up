@@ -22,11 +22,12 @@ const AccountSettings = lazy(() => import('./components/AccountSettings').then(m
 import { Toast } from './components/ui/Toast';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
-import { Sparkles, Settings } from 'lucide-react';
+import { RefreshCw, Sparkles, Settings } from 'lucide-react';
 
 import { scheduleAllDailyNotifications } from './services/scheduleNotifications';
 import { AppProvider } from './context';
 import { canPerformOnlineAction } from './services/onlineGuard';
+import { loadProfileSettingsFromSupabase } from './services/supabasePlanSync';
 
 import {
   useAuth,
@@ -77,7 +78,8 @@ export default function App() {
     handleGenerate,
     handleReset,
     handleStartTracking,
-    handleUpdatePlan
+    handleUpdatePlan,
+    handleRefreshPlan
   } = usePlanManager(userData, session, showToast);
 
   // 4. Workout History Hook
@@ -125,6 +127,8 @@ export default function App() {
   }, [session?.user?.id, plan]);
 
   const isLoading = planLoading || isAuthChecking;
+  const [hasInitialSynced, setHasInitialSynced] = useState(false);
+
   const handleCompleteWorkoutWithSleep = async (
     levelSelected: string,
     summary: string,
@@ -141,6 +145,42 @@ export default function App() {
       return;
     }
   };
+
+  const handleSyncAll = async () => {
+    if (!session?.user?.id) return;
+    if (!canPerformOnlineAction('sync-all', showToast)) return;
+
+    try {
+      showToast('Đang đồng bộ dữ liệu...', 'info');
+      // 1. Sync Profile Settings
+      const cloudSettings = await loadProfileSettingsFromSupabase(session.user.id);
+      if (cloudSettings) {
+        if (cloudSettings.userData) setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
+        if (cloudSettings.userStats) setUserStats(cloudSettings.userStats);
+        if (cloudSettings.userGoals) setUserGoals(cloudSettings.userGoals);
+        if (Array.isArray(cloudSettings.achievements)) setAchievements(cloudSettings.achievements);
+      }
+
+      // 2. Sync Plan
+      await handleRefreshPlan();
+
+      // 3. Sync History
+      await handleRefreshHistory();
+
+      showToast('Đồng bộ thành công!', 'success');
+    } catch (error) {
+      console.error('[Sync] Error syncing all data:', error);
+      showToast('Có lỗi xảy ra khi đồng bộ.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (session?.user?.id && !hasInitialSynced) {
+      setHasInitialSynced(true);
+      // Auto-sync when entering the app
+      handleSyncAll();
+    }
+  }, [session?.user?.id, hasInitialSynced]);
 
   const appContextValue = {
     userId: session?.user?.id,

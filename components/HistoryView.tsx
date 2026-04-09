@@ -619,10 +619,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                   <div className="text-[10px] text-yellow-400 font-bold">Fat</div>
                   <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalFat || 0}g</div>
                 </div>
-                <div className="text-center bg-black/30 rounded-lg p-2">
-                  <div className="text-[10px] text-[#60a5fa] font-bold">Giấc ngủ</div>
+                <div className="text-center bg-black/30 rounded-lg p-2 col-span-2">
+                  <div className="text-[10px] text-[#60a5fa] font-bold">Gic ng</div>
                   <div className="text-sm font-bold text-white">
-                    {sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${selectedDay}`)?.sleepHours || 0}h
+                    {(() => {
+                      const sleep = sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${selectedDay}`);
+                      if (sleep && sleep.sleepStart && sleep.sleepEnd) {
+                        return `${sleep.sleepStart} - ${sleep.sleepEnd} (${sleep.sleepHours}h)`;
+                      }
+                      return `${sleep?.sleepHours || 0}h`;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -722,9 +728,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-[11px] font-bold text-white">{log.exerciseName}</span>
                             <div className="flex items-center gap-1">
-                              {weightUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">🟢 +Kg</span>}
-                              {volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-bold">🔵 +Vol</span>}
-                              {prevLog && !weightUp && !volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-500/20 text-gray-400 font-bold">➡️ Giữ</span>}
+                              {weightUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">📈 +Kg</span>}
+                              {volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-bold">💪 +Vol</span>}
+                              {prevLog && !weightUp && !volumeUp && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-500/20 text-gray-400 font-bold">➖ Giữ</span>}
                             </div>
                           </div>
                           <div className="grid grid-cols-[24px_1fr_1fr_1fr] gap-1 text-[9px] text-gray-500 font-bold uppercase mb-1">
@@ -750,8 +756,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                   </div>
                 </div>
               )}
-
-
             </div>
           </div>
         )}
