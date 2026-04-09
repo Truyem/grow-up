@@ -119,7 +119,7 @@ export const loadPlanFromSupabase = async (
         }
 
         if (data) {
-            console.log('[PlanSync] Plan loaded from Supabase');
+            console.log('[PlanSync] Plan loaded from Supabase:', data);
             return {
                 plan: data.plan_data as DailyPlan,
                 workoutProgress: data.workout_progress as Record<string, any>,

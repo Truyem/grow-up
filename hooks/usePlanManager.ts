@@ -207,6 +207,7 @@ export function usePlanManager(
     setLoading(true);
     try {
       const { plan: cloudPlan, workoutProgress } = await loadPlanFromSupabase(userId);
+      console.log('Loaded plan from Supabase:', cloudPlan);
       if (!cloudPlan) {
         setPlan(null);
       } else {
@@ -214,8 +215,9 @@ export function usePlanManager(
           ...cloudPlan,
           workoutProgress: workoutProgress && typeof workoutProgress === 'object' && 'checkedState' in workoutProgress
             ? workoutProgress as { checkedState: Record<string, boolean>; userNote?: string; exerciseLogs?: Record<string, ExerciseLog> }
-            : cloudPlan.workoutProgress,
+            : cloudPlan?.workoutProgress,
         });
+        showToast('Đã tải kế hoạch từ máy chủ', 'success');
       }
     } catch (e) {
       console.error('[PlanManager] Refresh plan error:', e);

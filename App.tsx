@@ -175,12 +175,35 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (session?.user?.id && !hasInitialSynced) {
+    if (session?.user?.id && !hasInitialSynced && !isAuthChecking) {
       setHasInitialSynced(true);
-      // Auto-sync when entering the app
-      handleSyncAll();
+      // Thay vì gọi handleSyncAll (có thể bị chặn bởi toast/delay), ta gọi trực tiếp Refresh
+      const doInitialSync = async () => {
+        try {
+          console.log('[Initial Sync] Fetching profile, plan & history...');
+          // 1. Sync Profile Settings
+          const cloudSettings = await loadProfileSettingsFromSupabase(session.user.id);
+          if (cloudSettings) {
+            if (cloudSettings.userData) setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
+            if (cloudSettings.userStats) setUserStats(cloudSettings.userStats);
+            if (cloudSettings.userGoals) setUserGoals(cloudSettings.userGoals);
+            if (Array.isArray(cloudSettings.achievements)) setAchievements(cloudSettings.achievements);
+          }
+
+          // 2. Sync Plan
+          await handleRefreshPlan();
+
+          // 3. Sync History
+          await handleRefreshHistory();
+          console.log('[Initial Sync] Success.');
+        } catch (error) {
+          console.error('[Initial Sync] Error:', error);
+        }
+      };
+      
+      doInitialSync();
     }
-  }, [session?.user?.id, hasInitialSynced]);
+  }, [session?.user?.id, hasInitialSynced, isAuthChecking, setUserData, setUserStats, setUserGoals, setAchievements, handleRefreshPlan, handleRefreshHistory]);
 
   const appContextValue = {
     userId: session?.user?.id,
