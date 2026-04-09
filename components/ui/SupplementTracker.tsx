@@ -11,9 +11,38 @@ interface SupplementLog {
     lastUpdated: number;
 }
 
-interface SupplementTrackerProps {
-    useCreatine: boolean;
-}
+type SupplementKey = 'whey' | 'creatine' | 'vitamin' | 'omega3';
+
+const WheyIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 4h10l-1 14H8L7 4Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M9 4V3.5A1.5 1.5 0 0 1 10.5 2h3A1.5 1.5 0 0 1 15 3.5V4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M8.6 8.5h6.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M10.2 11.5h3.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+);
+
+const CreatineIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M13.8 2.5 6.2 13h4.7L10.2 21.5 17.8 11h-4.7l.7-8.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+);
+
+const VitaminIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="4" y="8" width="16" height="8" rx="4" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 8v8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M8 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+);
+
+const OmegaIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M6.5 12c1.8-2.7 4.5-4.2 7.9-4.2 2.1 0 3.8.7 5.1 2.1-1.3 1.4-3 2.1-5.1 2.1-3.4 0-6.1-1.5-7.9-4.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M6.5 12c1.8 2.7 4.5 4.2 7.9 4.2 2.1 0 3.8-.7 5.1-2.1-1.3-1.4-3-2.1-5.1-2.1-3.4 0-6.1 1.5-7.9 4.2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx="9" cy="10.5" r="0.9" fill="currentColor" />
+    </svg>
+);
 
 const WATER_GOAL = 2500; // ml
 const WATER_INCREMENT = 300; // ml per button press
@@ -47,7 +76,7 @@ function saveLog(log: SupplementLog) {
     localStorage.setItem('supplement_log', JSON.stringify(log));
 }
 
-export const SupplementTracker: React.FC<SupplementTrackerProps> = ({ useCreatine }) => {
+export const SupplementTracker: React.FC = () => {
     const [log, setLog] = useState<SupplementLog>(loadTodayLog);
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -74,7 +103,7 @@ export const SupplementTracker: React.FC<SupplementTrackerProps> = ({ useCreatin
         update({ water_ml: Math.min(WATER_GOAL + 500, log.water_ml + ml) });
     };
 
-    const toggleSupplement = (key: 'whey' | 'creatine' | 'vitamin' | 'omega3') => {
+    const toggleSupplement = (key: SupplementKey) => {
         update({ [key]: !log[key] });
     };
 
@@ -82,11 +111,11 @@ export const SupplementTracker: React.FC<SupplementTrackerProps> = ({ useCreatin
     const waterColor = waterPercent >= 100 ? '#22c55e' : waterPercent >= 60 ? '#3b82f6' : '#f97316';
 
     const supplements = [
-        { key: 'whey' as const, label: 'Whey Protein', detail: '1 scoop sau tập', color: '#8b5cf6', emoji: '🥤' },
-        { key: 'creatine' as const, label: 'Creatine', detail: '5g + 400ml nước', color: '#3b82f6', emoji: '⚡', hiddenIf: !useCreatine },
-        { key: 'vitamin' as const, label: 'Vitamin/Multivitamin', detail: 'Sau bữa ăn', color: '#eab308', emoji: '💊' },
-        { key: 'omega3' as const, label: 'Omega 3', detail: '2 viên sau ăn trưa & tối', color: '#22c55e', emoji: '🐟' },
-    ].filter(s => !s.hiddenIf);
+        { key: 'whey' as const, label: 'Whey Protein', detail: '1 scoop sau tập', icon: WheyIcon },
+        { key: 'creatine' as const, label: 'Creatine', detail: '5g + 400ml nước', icon: CreatineIcon },
+        { key: 'vitamin' as const, label: 'Vitamin/Multivitamin', detail: 'Sau bữa ăn', icon: VitaminIcon },
+        { key: 'omega3' as const, label: 'Omega 3', detail: '2 viên sau ăn trưa & tối', icon: OmegaIcon },
+    ];
 
     const completedSupps = supplements.filter(s => log[s.key]).length;
 
@@ -129,7 +158,11 @@ export const SupplementTracker: React.FC<SupplementTrackerProps> = ({ useCreatin
                             onClick={(e) => { e.stopPropagation(); toggleSupplement(s.key); }}
                             className={`p-2 text-center transition-colors ${log[s.key] ? 'bg-white/10' : 'hover:bg-white/5'}`}
                         >
-                            <span className="text-base">{log[s.key] ? '✅' : s.emoji}</span>
+                            <span className="flex justify-center">
+                                {log[s.key]
+                                    ? <Check className="w-4 h-4 text-emerald-300" />
+                                    : <s.icon className="w-4 h-4 text-cyan-200" />}
+                            </span>
                             <p className="text-[9px] text-gray-500 mt-0.5 truncate">{s.label.split(' ')[0]}</p>
                         </button>
                     ))}
@@ -205,7 +238,9 @@ export const SupplementTracker: React.FC<SupplementTrackerProps> = ({ useCreatin
                                         className={`w-8 h-8 rounded-lg flex items-center justify-center text-base transition-all ${log[s.key] ? 'bg-emerald-500 scale-110' : 'bg-white/10'}`}
                                         style={!log[s.key] ? {} : {}}
                                     >
-                                        {log[s.key] ? <Check className="w-4 h-4 text-white" /> : <span>{s.emoji}</span>}
+                                        {log[s.key]
+                                            ? <Check className="w-4 h-4 text-white" />
+                                            : <s.icon className="w-4 h-4 text-cyan-200" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className={`text-sm font-bold transition-colors ${log[s.key] ? 'text-emerald-300 line-through opacity-75' : 'text-white'}`}>

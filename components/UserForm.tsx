@@ -1,40 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { UserInput, UserStats, Intensity, WorkoutHistoryItem, UserGoals } from '../types';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Ruler, Weight, Activity, Flame, Dumbbell, Utensils, History, Loader2, ChevronRight, Camera } from 'lucide-react';
+import { Calendar, Ruler, Weight, Flame, Dumbbell, Utensils, Loader2, ChevronRight, Camera } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
 import { NutritionInput } from './forms/NutritionInput';
 import { HistoryView } from './HistoryView';
-import { PlanTabs } from './ui/PlanTabs';
 import { BodyMetricsCard } from './ui/BodyMetricsCard';
 import { GoalSettingCard } from './ui/GoalSettingCard';
 import { SupplementTracker } from './ui/SupplementTracker';
+import { PersonalRecordCard } from './ui/PersonalRecordCard';
+import { SleepRecoveryCard } from './ui/SleepRecoveryCard';
+import { ActiveRecoveryCard } from './ui/ActiveRecoveryCard';
+import { AchievementBadgesCard } from './ui/AchievementBadgesCard';
+import { useAppContext } from '../context';
+import { calculatePersonalRecords } from '../services/personalRecordService';
+import { SleepRecoveryEntry } from '../types';
 
 interface UserFormProps {
-  userData: UserInput;
-  setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
-  userStats: UserStats;
-  onSubmit: (type: 'workout' | 'nutrition' | 'history') => void;
-  isLoading: boolean;
-  onSickDay: () => void;
-  history: WorkoutHistoryItem[];
-  onDeleteHistory: (timestamp: number) => void;
-  activeTab: 'workout' | 'nutrition' | 'history'; // New prop
-  onStartTracking?: () => void;
-  onRefreshHistory?: () => void;
-  isRefreshing?: boolean;
-  userGoals: UserGoals | null;
-  onGoalsUpdate: (goals: UserGoals) => void;
+  activeTab: 'workout' | 'nutrition' | 'history';
 }
 
-type TabType = 'workout' | 'nutrition' | 'history';
-
-export const UserForm: React.FC<UserFormProps> = ({
-  userData, setUserData, userStats, onSubmit, isLoading, onSickDay,
-  history, onDeleteHistory,
-  activeTab, onStartTracking, onRefreshHistory, isRefreshing,
-  userGoals, onGoalsUpdate,
-}) => {
+export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
+  const {
+    userData,
+    setUserData,
+    userStats,
+    userGoals,
+    setUserGoals,
+    sleepRecovery,
+    setSleepRecovery,
+    workoutHistory,
+    plan,
+    isLoading,
+    isRefreshing,
+    generatePlan,
+    startTracking,
+    sickDay,
+    deleteHistoryItem,
+    refreshHistory,
+  } = useAppContext();
   const [currentDate, setCurrentDate] = useState('');
   // const [activeTab, setActiveTab] = useState<TabType>('workout'); // Removed internal state
 
@@ -52,6 +55,10 @@ export const UserForm: React.FC<UserFormProps> = ({
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
+
+  const handleAddSleepRecovery = (entry: SleepRecoveryEntry) => {
+    setSleepRecovery((prev) => [entry, ...prev].sort((a, b) => b.timestamp - a.timestamp));
+  };
 
   return (
     <div className="space-y-6 animate-fade-in relative pb-32">
@@ -85,15 +92,35 @@ export const UserForm: React.FC<UserFormProps> = ({
       {activeTab !== 'history' && (
         <GoalSettingCard
           goals={userGoals}
-          onSave={onGoalsUpdate}
-          history={history}
+          onSave={setUserGoals}
+          history={workoutHistory}
           userData={userData}
         />
       )}
 
+      {activeTab !== 'history' && (
+        <PersonalRecordCard records={calculatePersonalRecords(workoutHistory)} />
+      )}
+
+      {activeTab !== 'history' && (
+        <SleepRecoveryCard
+          entries={sleepRecovery}
+          onAddEntry={handleAddSleepRecovery}
+          suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
+        />
+      )}
+
+      {activeTab !== 'history' && (
+        <ActiveRecoveryCard history={workoutHistory} />
+      )}
+
+      {activeTab !== 'history' && (
+        <AchievementBadgesCard history={workoutHistory} />
+      )}
+
       {/* --- SUPPLEMENT & WATER TRACKER --- */}
       {activeTab !== 'history' && (
-        <SupplementTracker useCreatine={userData.useCreatine} />
+        <SupplementTracker />
       )}
 
 
@@ -161,11 +188,11 @@ export const UserForm: React.FC<UserFormProps> = ({
             <WorkoutInput
               userData={userData}
               setUserData={setUserData}
-              onSickDay={onSickDay}
+              onSickDay={sickDay}
             />
             <button
               id="tour-generate-btn"
-              onClick={() => onSubmit('workout')}
+              onClick={() => generatePlan('workout')}
               disabled={isLoading}
               className="group relative w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 cursor-pointer shadow-2xl bg-gradient-to-r from-cyan-600 to-blue-600 border-cyan-400/50 hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] border text-white hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:grayscale component-shadow"
             >
@@ -199,7 +226,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               {/* Option 1: AI Plan (Primary) */}
               <button
                 id="tour-nutrition-ai-btn"
-                onClick={() => onSubmit('nutrition')}
+                onClick={() => generatePlan('nutrition')}
                 disabled={isLoading}
                 className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-5 text-left transition-all hover:border-emerald-500/50 hover:from-emerald-500/20 hover:to-teal-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] active:scale-[0.98]"
               >
@@ -224,7 +251,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               {/* Option 2: Quick Check (Secondary) */}
               <button
                 id="tour-check-calo"
-                onClick={onStartTracking}
+                onClick={startTracking}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition-all hover:border-white/20 hover:bg-white/10 active:scale-[0.98]"
               >
                 <div className="relative z-10 flex items-center gap-4">
@@ -249,15 +276,15 @@ export const UserForm: React.FC<UserFormProps> = ({
 
         {activeTab === 'history' && (
           <HistoryView
-            history={history}
-            onDelete={onDeleteHistory}
+            history={workoutHistory}
+            onDelete={deleteHistoryItem}
             userData={userData}
-            onRefresh={onRefreshHistory}
+            onRefresh={refreshHistory}
             isRefreshing={isRefreshing}
+            sleepRecovery={sleepRecovery}
           />
         )}
       </div>
     </div>
   );
 };
-

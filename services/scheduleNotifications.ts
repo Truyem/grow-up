@@ -74,6 +74,25 @@ export async function scheduleAllDailyNotifications(): Promise<void> {
         return;
     }
 
+    // Android 13+ cần quyền runtime cho thông báo
+    try {
+        const currentPerm = await ln.checkPermissions?.();
+        let displayPerm = currentPerm?.display;
+
+        if (displayPerm !== 'granted') {
+            const reqPerm = await ln.requestPermissions?.();
+            displayPerm = reqPerm?.display;
+        }
+
+        if (displayPerm && displayPerm !== 'granted') {
+            console.warn('[Notifications] Chưa được cấp quyền thông báo local:', displayPerm);
+            return;
+        }
+    } catch (e) {
+        console.warn('[Notifications] Không kiểm tra được quyền thông báo:', e);
+        return;
+    }
+
     const allItems = [...morningSchedule, ...afternoonSchedule];
     const notifications: object[] = [];
 

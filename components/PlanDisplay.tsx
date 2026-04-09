@@ -1,12 +1,13 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
+import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 import { AddExerciseModal } from './AddExerciseModal';
 import { suggestNextExercises, suggestAlternativeExercise } from '../services/geminiService';
+import { useAppContext } from '../context';
 
 
 import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, RefreshCw, Layers, Sun, Moon, Footprints, Sparkles, Loader2, Weight, Plus, Minus } from 'lucide-react';
@@ -15,11 +16,9 @@ import { calculateWorkoutCalories, formatDuration } from '../services/metCalorie
 
 interface PlanDisplayProps {
   plan: DailyPlan;
-  userData: UserInput;
   onReset: (type: 'workout' | 'nutrition') => void;
   onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => void;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
-  history: WorkoutHistoryItem[];
 }
 
 const formatCurrencyInput = (value: string) => {
@@ -324,7 +323,8 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
 
 
 
-export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onReset, onComplete, onUpdatePlan, history }) => {
+export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete, onUpdatePlan }) => {
+  const { userData, workoutHistory } = useAppContext();
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -355,7 +355,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   }
 
   // Combine all exercises to calculate progress
-  const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+  const warmupExercises = currentWorkout.warmup || [];
+  const morningExercises = currentWorkout.morning || [];
+  const eveningExercises = currentWorkout.evening || [];
+  const cooldownExercises = currentWorkout.cooldown || [];
+  const allExercises = [...warmupExercises, ...morningExercises, ...eveningExercises, ...cooldownExercises];
   const totalExercises = allExercises.length;
 
   // Calculate checked based on composite keys "mor-X" and "eve-X"
@@ -419,11 +423,11 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   };
 
   // --- Volume Tracking Computations ---
-  const morningVolume = currentWorkout.morning.reduce((sum, _, idx) => {
+  const morningVolume = morningExercises.reduce((sum, _, idx) => {
     const log = exerciseLogs[`mor-${idx}`];
     return sum + (log?.totalVolume || 0);
   }, 0);
-  const eveningVolume = currentWorkout.evening.reduce((sum, _, idx) => {
+  const eveningVolume = eveningExercises.reduce((sum, _, idx) => {
     const log = exerciseLogs[`eve-${idx}`];
     return sum + (log?.totalVolume || 0);
   }, 0);
@@ -432,23 +436,35 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   // --- MET Calories Computation ---
   const metCalorieResult = (() => {
     const allExs = [
-      ...currentWorkout.morning.map((ex, i) => ({
+      ...warmupExercises.map((ex, i) => ({
+        name: ex.name,
+        sets: checkedState[`warm-${i}`] ? (exerciseLogs[`warm-${i}`]?.sets?.length || ex.sets || 1) : (ex.sets || 1),
+        reps: ex.reps || '60s',
+      })),
+      ...morningExercises.map((ex, i) => ({
         name: ex.name,
         sets: checkedState[`mor-${i}`] ? (exerciseLogs[`mor-${i}`]?.sets?.length || ex.sets) : ex.sets,
         reps: ex.reps,
       })),
-      ...currentWorkout.evening.map((ex, i) => ({
+      ...eveningExercises.map((ex, i) => ({
         name: ex.name,
         sets: checkedState[`eve-${i}`] ? (exerciseLogs[`eve-${i}`]?.sets?.length || ex.sets) : ex.sets,
         reps: ex.reps,
       })),
+      ...cooldownExercises.map((ex, i) => ({
+        name: ex.name,
+        sets: checkedState[`cool-${i}`] ? (exerciseLogs[`cool-${i}`]?.sets?.length || ex.sets || 1) : (ex.sets || 1),
+        reps: ex.reps || '60s',
+      })),
     ];
-    return calculateWorkoutCalories(allExs, userData.weight || 65);
+    const warmupMinutes = warmupExercises.length > 0 ? 0 : 10;
+    const cooldownMinutes = cooldownExercises.length > 0 ? 0 : 5;
+    return calculateWorkoutCalories(allExs, userData.weight || 65, warmupMinutes, cooldownMinutes);
   })();
 
   // Find previous session's total volume (most recent history entry with any exerciseLogs)
   const previousSessionVolume = (() => {
-    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    const sortedHistory = [...workoutHistory].sort((a, b) => b.timestamp - a.timestamp);
     const prev = sortedHistory.find(h => h.exerciseLogs && h.exerciseLogs.length > 0);
     if (!prev || !prev.exerciseLogs) return 0;
     return prev.exerciseLogs.reduce((sum, log) => sum + log.totalVolume, 0);
@@ -457,7 +473,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   // Build a map: exerciseName -> previousVolume (from most recent history entry containing that exercise)
   const previousVolumeMap = (() => {
     const map: Record<string, number> = {};
-    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    const sortedHistory = [...workoutHistory].sort((a, b) => b.timestamp - a.timestamp);
     sortedHistory.forEach(h => {
       if (!h.exerciseLogs) return;
       h.exerciseLogs.forEach(log => {
@@ -475,7 +491,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     if (!exercise) return;
     setSwappingKey(key);
     try {
-      const alternative = await suggestAlternativeExercise(exercise, plan, userData, history);
+      const alternative = await suggestAlternativeExercise(exercise, plan, userData, workoutHistory);
       if (alternative) {
         const updatedPlan = {
           ...plan,
@@ -543,15 +559,23 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const handleComplete = () => {
     setIsCompleted(true);
 
-    const completedMorning = currentWorkout.morning
+    const completedWarmup = warmupExercises
+      .filter((_, idx) => checkedState[`warm-${idx}`])
+      .map(ex => ex.name);
+
+    const completedMorning = morningExercises
       .filter((_, idx) => checkedState[`mor-${idx}`])
       .map(ex => ex.name);
 
-    const completedEvening = currentWorkout.evening
+    const completedEvening = eveningExercises
       .filter((_, idx) => checkedState[`eve-${idx}`])
       .map(ex => ex.name);
 
-    const completedExercisesList = [...completedMorning, ...completedEvening];
+    const completedCooldown = cooldownExercises
+      .filter((_, idx) => checkedState[`cool-${idx}`])
+      .map(ex => ex.name);
+
+    const completedExercisesList = [...completedWarmup, ...completedMorning, ...completedEvening, ...completedCooldown];
 
     // Clear the progress cache since we are finishing it
     localStorage.removeItem('workout_progress');
@@ -581,7 +605,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const handleAutoAddExercise = async (section: 'morning' | 'evening') => {
     setGeneratingSection(section);
     try {
-      const suggested = await suggestNextExercises(plan, userData, section, history);
+      const suggested = await suggestNextExercises(plan, userData, section, workoutHistory);
       if (suggested && suggested.length > 0) {
         const newExercise = suggested[0];
         const updatedPlan = { ...plan };
@@ -601,7 +625,14 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
 
 
-  const renderSection = (title: string, icon: React.ReactNode, exercises: Exercise[], prefix: string, sectionKey: 'morning' | 'evening') => (
+  const renderSection = (
+    title: string,
+    icon: React.ReactNode,
+    exercises: Exercise[],
+    prefix: string,
+    sectionKey?: 'morning' | 'evening',
+    showAiAdd: boolean = false
+  ) => (
     <div className="mb-6 last:mb-0">
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10 text-cyan-200">
         {icon}
@@ -632,10 +663,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
                 onStartTimer={() => handleStartTimer(ex.name)}
                 exerciseLog={exerciseLogs[key]}
                 onUpdateLog={(log) => handleUpdateExerciseLog(key, log)}
-                onSwap={!isCompleted ? () => handleSwapExercise(key, sectionKey, originalIndex) : undefined}
-                isSwapping={swappingKey === key}
-                previousVolume={previousVolumeMap[ex.name]}
-              />
+                 onSwap={!isCompleted && sectionKey ? () => handleSwapExercise(key, sectionKey, originalIndex) : undefined}
+                 isSwapping={swappingKey === key}
+                 previousVolume={previousVolumeMap[ex.name]}
+               />
             );
           })
         ) : (
@@ -644,7 +675,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
       </div>
 
       {/* Add Exercise Button */}
-      {!isCompleted && (
+      {!isCompleted && showAiAdd && sectionKey && (
         <button
           onClick={() => handleAutoAddExercise(sectionKey)}
           disabled={generatingSection !== null}
@@ -844,19 +875,27 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
             </div>
           </div>
 
-          {currentWorkout.evening && currentWorkout.evening.length > 0 ? (
+          {warmupExercises.length > 0 && (
+            renderSection("Khoi dong", <Footprints className="w-4 h-4 text-emerald-300" />, warmupExercises, 'warm')
+          )}
+
+          {eveningExercises.length > 0 ? (
             <>
               {/* Render Morning Session */}
-              {renderSection("Buổi Sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, currentWorkout.morning, 'mor', 'morning')}
+              {renderSection("Buoi sang (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, morningExercises, 'mor', 'morning', true)}
 
               {/* Render Evening Session */}
-              {renderSection("Buổi Tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, currentWorkout.evening, 'eve', 'evening')}
+              {renderSection("Buoi toi (Evening)", <Moon className="w-4 h-4 text-blue-300" />, eveningExercises, 'eve', 'evening', true)}
             </>
           ) : (
             <>
               {/* Single Session Render (No Morning/Evening Header needed, or generic header) */}
-              {renderSection("Bài Tập Trong Ngày", <Dumbbell className="w-4 h-4 text-emerald-400" />, currentWorkout.morning, 'mor', 'morning')}
+              {renderSection("Bai tap trong ngay", <Dumbbell className="w-4 h-4 text-emerald-400" />, morningExercises, 'mor', 'morning', true)}
             </>
+          )}
+
+          {cooldownExercises.length > 0 && (
+            renderSection("Hoi phuc", <Moon className="w-4 h-4 text-cyan-300" />, cooldownExercises, 'cool')
           )}
 
           <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">

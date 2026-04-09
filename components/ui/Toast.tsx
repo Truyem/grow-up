@@ -6,7 +6,7 @@ interface ToastProps {
     isOpen: boolean;
     onClose: () => void;
     duration?: number; // Auto close after duration (ms), 0 = no auto close
-    type?: 'success' | 'info';
+    type?: 'success' | 'info' | 'error';
 }
 
 export const Toast: React.FC<ToastProps> = ({
@@ -48,9 +48,21 @@ export const Toast: React.FC<ToastProps> = ({
 
     if (!isVisible) return null;
 
-    const iconColor = type === 'success' ? 'text-green-400' : 'text-cyan-400';
-    const borderColor = type === 'success' ? 'border-green-500/30' : 'border-cyan-500/30';
-    const bgGlow = type === 'success' ? 'shadow-green-500/10' : 'shadow-cyan-500/10';
+    const iconColor = type === 'success'
+        ? 'text-green-400'
+        : type === 'error'
+            ? 'text-red-400'
+            : 'text-cyan-400';
+    const borderColor = type === 'success'
+        ? 'border-green-500/30'
+        : type === 'error'
+            ? 'border-red-500/30'
+            : 'border-cyan-500/30';
+    const bgGlow = type === 'success'
+        ? 'shadow-green-500/10'
+        : type === 'error'
+            ? 'shadow-red-500/10'
+            : 'shadow-cyan-500/10';
 
     return (
         <div

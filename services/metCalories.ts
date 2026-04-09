@@ -158,8 +158,10 @@ export function calculateWorkoutCalories(
     const exerciseBreakdown: WorkoutCalorieResult['exerciseBreakdown'] = [];
 
     // Warmup calories
-    const warmupCals = Math.round(3.5 * 3.5 * userWeightKg / 200 * warmupMinutes);
-    totalCalories += warmupCals;
+    if (warmupMinutes > 0) {
+        const warmupCals = Math.round(3.5 * 3.5 * userWeightKg / 200 * warmupMinutes);
+        totalCalories += warmupCals;
+    }
 
     for (const ex of exercises) {
         const cals = calculateExerciseCalories(ex.name, ex.sets, ex.reps, userWeightKg);
@@ -180,6 +182,11 @@ export function calculateWorkoutCalories(
 
         totalCalories += cals;
         exerciseBreakdown.push({ name: ex.name, calories: cals, met });
+    }
+
+    if (cooldownMinutes > 0) {
+        const cooldownCals = Math.round(2.5 * 3.5 * userWeightKg / 200 * cooldownMinutes);
+        totalCalories += cooldownCals;
     }
 
     return {

@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry } from "../types";
+import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
@@ -387,12 +388,9 @@ const calculateTargetCalories = (weight: number, height: number, age: number = 1
 };
 
 // 5. Calculate Water Intake
-const calculateWaterIntake = (weight: number, useCreatine: boolean): number => {
+const calculateWaterIntake = (weight: number): number => {
   // Base: 40ml per kg (0.04L)
-  let baseWater = weight * 0.04;
-  if (useCreatine) {
-    baseWater += 1.5; // Add 1.5L if taking Creatine
-  }
+  const baseWater = weight * 0.04;
   // Round to 1 decimal place
   return Math.round(baseWater * 10) / 10;
 };
@@ -680,7 +678,12 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
 
 // --- SPLIT GENERATION PARTS ---
 
-const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], onProgress?: (text: string) => void): Promise<any> => {
+const generateWorkoutPart = async (
+  userData: UserInput,
+  history: WorkoutHistoryItem[],
+  sleepRecovery7Days: SleepRecoveryEntry[],
+  onProgress?: (text: string) => void
+): Promise<any> => {
   const model = MODELS.WORKOUT;
   const dayPeriod = getCurrentDayPeriod();
   const { target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
@@ -735,6 +738,10 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
       })),
     }));
 
+  const avgSleepHours = sleepRecovery7Days.length > 0
+    ? Number((sleepRecovery7Days.reduce((sum: number, s) => sum + (Number(s.sleepHours) || 0), 0) / sleepRecovery7Days.length).toFixed(1))
+    : null;
+
   const prompt = `
     ACT AS A WORLD-CLASS PERSONAL TRAINER USING MODEL ${model}.
     GENERATE A 1-DAY WORKOUT PLAN FOR: ${getCurrentDate()}.
@@ -762,6 +769,8 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     - Tình trạng ăn uống: ${foodAssessment.status} (${foodAssessment.reason})
     - Điều chỉnh cương độ dựa trên thức ăn: ${foodAssessment.adjustment}
     - Thời điểm hiện tại: ${dayPeriod}
+    - Dữ liệu giấc ngủ 7 ngày: ${JSON.stringify(sleepRecovery7Days)}
+    - Số giờ ngủ trung bình 7 ngày: ${avgSleepHours ?? 'Chưa có dữ liệu'}
 
     LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, cân nặng, calories, protein, dụng cụ):
     ${JSON.stringify(history7Days, null, 2)}
@@ -814,7 +823,12 @@ const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7
   return recentMeals;
 };
 
-const generateNutritionPart = async (userData: UserInput, fullHistory: WorkoutHistoryItem[] = [], onProgress?: (text: string) => void): Promise<any> => {
+const generateNutritionPart = async (
+  userData: UserInput,
+  fullHistory: WorkoutHistoryItem[] = [],
+  sleepRecovery7Days: SleepRecoveryEntry[],
+  onProgress?: (text: string) => void
+): Promise<any> => {
   const model = MODELS.MENU;
 
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
@@ -839,6 +853,10 @@ const generateNutritionPart = async (userData: UserInput, fullHistory: WorkoutHi
   const recentMeals = extractMealsFromHistory(fullHistory, 7);
   const uniqueRecentMeals = Array.from(new Set(recentMeals));
   const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join(', ') : 'none';
+
+  const avgSleepHours = sleepRecovery7Days.length > 0
+    ? Number((sleepRecovery7Days.reduce((sum: number, s) => sum + (Number(s.sleepHours) || 0), 0) / sleepRecovery7Days.length).toFixed(1))
+    : null;
   
   // Adjust calorie target based on weight trend
   let adjustedCalories = Math.round(target);
@@ -864,6 +882,8 @@ BODY METRICS:
 - Cân nặng hiện tại: ${userData.weight}kg
 - Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
 - Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg)
+- Dữ liệu giấc ngủ 7 ngày: ${JSON.stringify(sleepRecovery7Days)}
+- Số giờ ngủ trung bình 7 ngày: ${avgSleepHours ?? 'Chưa có dữ liệu'}
 
 NUTRITIONAL TARGETS:
 - Calories: ${adjustedCalories}${calorieNote}
@@ -879,7 +899,6 @@ USER INPUTS:
 - Height: ${userData.height}cm
 - Food consumed today: ${userData.consumedFood.join(', ') || 'none'}
 - Tình trạng ăn uống: ${foodAssessment.status}
-- Creatine: ${userData.useCreatine ? "YES" : "NO"}
 
 MEALS CONSUMED IN LAST 7 DAYS (TO AVOID REPETITION):
 ${recentMealsStr}
@@ -937,6 +956,7 @@ YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
 export const generateDailyPlan = async (
   userData: UserInput,
   fullHistory: WorkoutHistoryItem[],
+  userId?: string,
   generationType: 'workout' | 'nutrition' | 'both' = 'both',
   onProgress?: (text: string) => void
 ): Promise<DailyPlan> => {
@@ -949,12 +969,18 @@ export const generateDailyPlan = async (
     let workoutPart: any = {};
     let nutritionPart: any = {};
 
+    const sleepRecoveryAll = userId ? await loadSleepRecoveryFromSupabase(userId) : [];
+    const sleepRecovery7Days = [...sleepRecoveryAll]
+      .filter((s) => typeof s.timestamp === 'number')
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 7);
+
     if (generationType === 'workout' || generationType === 'both') {
-      workoutPart = await generateWorkoutPart(userData, history, onProgress);
+      workoutPart = await generateWorkoutPart(userData, history, sleepRecovery7Days, onProgress);
     }
 
     if (generationType === 'nutrition' || generationType === 'both') {
-      nutritionPart = await generateNutritionPart(userData, fullHistory, onProgress);
+      nutritionPart = await generateNutritionPart(userData, fullHistory, sleepRecovery7Days, onProgress);
     }
 
     const fallback = getFallbackPlan(userData);
@@ -967,7 +993,7 @@ export const generateDailyPlan = async (
       advice: '', isGenerated: false, meals: [] as Meal[]
     };
     const blankWorkout = {
-      summary: '', detail: { levelName: '', description: '', morning: [] as Exercise[], evening: [] as Exercise[] },
+      summary: '', detail: { levelName: '', description: '', warmup: [] as Exercise[], morning: [] as Exercise[], evening: [] as Exercise[], cooldown: [] as Exercise[] },
       isGenerated: false
     };
 
@@ -1252,7 +1278,7 @@ export const getBasicNutritionPlan = (userData: UserInput): DailyPlan => {
     },
     workout: {
       summary: "Chưa có lịch tập.",
-      detail: { levelName: "N/A", description: "N/A", morning: [], evening: [] },
+      detail: { levelName: "N/A", description: "N/A", warmup: [], morning: [], evening: [], cooldown: [] },
       isGenerated: false
     },
     nutrition: {

@@ -13,7 +13,6 @@ interface NutritionDisplayProps {
     onUpdatePlan: (plan: DailyPlan) => void;
 
     onCompleteNutrition?: (nutrition: DailyPlan['nutrition']) => void;
-    userId: string;
 }
 
 // --- MICRO COMPONENTS ---
@@ -509,7 +508,7 @@ const LocketCameraModal: React.FC<{
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onCompleteNutrition, userId }) => {
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onCompleteNutrition }) => {
     // Consumed state is now persisted in meal.consumed via onUpdatePlan
 
     // State for modal

@@ -1,10 +1,11 @@
 import React, { useMemo, useState, lazy, Suspense, useCallback } from 'react';
-import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview } from '../types';
+import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview, SleepRecoveryEntry } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { ActivityRings } from './ui/ActivityRings';
 import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { generateAIOverview } from '../services/geminiService';
+import { getSleepQualityLabel } from '../services/sleepRecoveryService';
 
 // Lazy load the heavy charts component (contains all recharts)
 const StatsCharts = lazy(() => import('./ui/StatsCharts'));
@@ -15,6 +16,7 @@ interface HistoryViewProps {
   userData?: UserInput; // Needed for context
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  sleepRecovery?: SleepRecoveryEntry[];
 }
 
 const formatCurrency = (amount?: number) => {
@@ -45,7 +47,7 @@ const RING_GOALS = {
   protein: 100,    // ~100g protein
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing, sleepRecovery = [] }) => {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
@@ -246,11 +248,27 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [history, calendarDate]);
 
+  const latestRecovery = useMemo(() => {
+    if (!sleepRecovery.length) return null;
+    return [...sleepRecovery].sort((a, b) => b.timestamp - a.timestamp)[0];
+  }, [sleepRecovery]);
+
   return (
     <div id="tour-history-calendar" className="space-y-6 animate-fade-in relative pb-8">
 
       {/* --- HEADER & CONTROLS --- */}
       <div className="flex flex-col gap-4">
+        {latestRecovery && (
+          <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-2xl p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div>
+              <div className="text-indigo-300 uppercase tracking-wide">Giấc ngủ</div>
+              <div className="text-gray-400">{latestRecovery.date}</div>
+            </div>
+            <div className="text-white">Số giờ ngủ: {latestRecovery.sleepHours}h</div>
+            <div className="text-white">Chất lượng giấc ngủ: {getSleepQualityLabel(latestRecovery.sleepQuality)}</div>
+            <div className="text-white">Trạng thái: đã ghi nhận</div>
+          </div>
+        )}
         {/* Top Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-purple-900/20 border border-purple-500/20 rounded-2xl p-4 flex flex-col justify-center items-center shadow-lg">

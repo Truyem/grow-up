@@ -142,12 +142,19 @@ export interface Meal {
 export interface WorkoutLevel {
   levelName: string;
   description: string;
+  warmup?: Exercise[];
   morning: Exercise[];
   evening: Exercise[];
+  cooldown?: Exercise[];
 }
 
 export interface DailyPlan {
   date: string;
+  schedule?: {
+    suggestedWorkoutTime?: string;
+    suggestedSleepTime?: string;
+    reasoning?: string;
+  };
   workout: {
     summary: string;
     detail: WorkoutLevel;
@@ -167,7 +174,6 @@ export interface DailyPlan {
     userNote?: string;
     exerciseLogs?: Record<string, ExerciseLog>; // key = exercise key (e.g. "mor-0")
   };
-
 }
 
 export interface WorkoutHistoryItem {
@@ -180,6 +186,7 @@ export interface WorkoutHistoryItem {
   userNotes?: string;
   exercisesSummary?: string;
   exerciseLogs?: ExerciseLog[]; // Weight/rep tracking per exercise
+  completedSchedule?: string[];
   nutrition?: {
     totalCalories: number;
     totalProtein: number;
@@ -189,6 +196,33 @@ export interface WorkoutHistoryItem {
 
   };
   weight?: number; // Recorded weight for that day
+}
+
+export interface PersonalRecord {
+  exerciseName: string;
+  maxEstimated1RM: number;
+  maxVolume: number;
+  maxWeight: number;
+  bestSetReps: number;
+  achievedAt: number;
+}
+
+export type SleepQuality = 'bad' | 'average' | 'good';
+
+export interface SleepRecoveryEntry {
+  id: string;
+  timestamp: number;
+  date: string;
+  sleepHours: number;
+  sleepQuality: SleepQuality;
+}
+
+export interface AchievementBadge {
+  id: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progressText: string;
 }
 
 // AI Overview - Insights from Gemini AI about workout progress

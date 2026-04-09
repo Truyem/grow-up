@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DailyPlan } from '../types';
+import { DailyPlan, SleepRecoveryEntry, UserGoals, UserInput, UserStats, WorkoutHistoryItem } from '../types';
 
 // ========================================
 // Debounce utility
@@ -239,6 +239,210 @@ export const loadLoginHistory = async (userId: string) => {
 
         return data || [];
     } catch {
+        return [];
+    }
+};
+
+// ========================================
+// LocalStorage sync helpers
+// ========================================
+
+export const syncUserSettingsToSupabase = async (userId: string, settings: UserInput) => {
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            userData: settings,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] settings sync error:', error);
+        }
+    } catch (err) {
+        console.error('[ProfileSync] settings unexpected error:', err);
+    }
+};
+
+export const syncUserStatsToSupabase = async (userId: string, stats: UserStats) => {
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            userStats: stats,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] stats sync error:', error);
+        }
+    } catch (err) {
+        console.error('[ProfileSync] stats unexpected error:', err);
+    }
+};
+
+export const syncUserGoalsToSupabase = async (userId: string, goals: UserGoals | null) => {
+    if (!goals) return;
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            userGoals: goals,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] goals sync error:', error);
+        }
+    } catch (err) {
+        console.error('[ProfileSync] goals unexpected error:', err);
+    }
+};
+
+export const syncWorkoutHistoryToSupabase = async (userId: string, history: WorkoutHistoryItem[]) => {
+    if (!history || history.length === 0) return;
+    try {
+        const rows = history.map((item) => ({
+            user_id: userId,
+            date: item.date,
+            data: item,
+        }));
+
+        const { error } = await supabase
+            .from('workout_logs')
+            .upsert(rows, { onConflict: 'user_id,date' });
+
+        if (error) {
+            // Graceful fallback if table is missing in this project
+            const code = (error as any)?.code;
+            if (code === 'PGRST204' || code === 'PGRST205') {
+                console.warn('[HistorySync] workout_logs table/columns not available. Skipping cloud sync.');
+                return;
+            }
+            console.error('[HistorySync] workout history sync error:', error);
+        }
+    } catch (err) {
+        console.error('[HistorySync] workout history unexpected error:', err);
+    }
+};
+
+export const syncSleepRecoveryToSupabase = async (userId: string, sleepRecovery: SleepRecoveryEntry[]) => {
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            sleepRecovery,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] sleep recovery sync error:', error);
+        }
+    } catch (err) {
+        console.error('[ProfileSync] sleep recovery unexpected error:', err);
+    }
+};
+
+export const loadSleepRecoveryFromSupabase = async (userId: string): Promise<SleepRecoveryEntry[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[ProfileSync] sleep recovery load error:', error);
+            return [];
+        }
+
+        const settings = (data?.settings && typeof data.settings === 'object') ? data.settings as any : {};
+        const cloudSleep = Array.isArray(settings.sleepRecovery) ? settings.sleepRecovery : [];
+
+        return cloudSleep.filter((item: any) =>
+            item &&
+            typeof item.timestamp === 'number' &&
+            typeof item.sleepHours === 'number' &&
+            typeof item.sleepQuality === 'string'
+        ) as SleepRecoveryEntry[];
+    } catch (err) {
+        console.error('[ProfileSync] sleep recovery load unexpected error:', err);
         return [];
     }
 };

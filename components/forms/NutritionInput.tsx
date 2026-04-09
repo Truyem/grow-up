@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserInput } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
-import { Utensils, Refrigerator, Zap, TrendingUp, TrendingDown, Leaf, Plus, X, Loader2, Beef, Carrot, Egg, Droplets, Nut } from 'lucide-react';
+import { Utensils, Refrigerator, TrendingUp, TrendingDown, Leaf, Plus, X, Loader2, Beef, Carrot, Egg, Droplets, Nut } from 'lucide-react';
 
 
 
@@ -82,33 +82,6 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
                             <span className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</span>
                         </div>
                     </button>
-                </div>
-
-                {/* Creatine Switch - Styled as a "Power Up" */}
-                <div
-                    onClick={() => setUserData({ ...userData, useCreatine: !userData.useCreatine })}
-                    className={`
-            cursor-pointer group relative overflow-hidden rounded-xl border p-4 transition-all duration-300
-            ${userData.useCreatine
-                            ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                            : 'bg-black/20 border-white/10 hover:border-white/20'}
-          `}
-                >
-                    <div className="flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg transition-colors duration-300 ${userData.useCreatine ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                                <Zap className={`w-5 h-5 ${userData.useCreatine ? 'fill-white' : ''}`} />
-                            </div>
-                            <div>
-                                <h4 className={`font-bold text-sm ${userData.useCreatine ? 'text-blue-300' : 'text-gray-300'}`}>Creatine Boost</h4>
-                                <p className="text-[10px] text-gray-400">Tự động +1.5L nước vào thực đơn</p>
-                            </div>
-                        </div>
-                        {/* Switch UI */}
-                        <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${userData.useCreatine ? 'bg-blue-500' : 'bg-gray-700'}`}>
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${userData.useCreatine ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </div>
-                    </div>
                 </div>
             </GlassCard>
 
