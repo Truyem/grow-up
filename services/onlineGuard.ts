@@ -5,6 +5,11 @@ const lastNoticeByKey = new Map<string, number>();
 export const ONLINE_ONLY_OFFLINE_MESSAGE = 'Mất kết nối mạng. Chế độ online-only: không thể lưu dữ liệu khi offline.';
 
 export const isOnline = (): boolean => {
+  // In Capacitor WebViews, navigator.onLine can be unreliable without the network plugin.
+  // It's safer to allow the request to proceed and let the fetch API handle any real network errors.
+  if (typeof window !== 'undefined' && (window as any).Capacitor?.isNative) {
+    return true;
+  }
   if (typeof navigator === 'undefined') return true;
   return navigator.onLine;
 };

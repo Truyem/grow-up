@@ -122,31 +122,6 @@ export default function App() {
     hasInitialSynced
   );
 
-  // Native Notifications
-  useEffect(() => {
-    if (!session?.user) return;
-    scheduleAllDailyNotifications(plan || undefined).catch((e) => {
-      console.warn('[Notifications] Failed to schedule daily notifications:', e);
-    });
-  }, [session?.user?.id, plan]);
-
-  const handleCompleteWorkoutWithSleep = async (
-    levelSelected: string,
-    summary: string,
-    completedExercises: string[],
-    userNotes: string,
-    nutrition: any,
-    exerciseLogs?: any[]
-  ) => {
-    if (!canPerformOnlineAction('complete-workout', showToast)) return;
-
-    try {
-      await handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
-    } catch {
-      return;
-    }
-  };
-
   const handleSyncAll = async () => {
     if (!session?.user?.id) return;
     if (!canPerformOnlineAction('sync-all', showToast)) return;
@@ -174,6 +149,47 @@ export default function App() {
       showToast('Có lỗi xảy ra khi đồng bộ.', 'error');
     }
   };
+
+  const handleCompleteWorkoutWithSleep = async (
+    levelSelected: string,
+    summary: string,
+    completedExercises: string[],
+    userNotes: string,
+    nutrition: any,
+    exerciseLogs?: any[]
+  ) => {
+    if (!canPerformOnlineAction('complete-workout', showToast)) return;
+
+    try {
+      await handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
+    } catch {
+      return;
+    }
+  };
+
+  // Native Notifications & App State
+  useEffect(() => {
+    if (!session?.user) return;
+    
+    // Schedule notifications
+    scheduleAllDailyNotifications(plan || undefined).catch((e) => {
+      console.warn('[Notifications] Failed to schedule daily notifications:', e);
+    });
+
+    // Listen for app coming to foreground to trigger sync
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && hasInitialSynced && !isAuthChecking) {
+        console.log('[App State] App came to foreground, triggering background sync...');
+        handleSyncAll();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [session?.user?.id, plan, hasInitialSynced, isAuthChecking, handleSyncAll]);
 
   useEffect(() => {
     if (session?.user?.id && !hasInitialSynced && !isAuthChecking) {

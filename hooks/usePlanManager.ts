@@ -183,7 +183,9 @@ export function usePlanManager(
   }, [showToast, userId]);
 
   const handleRefreshPlan = useCallback(async () => {
-    if (!userId || !online) return;
+    if (!userId) return;
+    if (!canPerformOnlineAction('plan-refresh', showToast)) return;
+    
     setLoading(true);
     try {
       const { plan: cloudPlan, workoutProgress } = await loadPlanFromSupabase(userId);
