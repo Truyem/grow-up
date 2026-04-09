@@ -3,13 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { DailyPlan, Exercise, ExerciseLog, ExerciseSetLog, Meal, WorkoutLevel, MuscleGroup, WorkoutHistoryItem, UserInput } from '../types';
 import { GlassCard } from './ui/GlassCard';
+import { LiquidGlassContainer } from './ui/LiquidGlassContainer';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 import { AddExerciseModal } from './AddExerciseModal';
-import { suggestNextExercises } from '../services/geminiService';
+import { suggestNextExercises, suggestAlternativeExercise } from '../services/geminiService';
 
 
 import { Flame, Zap, Clock, CheckSquare, Circle, Dumbbell, ExternalLink, Timer, PenLine, CheckCircle2, RefreshCw, Layers, Sun, Moon, Footprints, Sparkles, Loader2, Weight, Plus, Minus } from 'lucide-react';
+import { calculateWorkoutCalories, formatDuration } from '../services/metCalories';
 
 
 interface PlanDisplayProps {
@@ -66,10 +68,21 @@ interface ExerciseItemProps {
   onStartTimer: () => void;
   exerciseLog?: ExerciseLog;
   onUpdateLog: (log: ExerciseLog) => void;
+  onSwap?: () => void;
+  isSwapping?: boolean;
+  previousVolume?: number;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer, exerciseLog, onUpdateLog }) => {
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onToggle, onPreview, onStartTimer, exerciseLog, onUpdateLog, onSwap, isSwapping, previousVolume }) => {
   const isWalking = exercise.name.toLowerCase().includes('đi bộ') || exercise.name.toLowerCase().includes('walking');
+  const isBodyweight = !exercise.equipment || 
+                       exercise.equipment.toLowerCase() === 'none' || 
+                       exercise.equipment.toLowerCase().includes('bodyweight') ||
+                       exercise.name.toLowerCase().includes('bodyweight') ||
+                       exercise.name.toLowerCase().includes('push-up') ||
+                       exercise.name.toLowerCase().includes('pull-up') ||
+                       exercise.name.toLowerCase().includes('plank') ||
+                       exercise.name.toLowerCase().includes('burpee');
   const hasEquipment = !!exercise.equipment;
 
   // Initialize sets from exerciseLog or default based on exercise.sets
@@ -138,12 +151,23 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
               <ExternalLink className={`w-3.5 h-3.5 ${isChecked ? 'hidden' : 'opacity-0 group-hover:opacity-100 text-cyan-400 transition-opacity'}`} />
             </button>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <ColorBadge color={exercise.colorCode} />
               {exercise.isBFR && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-500 text-white shadow-lg shadow-pink-500/40">
                   BFR
                 </span>
+              )}
+              {onSwap && !isChecked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSwap(); }}
+                  disabled={isSwapping}
+                  title="Gợi ý bài tập thay thế (máy đang có người)"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 text-orange-400 text-[10px] font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSwapping ? 'animate-spin' : ''}`} />
+                  {isSwapping ? 'Đang tìm...' : 'Đổi bài'}
+                </button>
               )}
             </div>
           </div>
@@ -207,7 +231,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
           )}
 
           {/* Weight Tracking Inline Form */}
-          {isChecked && hasEquipment && (
+          {isChecked && !isBodyweight && (
             <div className="mt-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/15 animate-fade-in">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
@@ -215,9 +239,29 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
                   <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Tracking Tạ</span>
                 </div>
                 {totalVolume > 0 && (
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    Vol: {totalVolume.toLocaleString()} kg
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      Vol: {totalVolume.toLocaleString()} kg
+                    </span>
+                    {previousVolume !== undefined && previousVolume > 0 && (() => {
+                      const delta = totalVolume - previousVolume;
+                      if (delta > 0) return (
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-0.5">
+                          ▲ +{delta.toLocaleString()} kg
+                        </span>
+                      );
+                      if (delta < 0) return (
+                        <span className="text-[10px] font-bold text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full border border-red-500/20 flex items-center gap-0.5">
+                          ▼ {delta.toLocaleString()} kg
+                        </span>
+                      );
+                      return (
+                        <span className="text-[10px] font-bold text-gray-400 bg-white/5 px-1.5 py-0.5 rounded-full border border-white/10">
+                          = Giữ nguyên
+                        </span>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
 
@@ -294,6 +338,8 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
 
   // Add Exercise State
   const [generatingSection, setGeneratingSection] = useState<'morning' | 'evening' | null>(null);
+  // Swap Exercise State
+  const [swappingKey, setSwappingKey] = useState<string | null>(null);
 
 
   const currentWorkout: WorkoutLevel | undefined = plan.workout?.detail;
@@ -373,6 +419,101 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
     setExerciseLogs(prev => ({ ...prev, [key]: log }));
   };
 
+  // --- Volume Tracking Computations ---
+  const morningVolume = currentWorkout.morning.reduce((sum, _, idx) => {
+    const log = exerciseLogs[`mor-${idx}`];
+    return sum + (log?.totalVolume || 0);
+  }, 0);
+  const eveningVolume = currentWorkout.evening.reduce((sum, _, idx) => {
+    const log = exerciseLogs[`eve-${idx}`];
+    return sum + (log?.totalVolume || 0);
+  }, 0);
+  const sessionTotalVolume = morningVolume + eveningVolume;
+
+  // --- MET Calories Computation ---
+  const metCalorieResult = (() => {
+    const allExs = [
+      ...currentWorkout.morning.map((ex, i) => ({
+        name: ex.name,
+        sets: checkedState[`mor-${i}`] ? (exerciseLogs[`mor-${i}`]?.sets?.length || ex.sets) : ex.sets,
+        reps: ex.reps,
+      })),
+      ...currentWorkout.evening.map((ex, i) => ({
+        name: ex.name,
+        sets: checkedState[`eve-${i}`] ? (exerciseLogs[`eve-${i}`]?.sets?.length || ex.sets) : ex.sets,
+        reps: ex.reps,
+      })),
+    ];
+    return calculateWorkoutCalories(allExs, userData.weight || 65);
+  })();
+
+  // Find previous session's total volume (most recent history entry with any exerciseLogs)
+  const previousSessionVolume = (() => {
+    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    const prev = sortedHistory.find(h => h.exerciseLogs && h.exerciseLogs.length > 0);
+    if (!prev || !prev.exerciseLogs) return 0;
+    return prev.exerciseLogs.reduce((sum, log) => sum + log.totalVolume, 0);
+  })();
+
+  // Build a map: exerciseName -> previousVolume (from most recent history entry containing that exercise)
+  const previousVolumeMap = (() => {
+    const map: Record<string, number> = {};
+    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    sortedHistory.forEach(h => {
+      if (!h.exerciseLogs) return;
+      h.exerciseLogs.forEach(log => {
+        if (!(log.exerciseName in map)) {
+          map[log.exerciseName] = log.totalVolume;
+        }
+      });
+    });
+    return map;
+  })();
+
+  // --- Swap Exercise Handler ---
+  const handleSwapExercise = async (key: string, section: 'morning' | 'evening', index: number) => {
+    const exercise = section === 'morning' ? currentWorkout.morning[index] : currentWorkout.evening[index];
+    if (!exercise) return;
+    setSwappingKey(key);
+    try {
+      const alternative = await suggestAlternativeExercise(exercise, plan, userData, history);
+      if (alternative) {
+        const updatedPlan = {
+          ...plan,
+          workout: {
+            ...plan.workout,
+            detail: {
+              ...plan.workout.detail,
+              morning: section === 'morning'
+                ? plan.workout.detail.morning.map((ex, i) => i === index ? alternative : ex)
+                : plan.workout.detail.morning,
+              evening: section === 'evening'
+                ? plan.workout.detail.evening.map((ex, i) => i === index ? alternative : ex)
+                : plan.workout.detail.evening,
+            }
+          }
+        };
+        // Reset log for the swapped exercise key
+        setExerciseLogs(prev => {
+          const updated = { ...prev };
+          delete updated[key];
+          return updated;
+        });
+        // Also uncheck the exercise
+        setCheckedState(prev => {
+          const updated = { ...prev };
+          delete updated[key];
+          return updated;
+        });
+        onUpdatePlan(updatedPlan);
+      }
+    } catch (error) {
+      console.error("Swap Exercise Error:", error);
+    } finally {
+      setSwappingKey(null);
+    }
+  };
+
   const handleOpenYouTube = (exerciseName: string) => {
     const query = encodeURIComponent(`${exerciseName}`);
 
@@ -441,7 +582,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
   const handleAutoAddExercise = async (section: 'morning' | 'evening') => {
     setGeneratingSection(section);
     try {
-      const suggested = await suggestNextExercises(plan, userData, section);
+      const suggested = await suggestNextExercises(plan, userData, section, history);
       if (suggested && suggested.length > 0) {
         const newExercise = suggested[0];
         const updatedPlan = { ...plan };
@@ -492,6 +633,9 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
                 onStartTimer={() => handleStartTimer(ex.name)}
                 exerciseLog={exerciseLogs[key]}
                 onUpdateLog={(log) => handleUpdateExerciseLog(key, log)}
+                onSwap={!isCompleted ? () => handleSwapExercise(key, sectionKey, originalIndex) : undefined}
+                isSwapping={swappingKey === key}
+                previousVolume={previousVolumeMap[ex.name]}
               />
             );
           })
@@ -531,15 +675,14 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
         defaultDuration={timerDuration}
       />
 
+      <LiquidGlassContainer intensity="medium" className="p-8 space-y-6">
+        {/* Top Header Removed - Using App Global Header */}
 
 
-      {/* Top Header Removed - Using App Global Header */}
+        {/* TIME OPTIMIZATION CARD REMOVED */}
 
 
-      {/* TIME OPTIMIZATION CARD REMOVED */}
-
-
-      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
         <GlassCard
           title={`Bài Tập: ${currentWorkout.levelName}`}
           icon={<Flame className="w-6 h-6" />}
@@ -629,6 +772,78 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
             </div>
           </div>
 
+          {/* Volume Tracking Summary Card */}
+          {sessionTotalVolume > 0 && (
+            <div className="mb-4 p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/20 animate-fade-in">
+              <div className="flex items-center gap-2 mb-2">
+                <Weight className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Tổng Volume Buổi Tập</span>
+                {previousSessionVolume > 0 && (() => {
+                  const delta = sessionTotalVolume - previousSessionVolume;
+                  if (delta > 0) return (
+                    <span className="ml-auto text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      ▲ +{delta.toLocaleString()} vs buổi trước
+                    </span>
+                  );
+                  if (delta < 0) return (
+                    <span className="ml-auto text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                      ▼ {delta.toLocaleString()} vs buổi trước
+                    </span>
+                  );
+                  return null;
+                })()}
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-center flex-1">
+                  <div className="text-xl font-black text-white">{sessionTotalVolume.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wider">kg tổng cộng</div>
+                </div>
+                {currentWorkout.evening && currentWorkout.evening.length > 0 && (morningVolume > 0 || eveningVolume > 0) && (
+                  <>
+                    <div className="w-px h-8 bg-white/10 mx-2" />
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-cyan-300">{morningVolume.toLocaleString()}</div>
+                      <div className="text-[10px] text-gray-500">☀️ Sáng</div>
+                    </div>
+                    <div className="w-px h-8 bg-white/10 mx-2" />
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-purple-300">{eveningVolume.toLocaleString()}</div>
+                      <div className="text-[10px] text-gray-500">🌙 Chiều</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* MET Calories Estimate Card */}
+          <div className="mb-4 p-3 bg-orange-500/5 rounded-xl border border-orange-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="w-4 h-4 text-orange-400" />
+              <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">Calo Ước Tính (MET)</span>
+              <span className="ml-auto text-[10px] text-gray-500">{formatDuration(metCalorieResult.totalDurationMinutes)}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center flex-1">
+                <div className="text-2xl font-black text-white">{metCalorieResult.totalCalories.toLocaleString()}</div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider">kcal đốt cháy</div>
+              </div>
+              <div className="flex-1 space-y-1">
+                {metCalorieResult.exerciseBreakdown.slice(0, 3).map((ex, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px]">
+                    <span className="text-gray-400 truncate max-w-[100px]">{ex.name}</span>
+                    <span className="text-orange-300 font-bold">{ex.calories} kcal</span>
+                  </div>
+                ))}
+                {metCalorieResult.exerciseBreakdown.length > 3 && (
+                  <div className="text-[10px] text-gray-600 text-right">
+                    +{metCalorieResult.exerciseBreakdown.length - 3} bài khác
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {currentWorkout.evening && currentWorkout.evening.length > 0 ? (
             <>
               {/* Render Morning Session */}
@@ -705,6 +920,7 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, userData, onRese
           </div>
         </button>
       </div>
+      </LiquidGlassContainer>
     </div >
   );
 };

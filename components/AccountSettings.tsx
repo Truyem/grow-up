@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { loadLoginHistory } from '../services/supabasePlanSync';
-import { subscribeToPush, isPushSubscribed } from '../services/pushNotification';
+import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, getPushSupportStatus, listenForSubscriptionChanges } from '../services/pushNotification';
 import { User } from '@supabase/supabase-js';
 import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff } from 'lucide-react';
 import { Toast } from './ui/Toast';
@@ -33,6 +33,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [isPushOn, setIsPushOn] = useState<boolean | null>(null);
     const [isTestingPush, setIsTestingPush] = useState(false);
+    const [isSubscribingPush, setIsSubscribingPush] = useState(false);
+    const [pushSupport, setPushSupport] = useState<ReturnType<typeof getPushSupportStatus> | null>(null);
 
     // Sync full name if it changes externally or initially
     useEffect(() => {
@@ -59,41 +61,75 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
 
     // Check notification permission status
     useEffect(() => {
-        if ('Notification' in window) {
-            setIsPushOn(Notification.permission === 'granted');
+        const status = getPushSupportStatus();
+        setPushSupport(status);
+
+        if (status.supported) {
+            isPushSubscribed().then(setIsPushOn);
         } else {
             setIsPushOn(false);
         }
-    }, []);
+
+        // Listen for SW subscription changes
+        const cleanup = listenForSubscriptionChanges(user.id);
+        return cleanup;
+    }, [user.id]);
+
+    const handleSubscribePush = async () => {
+        setIsSubscribingPush(true);
+        setError(null);
+        try {
+            const ok = await subscribeToPush(user.id);
+            if (ok) {
+                setIsPushOn(true);
+                setMsg('Đã bật thông báo! Push notification sẽ hoạt động ngay.');
+            } else {
+                setError('Không thể đăng ký push. Kiểm tra lại quyền thông báo trong trình duyệt.');
+            }
+        } catch (e: any) {
+            setError('Lỗi đăng ký push: ' + e.message);
+        } finally {
+            setIsSubscribingPush(false);
+        }
+    };
+
+    const handleUnsubscribePush = async () => {
+        setIsSubscribingPush(true);
+        try {
+            await unsubscribeFromPush(user.id);
+            setIsPushOn(false);
+            setMsg('Đã tắt thông báo push.');
+        } catch (e: any) {
+            setError('Lỗi tắt push: ' + e.message);
+        } finally {
+            setIsSubscribingPush(false);
+        }
+    };
 
     const handleTestNotification = async () => {
         setIsTestingPush(true);
+        setError(null);
         try {
-            // If window.Notification doesn't exist → native WebView (Capacitor)
-            // If window.Capacitor is present → also native
-            const isCapacitor = !('Notification' in window) || !!(window as any).Capacitor?.isNativePlatform?.();
+            const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.();
 
             if (isCapacitor) {
-                // Use Capacitor bridge (injected by WebView runtime, no npm package needed)
                 const ln = (window as any).Capacitor?.Plugins?.LocalNotifications;
                 if (!ln) {
                     setError('Plugin thông báo không sẵn sàng. Vui lòng cài lại app.');
                     return;
                 }
-                // Skip requestPermissions() — R8 minification breaks Capacitor annotation lookup
-                // User must grant permission via Android Settings manually
-                setIsPushOn(true);
                 await ln.schedule({
                     notifications: [{
                         id: Math.floor(Date.now() / 1000),
                         title: '🔔 Test Thông Báo',
-                        body: 'Notification hoạt động bình thường! 🎉',
+                        body: 'Notification hoạt động bình thường!',
                         schedule: { at: new Date(Date.now() + 500) },
                         smallIcon: 'ic_launcher',
                     }]
                 });
+                setMsg('Đã gửi test notification (Capacitor)!');
             } else {
-                // --- Web browser fallback ---
+                // Web browser - use Service Worker showNotification
                 if (!('Notification' in window)) {
                     setError('Trình duyệt không hỗ trợ thông báo.');
                     return;
@@ -103,29 +139,26 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                     permission = await Notification.requestPermission();
                 }
                 if (permission !== 'granted') {
-                    setError('Chưa cấp quyền thông báo.');
+                    setError('Chưa cấp quyền thông báo. Vào Cài đặt trình duyệt để cho phép.');
                     return;
                 }
-                setIsPushOn(true);
-                if ('serviceWorker' in navigator) {
-                    try {
-                        const reg = await navigator.serviceWorker.ready;
-                        await reg.showNotification('🔔 Test Thông Báo', {
-                            body: 'Push notification hoạt động bình thường! 🎉',
-                            icon: '/icon.png',
-                            tag: 'test-notification',
-                        } as NotificationOptions);
-                    } catch {
-                        new Notification('🔔 Test Thông Báo', { body: 'Hoạt động bình thường! 🎉' });
-                    }
-                } else {
-                    new Notification('🔔 Test Thông Báo', { body: 'Hoạt động bình thường! 🎉' });
-                }
-                // Try push subscription in background
-                subscribeToPush(user.id).catch(() => { });
-            }
 
-            setMsg('Thông báo test đã gửi!');
+                setIsPushOn(true);
+
+                if ('serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification('🔔 Test Thông Báo', {
+                        body: 'Push notification hoạt động bình thường!',
+                        icon: '/icons/icon-192.webp',
+                        badge: '/icons/icon-96.webp',
+                        tag: 'test-notification',
+                        vibrate: [200, 100, 200],
+                    } as NotificationOptions);
+                } else {
+                    new Notification('🔔 Test Thông Báo', { body: 'Hoạt động bình thường!' });
+                }
+                setMsg('Test notification đã gửi!');
+            }
         } catch (e: any) {
             setError('Lỗi: ' + (e.message || 'Không gửi được thông báo'));
         } finally {
@@ -460,29 +493,71 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                         <Bell className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-white">Thông Báo & Debug</h3>
-                        <p className="text-sm text-gray-400">Kiểm tra push notification</p>
+                        <h3 className="text-lg font-bold text-white">Thông Báo Push</h3>
+                        <p className="text-sm text-gray-400">Nhận nhắc nhở uống nước, tập luyện, supplement</p>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm">
-                        {isPushOn === null ? (
-                            <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-                        ) : isPushOn ? (
-                            <><Bell className="w-4 h-4 text-emerald-400" /><span className="text-emerald-400">Đã đăng ký push</span></>
+                {/* Support status */}
+                {pushSupport && !pushSupport.supported && (
+                    <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
+                        <BellOff className="w-4 h-4 flex-shrink-0" />
+                        <span>Trình duyệt này không hỗ trợ push: {pushSupport.reason}</span>
+                    </div>
+                )}
+
+                {/* Permission status */}
+                {pushSupport?.supported && pushSupport.permission === 'denied' && (
+                    <div className="mb-4 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-300 text-sm">
+                        Thông báo đã bị chặn. Vào Settings → Site Settings → Notifications để bật lại.
+                    </div>
+                )}
+
+                <div className="space-y-3">
+                    {/* Subscribe / Unsubscribe */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                            {isPushOn === null ? (
+                                <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                            ) : isPushOn ? (
+                                <><Bell className="w-4 h-4 text-emerald-400" /><span className="text-emerald-400">Push đang bật</span></>
+                            ) : (
+                                <><BellOff className="w-4 h-4 text-gray-500" /><span className="text-gray-500">Push chưa bật</span></>
+                            )}
+                        </div>
+                        {isPushOn ? (
+                            <button
+                                onClick={handleUnsubscribePush}
+                                disabled={isSubscribingPush}
+                                className="px-4 py-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isSubscribingPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <BellOff className="w-3 h-3" />}
+                                Tắt Push
+                            </button>
                         ) : (
-                            <><BellOff className="w-4 h-4 text-gray-500" /><span className="text-gray-500">Chưa đăng ký push</span></>
+                            <button
+                                onClick={handleSubscribePush}
+                                disabled={isSubscribingPush || pushSupport?.permission === 'denied' || !pushSupport?.supported}
+                                className="px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isSubscribingPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bell className="w-3 h-3" />}
+                                Bật Push
+                            </button>
                         )}
                     </div>
-                    <button
-                        onClick={handleTestNotification}
-                        disabled={isTestingPush}
-                        className="px-5 py-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 hover:text-amber-300 transition-all font-medium flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {isTestingPush ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
-                        Test Thông Báo
-                    </button>
+
+                    {/* Test notification */}
+                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                        <span className="text-sm text-gray-400">Kiểm tra thông báo ngay</span>
+                        <button
+                            onClick={handleTestNotification}
+                            disabled={isTestingPush}
+                            className="px-5 py-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 hover:text-amber-300 transition-all font-medium flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isTestingPush ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                            Test Thông Báo
+                        </button>
+                    </div>
                 </div>
             </div>
 

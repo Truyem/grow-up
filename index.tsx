@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { LiquidGlassProvider } from './components/ui/LiquidGlassContext';
 
 // Suppress Recharts defaultProps warning
 const originalConsoleError = console.error;
@@ -20,6 +21,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <LiquidGlassProvider>
+      <App />
+    </LiquidGlassProvider>
   </React.StrictMode>
 );

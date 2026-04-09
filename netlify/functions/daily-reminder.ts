@@ -1,8 +1,10 @@
 import { type Config, type Context } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
+import webpush from 'web-push';
 
+// Use SERVICE ROLE key on server so RLS doesn't block reading subscriptions
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -25,6 +27,12 @@ const SCHEDULE = [
     { id: 'smor-10', hour: 10, minute: 30, title: '🍱 10:30 - Ăn trưa', body: 'Ăn trưa ngon miệng!' },
     { id: 'smor-11', hour: 11, minute: 0, title: '💊 11:00 - Nghỉ ngơi & Omega 3', body: 'Rửa bát, nghỉ ngơi. Nhớ uống Omega 3 (lần 1).' },
     { id: 'smor-12', hour: 11, minute: 30, title: '🎒 11:30 - Đến trường', body: 'Chuẩn bị đi học ngay!' },
+    // Water reminders
+    { id: 'water-1', hour: 8, minute: 0, title: '💧 08:00 - Uống nước!', body: 'Nhớ uống 300ml nước. Mục tiêu 2.5-3L/ngày.' },
+    { id: 'water-2', hour: 12, minute: 0, title: '💧 12:00 - Uống nước!', body: 'Đã uống đủ nước chưa? Uống thêm 300ml nhé.' },
+    { id: 'water-3', hour: 15, minute: 0, title: '💧 15:00 - Uống nước!', body: 'Giữa chiều dễ thiếu nước. Uống 300ml ngay!' },
+    { id: 'water-4', hour: 17, minute: 0, title: '💧 17:00 - Uống nước!', body: 'Hydrate trước buổi tập tối nào.' },
+    // Afternoon
     { id: 'saft-0', hour: 14, minute: 30, title: '😴 14:30 - Về nhà & Magnesium 1', body: 'Về nhà, ngủ trưa 30 phút. Uống Magnesium (lần 1).' },
     { id: 'saft-1', hour: 15, minute: 30, title: '🛒 15:30 - Chuẩn bị bữa tối', body: 'Sắp đến giờ nấu ăn tối rồi.' },
     { id: 'saft-2', hour: 16, minute: 0, title: '⚡ 16:00 - Bật nóng lạnh & cắm cơm', body: 'Đừng quên bật điều hòa và cắm cơm!' },
@@ -34,64 +42,14 @@ const SCHEDULE = [
     { id: 'saft-6', hour: 18, minute: 0, title: '💊 18:00 - Giặt quần áo & Omega 3 2', body: 'Giặt quần áo. Nhớ uống Omega 3 (lần 2).' },
     { id: 'saft-7', hour: 18, minute: 15, title: '📚 18:15 - Ôn bài', body: 'Đến giờ học tập rồi!' },
     { id: 'saft-8', hour: 19, minute: 0, title: '💪 19:00 - Tập Isolation tại nhà', body: 'Plank/Abs — nhẹ thôi nhưng đều đặn nhé!' },
+    // Supplement reminder
+    { id: 'whey-1', hour: 19, minute: 30, title: '🥤 19:30 - Whey Protein!', body: 'Uống 1 scoop Whey sau tập để phục hồi cơ bắp.' },
     { id: 'saft-9', hour: 20, minute: 0, title: '💊 20:00 - Giải trí & Creatine', body: 'Uống 5g Creatine và Magnesium (lần 2).' },
     { id: 'saft-10', hour: 21, minute: 0, title: '📵 21:00 - Screen-off!', body: 'Tắt toàn bộ máy tính và điện thoại.' },
     { id: 'saft-11', hour: 21, minute: 30, title: '😴 21:30 - Đi ngủ', body: 'Chúc ngủ ngon! Ngày mai tiếp tục bứt phá.' },
 ];
 
-// Build VAPID JWT for Web Push authorization
-async function buildVapidJwt(audience: string): Promise<string> {
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-        aud: audience,
-        exp: now + 12 * 3600,
-        sub: VAPID_EMAIL,
-    };
-
-    const header = { alg: 'ES256', typ: 'JWT' };
-    const b64u = (obj: object | string) => {
-        const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
-        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    };
-
-    const signingInput = `${b64u(header)}.${b64u(payload)}`;
-
-    // Import VAPID private key (raw base64url → PKCS8)
-    const rawPrivate = Uint8Array.from(
-        atob(VAPID_PRIVATE_KEY.replace(/-/g, '+').replace(/_/g, '/')),
-        c => c.charCodeAt(0)
-    );
-
-    // PKCS8 wrapper for P-256 private key
-    const pkcs8Header = new Uint8Array([
-        0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
-        0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01,
-        0x01, 0x04, 0x20
-    ]);
-    const pkcs8 = new Uint8Array(pkcs8Header.length + rawPrivate.length);
-    pkcs8.set(pkcs8Header);
-    pkcs8.set(rawPrivate, pkcs8Header.length);
-
-    const cryptoKey = await crypto.subtle.importKey(
-        'pkcs8', pkcs8.buffer,
-        { name: 'ECDSA', namedCurve: 'P-256' },
-        false, ['sign']
-    );
-
-    const encoder = new TextEncoder();
-    const sig = await crypto.subtle.sign(
-        { name: 'ECDSA', hash: 'SHA-256' },
-        cryptoKey,
-        encoder.encode(signingInput)
-    );
-
-    const sigB64u = btoa(String.fromCharCode(...new Uint8Array(sig)))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-
-    return `${signingInput}.${sigB64u}`;
-}
-
-// Send a Web Push notification to one subscription
+// Send a Web Push notification using the web-push library (properly encrypted)
 async function sendWebPush(
     endpoint: string,
     p256dh: string,
@@ -99,65 +57,65 @@ async function sendWebPush(
     payload: object
 ): Promise<boolean> {
     try {
-        const url = new URL(endpoint);
-        const audience = `${url.protocol}//${url.host}`;
-        const jwt = await buildVapidJwt(audience);
+        webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-        const body = JSON.stringify(payload);
-        const encoder = new TextEncoder();
-        const bodyBytes = encoder.encode(body);
+        const pushSubscription = {
+            endpoint,
+            keys: { p256dh, auth },
+        };
 
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `vapid t=${jwt},k=${VAPID_PUBLIC_KEY}`,
-                'Content-Type': 'application/json',
-                'Content-Length': bodyBytes.length.toString(),
-                'TTL': '86400',
-            },
-            body: bodyBytes,
-        });
-
-        if (!res.ok) {
-            const text = await res.text();
-            console.error(`[Push] Failed ${res.status}: ${text}`);
-            if (res.status === 410 || res.status === 404) {
-                // Subscription expired — remove from DB
-                await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
-            }
-            return false;
-        }
+        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
         return true;
-    } catch (err) {
-        console.error('[Push] Send error:', err);
+    } catch (err: any) {
+        console.error(`[Push] Failed for ${endpoint.substring(0, 50)}:`, err?.statusCode, err?.body);
+        // 410 Gone or 404 = subscription expired
+        if (err?.statusCode === 410 || err?.statusCode === 404) {
+            await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+            console.log('[Push] Removed expired subscription');
+        }
         return false;
     }
 }
 
 // Send notification to all subscriptions in DB
-async function notifyAll(payload: object): Promise<void> {
+async function notifyAll(payload: object): Promise<{ sent: number; failed: number }> {
     const { data: subs, error } = await supabase
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth');
 
-    if (error || !subs || subs.length === 0) {
-        console.log('[Push] No subscriptions found.');
-        return;
+    if (error) {
+        console.error('[Push] DB error fetching subscriptions:', error);
+        return { sent: 0, failed: 0 };
     }
 
-    await Promise.all(
+    if (!subs || subs.length === 0) {
+        console.log('[Push] No subscriptions found in DB.');
+        return { sent: 0, failed: 0 };
+    }
+
+    console.log(`[Push] Sending to ${subs.length} subscription(s)...`);
+
+    const results = await Promise.all(
         subs.map((s: any) => sendWebPush(s.endpoint, s.p256dh, s.auth, payload))
     );
+
+    const sent = results.filter(Boolean).length;
+    const failed = results.length - sent;
+    return { sent, failed };
 }
 
 export default async (req: Request, context: Context) => {
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+        console.error('[DailyReminder] VAPID keys missing!');
+        return new Response('VAPID keys not configured', { status: 500 });
+    }
+
     const now = new Date();
     const vnTime = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
     const currentHour = vnTime.getHours();
     const currentMinute = vnTime.getMinutes();
-    const todayStr = `${vnTime.getFullYear()}-${vnTime.getMonth() + 1}-${vnTime.getDate()}`;
 
-    console.log(`[DailyReminder] VN Time: ${vnTime.toISOString()}. Hour: ${currentHour}, Minute: ${currentMinute}`);
+    console.log(`[DailyReminder] VN Time: ${vnTime.toLocaleString('vi-VN')}. Hour: ${currentHour}, Minute: ${currentMinute}`);
 
     // Find matching schedule event (within 4-minute window)
     const activeEvent = SCHEDULE.find(
@@ -165,28 +123,22 @@ export default async (req: Request, context: Context) => {
     );
 
     if (!activeEvent) {
-        return new Response('No active event');
+        return new Response('No active event at this time', { status: 200 });
     }
 
-    // Dedup: check if already sent
-    const dedupKey = `reminder_sent_${todayStr}_${activeEvent.hour}_${activeEvent.minute}`;
-    const { data: existing } = await supabase
-        .from('push_subscriptions')
-        .select('id')
-        .limit(1);
-
-    // Simple dedup via a meta table would be better; but for now we use Netlify Blobs
-    // Fallback: just send (cron fires once per window, acceptable)
-
-    await notifyAll({
+    const payload = {
         title: activeEvent.title,
         body: activeEvent.body,
         tag: activeEvent.id,
         url: '/#schedule',
-    });
+        icon: '/icons/icon-192.webp',
+        badge: '/icons/icon-96.webp',
+    };
 
-    console.log(`[DailyReminder] Sent push for ${activeEvent.title}`);
-    return new Response(`Sent: ${activeEvent.title}`, { status: 200 });
+    const { sent, failed } = await notifyAll(payload);
+
+    console.log(`[DailyReminder] Sent push for "${activeEvent.title}" → ${sent} OK, ${failed} failed`);
+    return new Response(`Sent: ${activeEvent.title} (${sent} success, ${failed} failed)`, { status: 200 });
 };
 
 export const config: Config = {

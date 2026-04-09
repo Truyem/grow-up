@@ -57,9 +57,27 @@ export type NutritionGoal = 'bulking' | 'cutting';
 
 export type TrainingMode = 'calis' | 'gym' | 'home';
 
+// ============================================================
+// Goal Setting
+// ============================================================
+export interface WeeklyGoal {
+  sessionsPerWeek: number;      // Số buổi tập mục tiêu mỗi tuần
+  targetWeightKg?: number;      // Cân nặng mục tiêu (kg)
+  targetDate?: string;          // Ngày đạt mục tiêu (ISO string)
+  weeklyCalorieDeficit?: number; // Thâm hụt/dư calo mỗi tuần (kcal)
+  notes?: string;
+}
+
+export interface UserGoals {
+  weekly: WeeklyGoal;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserInput {
   weight: number;
   height: number;
+  age: number;
   fatigue: FatigueLevel;
   healthCondition: HealthCondition; // New field
   soreMuscles: MuscleGroup[];

@@ -145,6 +145,79 @@ const callNemotronAPI = async (
   }
 };
 
+// Helper function to call Nemotron API with stream support
+const streamNemotronAPI = async (
+  messages: Array<{ role: string; content: string }>,
+  options?: { maxTokens?: number; temperature?: number; onProgress?: (text: string) => void }
+): Promise<string> => {
+  try {
+    const response = await fetch(NEMOTRON_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "x-model": GPT_OSS_MODEL
+      },
+      body: JSON.stringify({
+        model: GPT_OSS_MODEL,
+        messages: messages,
+        max_tokens: options?.maxTokens ?? 100000,
+        temperature: options?.temperature ?? 0.2,
+        stream: true,
+        plain_text: true
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Nemotron API error (${response.status}):`, errorText);
+      throw new Error(`Nemotron API error: ${response.status}`);
+    }
+
+    if (!response.body) throw new Error("No response body");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let fullText = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ") && line !== "data: [DONE]") {
+          try {
+            const data = JSON.parse(line.replace("data: ", ""));
+            const content = data.choices?.[0]?.delta?.content || "";
+            if (content) {
+              fullText += content;
+              
+              if (options?.onProgress) {
+                // Try to find if we entered the JSON block to stop streaming raw markdown
+                const jsonStartIndex = fullText.indexOf("\`\`\`json");
+                if (jsonStartIndex !== -1) {
+                  options.onProgress(fullText.substring(0, jsonStartIndex).trim());
+                } else {
+                  options.onProgress(fullText);
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors for incomplete chunks
+          }
+        }
+      }
+    }
+    return fullText;
+  } catch (error) {
+    console.error("Nemotron API stream failed:", error);
+    throw error;
+  }
+};
+
 // Check if error is rate limit related (not needed for Nemotron, but kept for compatibility)
 const isRateLimitError = (error: unknown): boolean => {
   if (error instanceof Error) {
@@ -246,8 +319,23 @@ const evaluateFoodIntake = (consumedFood: string[], targetCalories: number, rece
 // Helper to clean and parse JSON
 const cleanAndParseJSON = (text: string, context: string): any => {
   try {
-    // Remove markdown code blocks if present (e.g. ```json ... ```)
-    const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+    let cleaned = text;
+    // Extract json block if it exists
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      cleaned = jsonMatch[1].trim();
+    } else {
+      // Remove markdown code blocks if present (e.g. ```json ... ```)
+      cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+    }
+    
+    // Sometimes the AI might add some text before the `{`, let's find the first `{` and last `}`
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    
     return JSON.parse(cleaned);
   } catch (e) {
     console.error(`JSON Parse Error in ${context}:`, e);
@@ -262,8 +350,8 @@ const cleanAndParseJSON = (text: string, context: string): any => {
 
 // --- DYNAMIC CALCULATIONS ---
 
-// 1. Calculate BMR (Mifflin-St Jeor) - Assuming Male, Age 22 (avg student age based on context)
-const calculateBMR = (weight: number, height: number, age: number = 22): number => {
+// 1. Calculate BMR (Mifflin-St Jeor) - Assuming Male, Age 18 (avg student age based on context)
+const calculateBMR = (weight: number, height: number, age: number = 18): number => {
   return (10 * weight) + (6.25 * height) - (5 * age) + 5;
 };
 
@@ -278,8 +366,8 @@ const estimateWorkoutBurn = (intensity: Intensity): number => {
 };
 
 // 4. Calculate Final Target
-const calculateTargetCalories = (weight: number, height: number, goal: 'bulking' | 'cutting', intensity: Intensity): { tdee: number, burn: number, target: number } => {
-  const bmr = calculateBMR(weight, height);
+const calculateTargetCalories = (weight: number, height: number, age: number = 18, goal: 'bulking' | 'cutting', intensity: Intensity): { tdee: number, burn: number, target: number } => {
+  const bmr = calculateBMR(weight, height, age);
   const tdee = calculateTDEE(bmr);
   const burn = estimateWorkoutBurn(intensity);
 
@@ -312,7 +400,7 @@ const calculateWaterIntake = (weight: number, useCreatine: boolean): number => {
 
 // Fallback plans tailored by intensity and goal
 const getFallbackPlan = (userData: UserInput): DailyPlan => {
-  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
 
   const isBulking = userData.nutritionGoal === 'bulking';
   const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0)); // 2.2g or 2.0g per kg
@@ -592,10 +680,10 @@ const HOME_WORKOUT_SCHEDULE: Record<number, any> = {
 
 // --- SPLIT GENERATION PARTS ---
 
-const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[]): Promise<any> => {
+const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryItem[], onProgress?: (text: string) => void): Promise<any> => {
   const model = MODELS.WORKOUT;
   const dayPeriod = getCurrentDayPeriod();
-  const { target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const { target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
   const proteinTarget = Math.round(userData.weight * (userData.nutritionGoal === 'bulking' ? 2.2 : 2.0));
   
   // Get weight trend analysis
@@ -662,7 +750,8 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     - Intensity: ${userData.selectedIntensity}
     - Fatigue: ${userData.fatigue}
     - Sore muscles: ${userData.soreMuscles.join(', ')}
-    - Equipment: ${userData.equipment.join(', ')}
+    - Equipment: ${userData.equipment.join(', ')}, Thanh xà đơn (Pull-up bar), Thanh dips (Dip station), Tạ đơn (Dumbbells), Dây BFR (Blood Flow Restriction bands)
+    - Tuổi: ${userData.age || 18}
     - Cân nặng hiện tại: ${userData.weight}kg
     - Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
     - Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg, ${weightTrend.percentChange}%)
@@ -679,9 +768,11 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
 
     QUY TẮC CHỌN BÀI:
     - Không lặp nhóm cơ primary vừa tập nặng trong 48h gần nhất.
+    - Đa dạng hóa bài tập: Luân phiên các góc độ, kỹ thuật và biến thể khác nhau để không gây nhàm chán và kích thích cơ toàn diện. Tận dụng triệt để Thanh xà đơn, Thanh dips, Tạ đơn và ưu tiên sử dụng BFR (đặt isBFR: true) cho các bài tập cô lập/isolation cuối buổi.
     - Mỗi bài phải có primaryMuscleGroups và secondaryMuscleGroups rõ ràng.
     - Dùng tiếng Anh cho tên bài tập.
     - Summary/description/reasoning viết tiếng Việt.
+    - ĐỐI VỚI BÀI TẬP BODYWEIGHT (không dùng tạ ngoài, ví dụ: hít đất, kéo xà, plank, burpee, crunch...), 'equipment' BẮT BUỘC ghi là 'None'.
     - **NẾU XU HƯỚNG CÂN NẶNG GIẢM (${weightTrend.direction === 'giảm' ? 'ĐÚNG' : 'SAI'})**:
       - Nếu đang giảm cân, ưu tiên bài tập volume vừa phải, tránh overtraining.
       - Tập trọng lượng nhẹ hơn, tập nhiều reps hơn để tránh mất cơ.
@@ -692,13 +783,17 @@ const generateWorkoutPart = async (userData: UserInput, history: WorkoutHistoryI
     - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories (${target} kcal) và protein (${proteinTarget}g) chưa?"
     - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp, và cảnh báo nếu cần tăng intake.
 
-    Trả về DUY NHẤT JSON hợp lệ theo format:
+    YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
+    1. ĐẦU TIÊN, viết một đoạn văn bản ngắn (Markdown) chào hỏi, động viên người dùng và tóm tắt nhanh kế hoạch tập hôm nay bằng tiếng Việt.
+    2. SAU ĐÓ, xuất ra ĐÚNG 1 khối mã JSON chứa dữ liệu như sau (nằm trong \`\`\`json và \`\`\`):
+    \`\`\`json
     { "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [{ "name": "...", "sets": 0, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": false, "primaryMuscleGroups": ["..."], "secondaryMuscleGroups": ["..."] }], "evening": [] } } }
+    \`\`\`
   `;
 
-  const responseText = await callNemotronAPI([
+  const responseText = await streamNemotronAPI([
     { role: "user", content: prompt }
-  ]);
+  ], { maxTokens: 50000, temperature: 0.2, onProgress });
 
   if (!responseText) throw new Error("Empty workout response");
   return cleanAndParseJSON(responseText, "WorkoutPart");
@@ -719,10 +814,10 @@ const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7
   return recentMeals;
 };
 
-const generateNutritionPart = async (userData: UserInput, fullHistory: WorkoutHistoryItem[] = []): Promise<any> => {
+const generateNutritionPart = async (userData: UserInput, fullHistory: WorkoutHistoryItem[] = [], onProgress?: (text: string) => void): Promise<any> => {
   const model = MODELS.MENU;
 
-  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
   const proteinMultiplier = userData.nutritionGoal === 'bulking' ? 2.2 : 2.0;
   const proteinTarget = Math.round(userData.weight * proteinMultiplier);
   const fatTarget = Math.round(userData.weight * 0.9);
@@ -765,6 +860,7 @@ CURRENT TIME & CONTEXT:
 - Ngày hôm nay: ${getCurrentDate()}
 
 BODY METRICS:
+- Tuổi: ${userData.age || 18}
 - Cân nặng hiện tại: ${userData.weight}kg
 - Cân nặng trung bình 7 ngày: ${avgWeight || userData.weight}kg
 - Xu hướng cân nặng: ${weightTrend.direction} (${weightTrend.trend > 0 ? '+' : ''}${weightTrend.trend}kg)
@@ -804,7 +900,10 @@ RULES:
   - ${weightTrend.direction === 'tăng' ? '⚠️ Weight is INCREASING: Monitor portions if cutting, or celebrate if bulking!' : ''}
 - **FOOD INTAKE STATUS**: ${foodAssessment.reason}. ${foodAssessment.status === 'Ăn ít' ? 'Suggest smaller meals that are nutrient-dense.' : foodAssessment.status === 'Ăn đủ' ? 'Good intake so far, continue balanced meals.' : 'Ensure remaining meals are well-distributed.'}
 
-JSON schema:
+YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
+1. ĐẦU TIÊN, viết một đoạn văn bản ngắn (Markdown) động viên, nhận xét về tình trạng dinh dưỡng hiện tại và tóm tắt nhanh thực đơn hôm nay bằng tiếng Việt.
+2. SAU ĐÓ, xuất ra ĐÚNG 1 khối mã JSON chứa dữ liệu như sau (nằm trong \`\`\`json và \`\`\`):
+\`\`\`json
 {
   "nutrition": {
     "totalCalories": number,
@@ -824,11 +923,12 @@ JSON schema:
     ]
   }
 }
+\`\`\`
   `;
 
-  const responseText = await callNemotronAPI([
+  const responseText = await streamNemotronAPI([
     { role: "user", content: prompt }
-  ], { maxTokens: 50000, temperature: 0.2 });
+  ], { maxTokens: 50000, temperature: 0.2, onProgress });
 
   if (!responseText) throw new Error("Empty nutrition response");
   return cleanAndParseJSON(responseText, "NutritionPart");
@@ -837,7 +937,8 @@ JSON schema:
 export const generateDailyPlan = async (
   userData: UserInput,
   fullHistory: WorkoutHistoryItem[],
-  generationType: 'workout' | 'nutrition' | 'both' = 'both'
+  generationType: 'workout' | 'nutrition' | 'both' = 'both',
+  onProgress?: (text: string) => void
 ): Promise<DailyPlan> => {
   // Optimization: Only use the last 14 days of history
   const history = fullHistory.slice(-14);
@@ -849,11 +950,11 @@ export const generateDailyPlan = async (
     let nutritionPart: any = {};
 
     if (generationType === 'workout' || generationType === 'both') {
-      workoutPart = await generateWorkoutPart(userData, history);
+      workoutPart = await generateWorkoutPart(userData, history, onProgress);
     }
 
     if (generationType === 'nutrition' || generationType === 'both') {
-      nutritionPart = await generateNutritionPart(userData, fullHistory);
+      nutritionPart = await generateNutritionPart(userData, fullHistory, onProgress);
     }
 
     const fallback = getFallbackPlan(userData);
@@ -954,7 +1055,7 @@ CONTEXT: Lịch sử tập (7 ngày gần nhất):
 ${JSON.stringify(historySummary, null, 2)}
 
 Tổng buổi tập: ${history.length}
-${userData ? `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? 'Tăng cơ' : 'Giảm mỡ'}` : ''}
+${userData ? `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? 'Tăng cơ' : 'Giảm mỡ'}\nTuổi: ${userData.age || 18}` : ''}
 
 TASK: Phân tích tiến trình, tạo AI Overview bằng tiếng Việt.
 
@@ -994,7 +1095,8 @@ Generate JSON response with: { "summary": "...", "strengths": [...], "improvemen
 export const suggestNextExercises = async (
   currentPlan: DailyPlan,
   userData: UserInput,
-  section: 'morning' | 'evening'
+  section: 'morning' | 'evening',
+  history: WorkoutHistoryItem[] = []
 ): Promise<Exercise[]> => {
   try {
     const model = MODELS.WORKOUT;
@@ -1003,18 +1105,41 @@ export const suggestNextExercises = async (
       ? currentPlan.workout.detail.morning
       : currentPlan.workout.detail.evening;
 
+    const allTodayExercises = [...currentPlan.workout.detail.morning, ...currentPlan.workout.detail.evening];
+    const todayNamesAndMuscles = allTodayExercises.map(e => `${e.name} (Cơ chính: ${e.primaryMuscleGroups?.join(', ')}, Cơ phụ: ${e.secondaryMuscleGroups?.join(', ')})`).join(" | ");
+
     const existingNames = existingExercises.map(e => e.name).join(", ");
+    
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentHistory = history
+      .filter((h) => h.timestamp >= sevenDaysAgo)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 7)
+      .map((h) => ({
+        date: h.date,
+        level: h.levelSelected,
+        completedExercises: h.completedExercises || []
+      }));
 
     const prompt = `
       ACT AS A PERSONAL TRAINER.
       THE USER IS CURRENTLY DOING A WORKOUT SESSION (${section.toUpperCase()}).
       
-      CURRENT EXERCISES IN THIS SESSION: ${existingNames}
+      CURRENT EXERCISES IN THIS SECTION: ${existingNames}
+      ALL EXERCISES DONE TODAY (to understand current split): ${todayNamesAndMuscles}
+      RECENT WORKOUT HISTORY (last 7 days): ${JSON.stringify(recentHistory)}
+      
       USER GOAL: ${userData.nutritionGoal}
-      USER EQUIPMENT: ${userData.equipment.join(', ')}
+      USER AGE: ${userData.age || 18}
+      USER EQUIPMENT: ${userData.equipment.join(', ')}, Thanh xà đơn (Pull-up bar), Thanh dips (Dip station), Tạ đơn (Dumbbells), Dây BFR (Blood Flow Restriction bands)
       
       TASK: SUGGEST 1 NEW EXERCISE to add to this session.
-      It should complement the existing exercises (e.g., if they did Chest, maybe add Triceps or another Chest variation).
+      
+      RULES:
+      1. Đa dạng hóa biến thể bài tập, kết hợp linh hoạt dụng cụ. Đánh dấu isBFR: true nếu đề xuất bài tập dùng BFR.
+      2. KHÔNG đề xuất lại các bài tập có cùng chuyển động (movement pattern) hoặc bài tập giống y hệt đã có trong "ALL EXERCISES DONE TODAY" hoặc trong "RECENT WORKOUT HISTORY".
+      3. TUY NHIÊN, bài tập mới BẮT BUỘC PHẢI THUỘC ĐÚNG NHÓM CƠ CỦA BUỔI TẬP HÔM NAY (tuân thủ nguyên tắc Upper/Lower). Ví dụ: nếu danh sách hôm nay toàn bài Upper Body, bài mới cũng phải là Upper Body (nhưng là một chuyển động/nhóm cơ Upper chưa được tập kỹ). KHÔNG được lấy nhóm cơ của ngày mai sang tập.
+      4. Đối với bài tập BODYWEIGHT (không dùng tạ ngoài), 'equipment' BẮT BUỘC ghi là 'None'.
       
       OUTPUT FORMAT: JSON Array with 1 Exercise object.
       
@@ -1036,8 +1161,78 @@ export const suggestNextExercises = async (
   }
 };
 
+export const suggestAlternativeExercise = async (
+  exercise: Exercise,
+  currentPlan: DailyPlan,
+  userData: UserInput,
+  history: WorkoutHistoryItem[] = []
+): Promise<Exercise | null> => {
+  try {
+    const model = MODELS.WORKOUT;
+
+    const allTodayExercises = [...currentPlan.workout.detail.morning, ...currentPlan.workout.detail.evening];
+    const todayNamesAndMuscles = allTodayExercises
+      .filter(e => e.name !== exercise.name)
+      .map(e => `${e.name} (Cơ chính: ${e.primaryMuscleGroups?.join(', ')})`)
+      .join(' | ');
+
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentHistory = history
+      .filter(h => h.timestamp >= sevenDaysAgo)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 7)
+      .map(h => ({
+        date: h.date,
+        completedExercises: h.completedExercises || []
+      }));
+
+    const prompt = `
+      ACT AS A PERSONAL TRAINER.
+      THE USER NEEDS AN ALTERNATIVE EXERCISE because the equipment is currently in use.
+
+      EXERCISE TO REPLACE: ${exercise.name}
+      - Primary Muscle Groups: ${exercise.primaryMuscleGroups?.join(', ') || 'Unknown'}
+      - Secondary Muscle Groups: ${exercise.secondaryMuscleGroups?.join(', ') || 'None'}
+      - Equipment: ${exercise.equipment || 'None'}
+      - Sets/Reps: ${exercise.sets} sets x ${exercise.reps}
+
+      OTHER EXERCISES ALREADY IN TODAY'S PLAN: ${todayNamesAndMuscles}
+      RECENT WORKOUT HISTORY (last 7 days): ${JSON.stringify(recentHistory)}
+
+      USER GOAL: ${userData.nutritionGoal}
+      USER AGE: ${userData.age || 18}
+      USER EQUIPMENT: ${userData.equipment.join(', ')}, Thanh xà đơn (Pull-up bar), Thanh dips (Dip station), Tạ đơn (Dumbbells), Dây BFR (Blood Flow Restriction bands)
+
+      TASK: SUGGEST 1 ALTERNATIVE EXERCISE that:
+      1. Targets the SAME primary muscle groups as "${exercise.name}": [${exercise.primaryMuscleGroups?.join(', ')}]
+      2. Uses DIFFERENT equipment or movement pattern (since the original equipment is occupied)
+      3. Is NOT the same exercise as "${exercise.name}" and NOT already in today's plan
+      4. Prefers bodyweight or dumbbell alternatives if the original used a machine
+      5. Đánh dấu isBFR: true nếu đề xuất bài tập dùng BFR.
+      6. Đối với bài tập BODYWEIGHT (không dùng tạ ngoài), 'equipment' BẮT BUỘC ghi là 'None'.
+
+      OUTPUT FORMAT: JSON Array with 1 Exercise object.
+      REQUIRED FIELDS: name (English), sets (number), reps (string), notes (Vietnamese, explain why this is a good alternative), colorCode, primaryMuscleGroups, secondaryMuscleGroups, equipment, isBFR.
+
+      Return as: [{ "name": "...", "sets": number, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": boolean, "primaryMuscleGroups": [...], "secondaryMuscleGroups": [...] }]
+    `;
+
+    const responseText = await callNemotronAPI([
+      { role: "user", content: prompt }
+    ]);
+
+    if (!responseText) throw new Error("Empty response");
+
+    const results = cleanAndParseJSON(responseText, "SuggestAlternative");
+    return results && results.length > 0 ? results[0] : null;
+  } catch (error) {
+    console.error("Suggest Alternative Exercise Error:", error);
+    return null;
+  }
+};
+
 export const getBasicNutritionPlan = (userData: UserInput): DailyPlan => {
-  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.nutritionGoal, userData.selectedIntensity);
+  const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
 
   const isBulking = userData.nutritionGoal === 'bulking';
   const proteinTarget = Math.round(userData.weight * (isBulking ? 2.2 : 2.0));

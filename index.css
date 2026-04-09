@@ -3,6 +3,7 @@
 @import "@fontsource/inter/latin-600.css";
 @import "@fontsource/inter/latin-700.css";
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Custom theme configuration */
 @theme {

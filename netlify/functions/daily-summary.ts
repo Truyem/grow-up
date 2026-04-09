@@ -1,8 +1,10 @@
 import { type Config, type Context } from "@netlify/functions";
 import { createClient } from '@supabase/supabase-js';
+import webpush from 'web-push';
 
+// Use SERVICE ROLE key on server so RLS doesn't block reading subscriptions
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -36,70 +38,35 @@ function getDatesInWeek(targetDate: Date): string[] {
     return dates;
 }
 
-async function buildVapidJwt(audience: string): Promise<string> {
-    const now = Math.floor(Date.now() / 1000);
-    const payload = { aud: audience, exp: now + 12 * 3600, sub: VAPID_EMAIL };
-    const header = { alg: 'ES256', typ: 'JWT' };
-    const b64u = (obj: object | string) => {
-        const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
-        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    };
-    const signingInput = `${b64u(header)}.${b64u(payload)}`;
-    const rawPrivate = Uint8Array.from(
-        atob(VAPID_PRIVATE_KEY.replace(/-/g, '+').replace(/_/g, '/')),
-        c => c.charCodeAt(0)
-    );
-    const pkcs8Header = new Uint8Array([
-        0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
-        0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01,
-        0x01, 0x04, 0x20
-    ]);
-    const pkcs8 = new Uint8Array(pkcs8Header.length + rawPrivate.length);
-    pkcs8.set(pkcs8Header);
-    pkcs8.set(rawPrivate, pkcs8Header.length);
-    const cryptoKey = await crypto.subtle.importKey(
-        'pkcs8', pkcs8.buffer,
-        { name: 'ECDSA', namedCurve: 'P-256' },
-        false, ['sign']
-    );
-    const sig = await crypto.subtle.sign(
-        { name: 'ECDSA', hash: 'SHA-256' },
-        cryptoKey,
-        new TextEncoder().encode(signingInput)
-    );
-    const sigB64u = btoa(String.fromCharCode(...new Uint8Array(sig)))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    return `${signingInput}.${sigB64u}`;
-}
-
-async function sendWebPush(endpoint: string, p256dh: string, auth: string, payload: object): Promise<void> {
+async function sendWebPush(
+    endpoint: string,
+    p256dh: string,
+    auth: string,
+    payload: object
+): Promise<boolean> {
     try {
-        const url = new URL(endpoint);
-        const audience = `${url.protocol}//${url.host}`;
-        const jwt = await buildVapidJwt(audience);
-        const bodyBytes = new TextEncoder().encode(JSON.stringify(payload));
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `vapid t=${jwt},k=${VAPID_PUBLIC_KEY}`,
-                'Content-Type': 'application/json',
-                'TTL': '86400',
-            },
-            body: bodyBytes,
-        });
-        if (!res.ok) {
-            const text = await res.text();
-            console.error(`[Push] ${res.status}: ${text}`);
-            if (res.status === 410 || res.status === 404) {
-                await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
-            }
+        webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+        await webpush.sendNotification(
+            { endpoint, keys: { p256dh, auth } },
+            JSON.stringify(payload)
+        );
+        return true;
+    } catch (err: any) {
+        console.error(`[Push] Error ${err?.statusCode}: ${err?.body}`);
+        if (err?.statusCode === 410 || err?.statusCode === 404) {
+            await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
         }
-    } catch (err) {
-        console.error('[Push] Error:', err);
+        return false;
     }
 }
 
 export default async (req: Request, context: Context) => {
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+        console.error('[DailySummary] VAPID keys missing!');
+        return new Response('VAPID keys not configured', { status: 500 });
+    }
+
     try {
         const now = new Date();
         const vnTime = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
@@ -150,6 +117,8 @@ export default async (req: Request, context: Context) => {
             body: `Hôm nay: ${todayCompletedCount}/${TOTAL_DAILY_TASKS} việc (${todayPercentage}%) ${todayProgressBar}\nTuần này: ${weekCompletedCount}/${TOTAL_WEEKLY_TASKS} việc (${weekPercentage}%) • Còn ${remainingWeekTasks} việc`,
             tag: 'daily-summary',
             url: '/#schedule',
+            icon: '/icons/icon-192.webp',
+            badge: '/icons/icon-96.webp',
         };
 
         // Get all subscriptions and send
@@ -157,16 +126,18 @@ export default async (req: Request, context: Context) => {
             .from('push_subscriptions')
             .select('endpoint, p256dh, auth');
 
+        let sent = 0;
         if (subs && subs.length > 0) {
-            await Promise.all(
+            const results = await Promise.all(
                 subs.map((s: any) => sendWebPush(s.endpoint, s.p256dh, s.auth, notificationPayload))
             );
-            console.log(`[DailySummary] Sent push to ${subs.length} subscription(s).`);
+            sent = results.filter(Boolean).length;
+            console.log(`[DailySummary] Sent push to ${sent}/${subs.length} subscription(s).`);
         } else {
             console.log('[DailySummary] No subscriptions found.');
         }
 
-        return new Response('Daily summary sent via Web Push!', { status: 200 });
+        return new Response(`Daily summary sent: ${sent} notifications`, { status: 200 });
     } catch (err: any) {
         console.error('[DailySummary] Error:', err);
         return new Response(`Error: ${err.message}`, { status: 500 });

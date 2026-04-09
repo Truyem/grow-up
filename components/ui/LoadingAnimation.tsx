@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Brain } from 'lucide-react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const LOADING_MESSAGES = [
     "Đang phân tích dữ liệu cơ thể...",
@@ -11,8 +13,20 @@ const LOADING_MESSAGES = [
     "Đang đồng bộ hóa với mục tiêu của bạn..."
 ];
 
-export const LoadingAnimation: React.FC = () => {
+interface LoadingAnimationProps {
+    streamingText?: string;
+}
+
+export const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ streamingText }) => {
     const [messageIndex, setMessageIndex] = useState(0);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to bottom as text streams in
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [streamingText]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -24,7 +38,7 @@ export const LoadingAnimation: React.FC = () => {
     return (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#050505] transition-all duration-500">
             {/* Minimalist Centered Content */}
-            <div className="flex flex-col items-center">
+            <div className={`flex flex-col items-center transition-all duration-500 ease-in-out ${streamingText ? 'translate-y-[-20vh] scale-75' : ''}`}>
 
                 {/* Logo Section */}
                 <div className="relative mb-8 group">
@@ -37,18 +51,38 @@ export const LoadingAnimation: React.FC = () => {
                     Grow<span className="font-bold text-cyan-500">AI</span>
                 </h2>
 
-                {/* Animated Message */}
-                <div className="h-6 overflow-hidden mb-8">
-                    <p key={messageIndex} className="text-gray-500 text-sm font-light tracking-wide animate-fade-in-up">
-                        {LOADING_MESSAGES[messageIndex]}
-                    </p>
-                </div>
+                {/* Animated Message (Hide if streaming) */}
+                {!streamingText && (
+                    <>
+                        <div className="h-6 overflow-hidden mb-8">
+                            <p key={messageIndex} className="text-gray-500 text-sm font-light tracking-wide animate-fade-in-up">
+                                {LOADING_MESSAGES[messageIndex]}
+                            </p>
+                        </div>
 
-                {/* Ultra-thin Progress Line */}
-                <div className="w-32 h-[1px] bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading" />
-                </div>
+                        {/* Ultra-thin Progress Line */}
+                        <div className="w-32 h-[1px] bg-gray-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-cyan-500 shadow-[0_0_10px_cyan] animate-progress-loading" />
+                        </div>
+                    </>
+                )}
             </div>
+
+            {/* Streaming Text Container */}
+            {streamingText && (
+                <div 
+                    ref={scrollRef}
+                    className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 h-[50vh] overflow-y-auto no-scrollbar mask-image-fade"
+                >
+                    <div className="text-gray-300 font-light leading-relaxed prose prose-invert prose-cyan max-w-none">
+                        <Markdown remarkPlugins={[remarkGfm]}>
+                            {streamingText}
+                        </Markdown>
+                        {/* Blinking cursor */}
+                        <span className="inline-block w-2 h-5 ml-1 align-middle bg-cyan-500 animate-pulse"></span>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @keyframes progress-loading {
@@ -67,6 +101,21 @@ export const LoadingAnimation: React.FC = () => {
                 .animate-progress-loading { animation: progress-loading 2s infinite ease-in-out; }
                 .animate-fade-in-up { animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
                 .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+                
+                /* Custom mask for smooth scrolling fade effect */
+                .mask-image-fade {
+                    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+                    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+                }
+                
+                /* Hide scrollbar for cleaner look */
+                .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .no-scrollbar {
+                    -ms-overflow-style: none;  /* IE and Edge */
+                    scrollbar-width: none;  /* Firefox */
+                }
             `}</style>
         </div>
     );

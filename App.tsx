@@ -13,7 +13,7 @@ console.error = (...args: any[]) => {
 
 import wallpaper from './wallpaper.webp';
 import wallpaperMb from './wallpaper-mb.webp';
-import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Exercise, ExerciseLog } from './types';
+import { FatigueLevel, MuscleGroup, UserInput, DailyPlan, WorkoutHistoryItem, Intensity, Meal, UserStats, AIOverview, Expense, HealthCondition, Exercise, ExerciseLog, UserGoals } from './types';
 import { UserForm } from './components/UserForm';
 import { PlanDisplay } from './components/PlanDisplay';
 import { NutritionDisplay } from './components/NutritionDisplay';
@@ -48,6 +48,7 @@ const DEFAULT_EQUIPMENT = [
 const INITIAL_USER_DATA: UserInput = {
   weight: 61,
   height: 165,
+  age: 18,
   fatigue: FatigueLevel.Normal,
   healthCondition: HealthCondition.Good, // Default Health
   soreMuscles: [MuscleGroup.None],
@@ -135,6 +136,9 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [userGoals, setUserGoals] = useState<UserGoals | null>(null);
+  const [streamingText, setStreamingText] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
   // Authentication state
   const [session, setSession] = useState<any>(null);
@@ -481,6 +485,14 @@ export default function App() {
       } catch (e) { console.error("Failed to load expenses", e); }
     }
 
+    // 2b. Load Goals
+    const savedGoals = localStorage.getItem('user_goals');
+    if (savedGoals) {
+      try {
+        setUserGoals(JSON.parse(savedGoals));
+      } catch (e) { console.error("Failed to load goals", e); }
+    }
+
     // 2. Load Stats
     const savedStatsStr = localStorage.getItem('user_stats');
     let currentStats = INITIAL_STATS;
@@ -556,6 +568,13 @@ export default function App() {
     localStorage.setItem('user_expenses', JSON.stringify(expenses));
   }, [expenses]);
 
+  // Save Goals
+  useEffect(() => {
+    if (userGoals) {
+      localStorage.setItem('user_goals', JSON.stringify(userGoals));
+    }
+  }, [userGoals]);
+
   const handleGenerate = async (type: ViewMode) => {
     // If history or settings tab, just switch view
     if (type === 'history') {
@@ -569,13 +588,17 @@ export default function App() {
 
 
     setLoading(true);
+    setIsStreaming(true);
+    setStreamingText("");
 
     // Generate ONLY the requested part
     // Type cast is safe because we check for 'history' and 'settings' above
     const generationType = type as 'workout' | 'nutrition';
 
     // Pass workout history to the service
-    const generatedPartial = await generateDailyPlan(userData, workoutHistory, generationType);
+    const generatedPartial = await generateDailyPlan(userData, workoutHistory, generationType, (chunkText) => {
+      setStreamingText(chunkText);
+    });
 
     // MERGE LOGIC:
     // If we already have a plan, we keep the OTHER part.
@@ -615,6 +638,7 @@ export default function App() {
     localStorage.removeItem('workout_progress');
 
     setLoading(false);
+    setIsStreaming(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -920,7 +944,7 @@ export default function App() {
     <div className="relative min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
 
       {/* Loading Animation Overlay */}
-      {(loading || isAuthChecking) && <LoadingAnimation />}
+      {(loading || isAuthChecking) && <LoadingAnimation streamingText={isStreaming ? streamingText : undefined} />}
 
       {!isAuthChecking && !session ? (
         <AuthPage />
@@ -934,18 +958,18 @@ export default function App() {
             {/* Mobile Background */}
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 block md:hidden"
-              style={{ backgroundImage: `url(${wallpaperMb})` }}
+              style={{ backgroundImage: `url(${wallpaperMb})`, opacity: 0.3 }}
             />
             {/* Desktop Background */}
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-105 hidden md:block"
-              style={{ backgroundImage: `url(${wallpaper})` }}
+              style={{ backgroundImage: `url(${wallpaper})`, opacity: 0.3 }}
             />
-            {/* Optimized aesthetics: Reduced opacity to let wallpaper shine through, added blur for depth */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+            {/* Enhanced overlay to emphasize liquid glass - increased opacity from 40% to 60% */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px]" />
 
             {/* Gradient overlay for better text readability at the bottom */}
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950/95 via-gray-900/60 to-transparent" />
           </div>
 
           {/* Content Layer */}
@@ -953,7 +977,7 @@ export default function App() {
 
             {/* Header - Global for both Input and Plan views */}
             <div className="text-center mb-10 space-y-3 animate-fade-in relative transition-all duration-300">
-              <div className="inline-flex items-center justify-center p-3 bg-white/5 rounded-full mb-2 border border-white/10 shadow-lg backdrop-blur-md">
+              <div className="inline-flex items-center justify-center p-3 bg-white/8 rounded-full mb-2 border border-white/15 shadow-lg backdrop-blur-md hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-all duration-300">
                 <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
@@ -964,7 +988,7 @@ export default function App() {
                 <button
                   id="tour-settings"
                   onClick={() => setViewMode('settings')}
-                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 backdrop-blur-sm transition-all"
                 >
                   <span className="text-cyan-400 font-semibold group-hover:text-cyan-300">{session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Member'}</span>
                   <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
@@ -975,7 +999,7 @@ export default function App() {
                 <button
                   id="tour-guide"
                   onClick={() => setViewMode('history')}
-                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"
+                  className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 backdrop-blur-sm transition-all"
                 >
                   <span className="group-hover:text-cyan-300">Lịch sử</span>
                   <History className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
@@ -1044,6 +1068,8 @@ export default function App() {
                       onStartTracking={handleStartTracking}
                       onRefreshHistory={handleRefreshHistory}
                       isRefreshing={isRefreshing}
+                      userGoals={userGoals}
+                      onGoalsUpdate={setUserGoals}
                     />
                   </div>
                 )
@@ -1074,6 +1100,8 @@ export default function App() {
                       onStartTracking={handleStartTracking}
                       onRefreshHistory={handleRefreshHistory}
                       isRefreshing={isRefreshing}
+                      userGoals={userGoals}
+                      onGoalsUpdate={setUserGoals}
                     />
                   </div>
                 )
@@ -1094,6 +1122,8 @@ export default function App() {
                      onStartTracking={handleStartTracking}
                      onRefreshHistory={handleRefreshHistory}
                      isRefreshing={isRefreshing}
+                     userGoals={userGoals}
+                     onGoalsUpdate={setUserGoals}
                    />
                  </div>
                )}
