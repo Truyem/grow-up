@@ -47,27 +47,7 @@ export function usePlanManager(
     }
     if (!online) return;
 
-    let isCancelled = false;
-    (async () => {
-      const { plan: cloudPlan, workoutProgress } = await loadPlanFromSupabase(userId);
-      if (isCancelled) return;
-
-      if (!cloudPlan) {
-        setPlan(null);
-        return;
-      }
-
-      setPlan({
-        ...cloudPlan,
-        workoutProgress: workoutProgress && typeof workoutProgress === 'object' && 'checkedState' in workoutProgress
-          ? workoutProgress as { checkedState: Record<string, boolean>; userNote?: string; exerciseLogs?: Record<string, ExerciseLog> }
-          : cloudPlan.workoutProgress,
-      });
-    })();
-
-    return () => {
-      isCancelled = true;
-    };
+    // Lần đầu do App.tsx quản lý tải initial (tránh gọi duplicate)
   }, [userId, online]);
 
   const handleGenerate = useCallback(async (type: ViewMode, currentHistory: WorkoutHistoryItem[]) => {

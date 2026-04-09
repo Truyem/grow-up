@@ -60,7 +60,8 @@ export function useSupabaseProfileSync(
   userGoals?: UserGoals | null,
   setUserGoals?: React.Dispatch<React.SetStateAction<UserGoals | null>>,
   achievements?: AchievementBadge[],
-  setAchievements?: React.Dispatch<React.SetStateAction<AchievementBadge[]>>
+  setAchievements?: React.Dispatch<React.SetStateAction<AchievementBadge[]>>,
+  hasInitialSynced: boolean = false
 ) {
   const online = useOnlineStatus();
   const isHydratedRef = useRef(false);
@@ -68,59 +69,59 @@ export function useSupabaseProfileSync(
   useEffect(() => {
     if (!userId || !online) return;
 
+    // Nếu App.tsx đang lo phần load lần đầu (hasInitialSynced = false) thì skip ở đây
+    // để tránh race condition gọi load data 2 lần song song.
+    if (!hasInitialSynced) return;
+
     isHydratedRef.current = false;
     let isCancelled = false;
 
     (async () => {
-      const cloudSettings = await loadProfileSettingsFromSupabase(userId);
-      if (isCancelled) return;
+      try {
+        const cloudSettings = await loadProfileSettingsFromSupabase(userId);
+        if (isCancelled) return;
 
-      if (cloudSettings) {
-        if (cloudSettings.userData && setUserData) setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
-        if (cloudSettings.userStats && setUserStats) setUserStats(cloudSettings.userStats);
-        if (cloudSettings.userGoals && setUserGoals) setUserGoals(cloudSettings.userGoals);
-        if (Array.isArray(cloudSettings.achievements) && setAchievements) setAchievements(cloudSettings.achievements);
-        if (cloudSettings.userGoals?.weekly?.targetWeightKg != null && setUserData) {
-          const targetWeight = cloudSettings.userGoals.weekly.targetWeightKg;
-          setUserData((prev) => {
-            const diff = prev.weight - targetWeight;
-            if (diff === 0) return prev;
-            return { ...prev, nutritionGoal: diff > 0 ? 'cutting' : 'bulking' };
-          });
+        if (cloudSettings) {
+          if (cloudSettings.userData && setUserData) setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
+          if (cloudSettings.userStats && setUserStats) setUserStats(cloudSettings.userStats);
+          if (cloudSettings.userGoals && setUserGoals) setUserGoals(cloudSettings.userGoals);
+          if (Array.isArray(cloudSettings.achievements) && setAchievements) setAchievements(cloudSettings.achievements);
         }
+      } catch (err) {
+        console.error('[ProfileSync] Error loading settings:', err);
+      } finally {
+        isHydratedRef.current = true;
       }
-
-      isHydratedRef.current = true;
     })();
 
     return () => {
       isCancelled = true;
     };
-  }, [userId, setUserData, setUserStats, setUserGoals, setAchievements, online]);
+  }, [userId, setUserData, setUserStats, setUserGoals, setAchievements, online, hasInitialSynced]);
 
   useEffect(() => {
-    if (!userId || !userData || !isHydratedRef.current) return;
+    if (!userId || !userData || !isHydratedRef.current || !hasInitialSynced) return;
     if (!online) return;
     syncUserSettingsToSupabase(userId, userData);
   }, [userId, userData, online]);
 
   useEffect(() => {
-    if (!userId || !userStats || !isHydratedRef.current) return;
+    if (!userId || !userStats || !isHydratedRef.current || !hasInitialSynced) return;
     if (!online) return;
     syncUserStatsToSupabase(userId, userStats);
-  }, [userId, userStats, online]);
+  }, [userId, userStats, online, hasInitialSynced]);
 
   useEffect(() => {
-    if (!userId || !userGoals || !isHydratedRef.current) return;
+    if (!userId || !userGoals || !isHydratedRef.current || !hasInitialSynced) return;
     if (!online) return;
     syncUserGoalsToSupabase(userId, userGoals);
-  }, [userId, userGoals, online]);
+  }, [userId, userGoals, online, hasInitialSynced]);
 
   useEffect(() => {
-    if (!userId || !achievements || !isHydratedRef.current) return;
+    if (!userId || !achievements || !isHydratedRef.current || !hasInitialSynced) return;
     if (!online) return;
     syncAchievementsToSupabase(userId, achievements);
-  }, [userId, achievements, online]);
+  }, [userId, achievements, online, hasInitialSynced]);
 }
 
 export { INITIAL_USER_DATA, INITIAL_STATS, DEFAULT_EQUIPMENT };

@@ -115,7 +115,8 @@ export default function App() {
     userData, setUserData,
     userStats, setUserStats,
     userGoals, setUserGoals,
-    achievements, setAchievements
+    achievements, setAchievements,
+    hasInitialSynced
   );
 
   // Native Notifications
