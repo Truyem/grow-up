@@ -3,6 +3,14 @@ import { supabase } from './supabase';
 // Must match VAPID_PUBLIC_KEY used in Netlify functions environment
 const VAPID_PUBLIC_KEY = 'BPOXIYYrw7U6FmISPyjxu_0uy3KuhZKYI1awwnmtabE9P5GJNxhsuIj44CxvVF5iJPxyloZ76wvGQU2olfBbZzw';
 
+function isNativeCapacitor(): boolean {
+    return !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
+function getLocalNotificationsPlugin(): any | null {
+    return (window as any).Capacitor?.Plugins?.LocalNotifications || null;
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -49,6 +57,26 @@ async function saveSubscriptionToDb(userId: string, subscription: PushSubscripti
  * Saves the subscription to Supabase.
  */
 export async function subscribeToPush(userId: string): Promise<boolean> {
+    if (isNativeCapacitor()) {
+        const ln = getLocalNotificationsPlugin();
+        if (!ln) return false;
+
+        try {
+            const currentPerm = await ln.checkPermissions?.();
+            let displayPerm = currentPerm?.display;
+
+            if (displayPerm !== 'granted') {
+                const reqPerm = await ln.requestPermissions?.();
+                displayPerm = reqPerm?.display;
+            }
+
+            return displayPerm === 'granted';
+        } catch (err: any) {
+            console.error('[Push][Native] Failed to request local notification permission:', err?.message || err);
+            return false;
+        }
+    }
+
     // Check browser support
     if (!('serviceWorker' in navigator)) {
         console.warn('[Push] Service Worker not supported.');
@@ -112,6 +140,18 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
  * Unsubscribe from Web Push and remove from Supabase.
  */
 export async function unsubscribeFromPush(userId: string): Promise<void> {
+    if (isNativeCapacitor()) {
+        const ln = getLocalNotificationsPlugin();
+        if (!ln) return;
+        try {
+            const idsToCancel = Array.from({ length: 200 }, (_, i) => ({ id: 1000 + i }));
+            await ln.cancel({ notifications: idsToCancel });
+        } catch (err) {
+            console.warn('[Push][Native] Failed to cancel local notifications:', err);
+        }
+        return;
+    }
+
     if (!('serviceWorker' in navigator)) return;
 
     const registration = await navigator.serviceWorker.getRegistration('/');
@@ -134,6 +174,17 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
  * Check if push notifications are currently active for this browser.
  */
 export async function isPushSubscribed(): Promise<boolean> {
+    if (isNativeCapacitor()) {
+        const ln = getLocalNotificationsPlugin();
+        if (!ln) return false;
+        try {
+            const perm = await ln.checkPermissions?.();
+            return perm?.display === 'granted';
+        } catch {
+            return false;
+        }
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
     const registration = await navigator.serviceWorker.getRegistration('/');
     if (!registration) return false;
@@ -149,6 +200,10 @@ export function getPushSupportStatus(): {
     permission: NotificationPermission | 'unsupported';
     reason?: string;
 } {
+    if (isNativeCapacitor()) {
+        return { supported: true, permission: 'granted' };
+    }
+
     if (!('serviceWorker' in navigator)) {
         return { supported: false, permission: 'unsupported', reason: 'Service Worker not supported' };
     }
@@ -166,6 +221,8 @@ export function getPushSupportStatus(): {
  * Call this once on app startup.
  */
 export function listenForSubscriptionChanges(userId: string): () => void {
+    if (isNativeCapacitor()) return () => {};
+
     if (!('serviceWorker' in navigator)) return () => {};
 
     const handler = (event: MessageEvent) => {
