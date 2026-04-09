@@ -109,6 +109,9 @@ export default function App() {
     userData, setUserDataOnline, planLoading, setViewMode, setPlan, handleStartTracking, showToast
   );
 
+  const isLoading = planLoading || isAuthChecking;
+  const [hasInitialSynced, setHasInitialSynced] = useState(false);
+
   // 6. Supabase background sync (state -> cloud)
   useSupabaseProfileSync(
     session?.user?.id,
@@ -126,9 +129,6 @@ export default function App() {
       console.warn('[Notifications] Failed to schedule daily notifications:', e);
     });
   }, [session?.user?.id, plan]);
-
-  const isLoading = planLoading || isAuthChecking;
-  const [hasInitialSynced, setHasInitialSynced] = useState(false);
 
   const handleCompleteWorkoutWithSleep = async (
     levelSelected: string,
