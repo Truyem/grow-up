@@ -1,7 +1,8 @@
 import { SleepQuality, SleepRecoveryEntry } from '../types';
 
 export interface SleepRecoveryDraft {
-  sleepHours: number;
+  sleepStart: string;
+  sleepEnd: string;
 }
 
 export const MIN_SLEEP_HOURS = 3;
@@ -20,6 +21,20 @@ export const inferSleepQuality = (sleepHours: number): SleepQuality => {
   return 'good';
 };
 
+export const calculateSleepHours = (sleepStart: string, sleepEnd: string): number => {
+  if (!sleepStart || !sleepEnd) return DEFAULT_SLEEP_HOURS;
+
+  const [startHour, startMinute] = sleepStart.split(':').map(Number);
+  const [endHour, endMinute] = sleepEnd.split(':').map(Number);
+  if ([startHour, startMinute, endHour, endMinute].some((n) => Number.isNaN(n))) return DEFAULT_SLEEP_HOURS;
+
+  const start = startHour * 60 + startMinute;
+  let end = endHour * 60 + endMinute;
+  if (end <= start) end += 24 * 60;
+
+  return clampSleepHours((end - start) / 60);
+};
+
 export const getSleepQualityLabel = (quality: SleepQuality): string => {
   if (quality === 'bad') return 'Kém';
   if (quality === 'average') return 'Trung bình';
@@ -36,11 +51,13 @@ const getDateLabel = (timestamp: number) => {
 
 export const createSleepRecoveryEntry = (draft: SleepRecoveryDraft): SleepRecoveryEntry => {
   const timestamp = Date.now();
-  const normalizedHours = clampSleepHours(draft.sleepHours);
+  const normalizedHours = calculateSleepHours(draft.sleepStart, draft.sleepEnd);
   return {
     id: `sr-${timestamp}`,
     timestamp,
     date: getDateLabel(timestamp),
+    sleepStart: draft.sleepStart,
+    sleepEnd: draft.sleepEnd,
     sleepHours: normalizedHours,
     sleepQuality: inferSleepQuality(normalizedHours),
   };

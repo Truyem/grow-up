@@ -218,6 +218,8 @@ export interface SleepRecoveryEntry {
   id: string;
   timestamp: number;
   date: string;
+  sleepStart: string;
+  sleepEnd: string;
   sleepHours: number;
   sleepQuality: SleepQuality;
 }

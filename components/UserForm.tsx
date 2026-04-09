@@ -127,8 +127,8 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
           <SleepRecoveryCard
             entries={sleepRecovery}
             onAddEntry={() => {}} // No longer used directly here
-            onSleepChange={(hours) => {
-              saveSleep(hours).catch(() => showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error'));
+            onSleepChange={(sleepStart, sleepEnd) => {
+              saveSleep(sleepStart, sleepEnd).catch(() => showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error'));
             }}
             suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
           />

@@ -69,7 +69,7 @@ export interface UseWorkoutHistoryReturn {
   handleDeleteHistoryItem: (timestamp: number) => Promise<void>;
   handleRefreshHistory: () => Promise<void>;
   handleSickDay: () => Promise<void>;
-  handleSaveSleep: (sleepHours: number) => Promise<void>;
+  handleSaveSleep: (sleepStart: string, sleepEnd: string) => Promise<void>;
   isRefreshing: boolean;
   calculateStreak: () => number;
 }
@@ -335,10 +335,10 @@ export function useWorkoutHistory(
     showToast(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
   }, [workoutHistory, userData.weight, userStats, setUserStats, showToast, userId]);
 
-  const handleSaveSleep = useCallback(async (sleepHours: number) => {
+  const handleSaveSleep = useCallback(async (sleepStart: string, sleepEnd: string) => {
     if (!userId) return;
     if (!canPerformOnlineAction('history-save-sleep', showToast)) return;
-    const saved = await upsertSleepLogToWorkoutLogs(userId, sleepHours);
+    const saved = await upsertSleepLogToWorkoutLogs(userId, sleepStart, sleepEnd);
     if (!saved) {
       showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error');
       return;

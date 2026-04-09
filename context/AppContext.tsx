@@ -19,7 +19,7 @@ export interface AppContextValue {
   resetPlan: (type: 'workout' | 'nutrition') => void;
   startTracking: () => void;
   updatePlan: (updatedPlan: DailyPlan) => void;
-  saveSleep: (sleepHours: number) => Promise<void>;
+  saveSleep: (sleepStart: string, sleepEnd: string) => Promise<void>;
   completeWorkout: (
     levelSelected: string,
     summary: string,

@@ -560,10 +560,19 @@ export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<Wo
     }
 };
 
-export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepHours: number, dateText?: string): Promise<boolean> => {
+export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepStart: string, sleepEnd: string, dateText?: string): Promise<boolean> => {
     try {
         const timestamp = Date.now();
         const date = dateText || new Date(timestamp).toLocaleDateString('vi-VN');
+        const hours = (() => {
+            const [startHour, startMinute] = sleepStart.split(':').map(Number);
+            const [endHour, endMinute] = sleepEnd.split(':').map(Number);
+            if ([startHour, startMinute, endHour, endMinute].some((n) => Number.isNaN(n))) return 8;
+            const start = startHour * 60 + startMinute;
+            let end = endHour * 60 + endMinute;
+            if (end <= start) end += 24 * 60;
+            return Math.min(12, Math.max(3, (end - start) / 60));
+        })();
         const item: WorkoutHistoryItem = {
             recordType: 'sleep',
             date,
@@ -571,8 +580,10 @@ export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepHours: nu
             levelSelected: 'Giấc ngủ',
             summary: 'Ghi nhận giấc ngủ',
             completedExercises: [],
-            sleepHours,
-            sleepQuality: (sleepHours >= 7 ? 'good' : sleepHours >= 5.5 ? 'average' : 'bad') as SleepQuality,
+            sleepStart,
+            sleepEnd,
+            sleepHours: hours,
+            sleepQuality: (hours >= 7 ? 'good' : hours >= 5.5 ? 'average' : 'bad') as SleepQuality,
         };
 
         return upsertWorkoutHistoryItemToSupabase(userId, item);
