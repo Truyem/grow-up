@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { Calendar, Ruler, Weight, Flame, Dumbbell, Utensils, Loader2, ChevronRight, Camera } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
@@ -26,9 +26,9 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
     userStats,
     userGoals,
     setUserGoals,
-    sleepRecovery,
-    setSleepRecovery,
     workoutHistory,
+    achievements,
+    saveSleep,
     plan,
     isLoading,
     isRefreshing,
@@ -56,6 +56,18 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
+
+  const sleepRecovery = useMemo(() => {
+    return workoutHistory
+      .filter((item) => item.recordType === 'sleep' || item.sleepHours != null)
+      .map((item) => ({
+        id: item.id || String(item.timestamp),
+        timestamp: item.timestamp,
+        date: item.date,
+        sleepHours: item.sleepHours || 0,
+        sleepQuality: item.sleepQuality || 'average',
+      }));
+  }, [workoutHistory]);
 
   // Removed internal handleAddSleepRecovery since we will pass it dynamically or handle on complete
 
@@ -112,16 +124,14 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
       )}
 
       {activeTab === 'workout' && (
-        <SleepRecoveryCard
-          entries={sleepRecovery}
-          onAddEntry={() => {}} // No longer used directly here
-          onSleepChange={(hours) => {
-             // We can store this in userData temporarily or AppContext, 
-             // but let's just add it to userData so it can be saved later
-             setUserData(prev => ({ ...prev, tempSleepHours: hours }));
-          }}
-          suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
-        />
+          <SleepRecoveryCard
+            entries={sleepRecovery}
+            onAddEntry={() => {}} // No longer used directly here
+            onSleepChange={(hours) => {
+              saveSleep(hours).catch(() => showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error'));
+            }}
+            suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
+          />
       )}
 
       {activeTab === 'history' && (
@@ -129,7 +139,7 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
       )}
 
       {activeTab === 'history' && (
-        <AchievementBadgesCard history={workoutHistory} />
+        <AchievementBadgesCard badges={achievements} />
       )}
 
       {/* --- SUPPLEMENT & WATER TRACKER --- */}

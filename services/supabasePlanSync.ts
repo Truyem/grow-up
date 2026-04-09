@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
-import { DailyPlan, SleepRecoveryEntry, UserGoals, UserInput, UserStats, WorkoutHistoryItem } from '../types';
-import { clampSleepHours, inferSleepQuality } from './sleepRecoveryService';
+import { DailyPlan, UserGoals, UserInput, UserStats, WorkoutHistoryItem, AchievementBadge, SleepQuality } from '../types';
 
 const getTodayDateKey = (): string => {
     const now = new Date();
@@ -415,6 +414,42 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
     }
 };
 
+export const syncAchievementsToSupabase = async (userId: string, achievements: AchievementBadge[]) => {
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            achievements,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] achievements sync error:', error);
+        }
+    } catch (err) {
+        console.error('[ProfileSync] achievements unexpected error:', err);
+    }
+};
+
 export const deletePlanByDate = async (userId: string, dateKey: string): Promise<boolean> => {
     try {
         const { error } = await supabase
@@ -507,7 +542,7 @@ export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<Wo
 
         const history = (data || [])
             .map((row: any) => row?.data)
-            .filter((item: any) => item && typeof item.timestamp === 'number');
+            .filter((item: any) => item && typeof item.timestamp === 'number' && item.recordType !== 'sleep');
 
         const dedupByDate = new Map<string, WorkoutHistoryItem>();
         history.forEach((item: WorkoutHistoryItem) => {
@@ -525,88 +560,31 @@ export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<Wo
     }
 };
 
-export const syncSleepRecoveryToSupabase = async (userId: string, sleepRecovery: SleepRecoveryEntry[]) => {
+export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepHours: number, dateText?: string): Promise<boolean> => {
     try {
-        const normalizedSleepRecovery = (sleepRecovery || []).map((item) => {
-            const normalizedHours = clampSleepHours(item.sleepHours);
-            return {
-                ...item,
-                sleepHours: normalizedHours,
-                sleepQuality: inferSleepQuality(normalizedHours),
-            };
-        });
-
-        const { data: existing } = await supabase
-            .from('profiles')
-            .select('settings')
-            .eq('id', userId)
-            .maybeSingle();
-
-        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
-            ? existing.settings
-            : {};
-
-        const mergedSettings = {
-            ...existingSettings,
-            sleepRecovery: normalizedSleepRecovery,
+        const timestamp = Date.now();
+        const date = dateText || new Date(timestamp).toLocaleDateString('vi-VN');
+        const item: WorkoutHistoryItem = {
+            recordType: 'sleep',
+            date,
+            timestamp,
+            levelSelected: 'Giấc ngủ',
+            summary: 'Ghi nhận giấc ngủ',
+            completedExercises: [],
+            sleepHours,
+            sleepQuality: (sleepHours >= 7 ? 'good' : sleepHours >= 5.5 ? 'average' : 'bad') as SleepQuality,
         };
 
-        const { error } = await supabase
-            .from('profiles')
-            .upsert(
-                {
-                    id: userId,
-                    settings: mergedSettings,
-                    updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'id' }
-            );
-
-        if (error) {
-            console.error('[ProfileSync] sleep recovery sync error:', error);
-        }
+        return upsertWorkoutHistoryItemToSupabase(userId, item);
     } catch (err) {
-        console.error('[ProfileSync] sleep recovery unexpected error:', err);
+        console.error('[HistorySync] sleep log unexpected error:', err);
+        return false;
     }
 };
 
-export const loadSleepRecoveryFromSupabase = async (userId: string): Promise<SleepRecoveryEntry[]> => {
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('settings')
-            .eq('id', userId)
-            .maybeSingle();
-
-        if (error) {
-            console.error('[ProfileSync] sleep recovery load error:', error);
-            return [];
-        }
-
-        const settings = (data?.settings && typeof data.settings === 'object') ? data.settings as any : {};
-        const cloudSleep = Array.isArray(settings.sleepRecovery) ? settings.sleepRecovery : [];
-
-        return cloudSleep
-            .filter((item: any) =>
-                item &&
-                typeof item.timestamp === 'number' &&
-                typeof item.sleepHours === 'number'
-            )
-            .map((item: any) => {
-                const normalizedHours = clampSleepHours(item.sleepHours);
-                return {
-                    id: typeof item.id === 'string' ? item.id : `sr-${item.timestamp}`,
-                    timestamp: item.timestamp,
-                    date: typeof item.date === 'string' ? item.date : new Date(item.timestamp).toLocaleDateString('vi-VN'),
-                    sleepHours: normalizedHours,
-                    sleepQuality: inferSleepQuality(normalizedHours),
-                } as SleepRecoveryEntry;
-            })
-            .sort((a, b) => b.timestamp - a.timestamp);
-    } catch (err) {
-        console.error('[ProfileSync] sleep recovery load unexpected error:', err);
-        return [];
-    }
+export const loadSleepRecoveryFromSupabase = async (userId: string) => {
+    const history = await loadWorkoutHistoryFromSupabase(userId);
+    return history.filter((item) => item.recordType === 'sleep' || (item.sleepHours != null && item.completedExercises.length === 0));
 };
 
 export const loadProfileSettingsFromSupabase = async (userId: string) => {

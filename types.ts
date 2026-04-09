@@ -88,16 +88,6 @@ export interface UserInput {
   equipment: string[];
   consumedFood: string[];
   hasSeenOnboarding: boolean;
-  tempSleepHours?: number; // Used to hold temporary sleep input before workout completion
-}
-
-export interface Expense {
-  id: string;
-  name: string;
-  category: 'supplement' | 'equipment' | 'food' | 'other';
-  price: number;
-  date: string;
-  note?: string;
 }
 
 export interface UserStats {
@@ -190,6 +180,7 @@ export interface DailyPlan {
 
 export interface WorkoutHistoryItem {
   id?: string; // Supabase UUID
+  recordType?: 'workout' | 'nutrition' | 'sleep';
   date: string;
   timestamp: number;
   levelSelected: string;
@@ -208,6 +199,8 @@ export interface WorkoutHistoryItem {
 
   };
   weight?: number; // Recorded weight for that day
+  sleepHours?: number;
+  sleepQuality?: SleepQuality;
 }
 
 export interface PersonalRecord {
@@ -235,6 +228,22 @@ export interface AchievementBadge {
   description: string;
   unlocked: boolean;
   progressText: string;
+}
+
+export interface ProfileSettings {
+  userData?: UserInput;
+  userStats?: UserStats;
+  userGoals?: UserGoals;
+  supplementLog?: {
+    date: string;
+    water_ml: number;
+    whey: boolean;
+    creatine: boolean;
+    vitamin: boolean;
+    omega3: boolean;
+    lastUpdated: number;
+  };
+  achievements?: AchievementBadge[];
 }
 
 // AI Overview - Insights from Gemini AI about workout progress

@@ -34,7 +34,6 @@ import {
   useWorkoutHistory,
   usePlanManager,
   useTour,
-  useSupabaseSleepRecoverySync,
   useSupabaseProfileSync,
 } from './hooks';
 import { UserGoals, UserInput } from './types';
@@ -55,7 +54,7 @@ export default function App() {
     userData, setUserData,
     userStats, setUserStats,
     userGoals, setUserGoals,
-    sleepRecovery, setSleepRecovery,
+    achievements, setAchievements,
   } = useUserData();
 
   const setUserDataOnline: React.Dispatch<React.SetStateAction<UserInput>> = (value) => {
@@ -89,6 +88,7 @@ export default function App() {
     handleDeleteHistoryItem,
     handleRefreshHistory,
     handleSickDay,
+    handleSaveSleep,
     isRefreshing,
     calculateStreak
   } = useWorkoutHistory(userData, userStats, setUserStats, plan, setPlan, showToast, session?.user?.id);
@@ -112,9 +112,9 @@ export default function App() {
     session?.user?.id,
     userData, setUserData,
     userStats, setUserStats,
-    userGoals, setUserGoals
+    userGoals, setUserGoals,
+    achievements, setAchievements
   );
-  useSupabaseSleepRecoverySync(session?.user?.id, sleepRecovery, setSleepRecovery);
 
   // Native Notifications
   useEffect(() => {
@@ -140,13 +140,6 @@ export default function App() {
     } catch {
       return;
     }
-
-    if (userData.tempSleepHours !== undefined && userData.tempSleepHours > 0) {
-      const { createSleepRecoveryEntry } = require('./services/sleepRecoveryService');
-      const entry = createSleepRecoveryEntry({ sleepHours: userData.tempSleepHours });
-      setSleepRecovery((prev) => [entry, ...prev].sort((a, b) => b.timestamp - a.timestamp));
-      setUserData(prev => ({ ...prev, tempSleepHours: undefined }));
-    }
   };
 
   const appContextValue = {
@@ -156,8 +149,7 @@ export default function App() {
     userStats,
     userGoals,
     setUserGoals: setUserGoalsOnline,
-    sleepRecovery,
-    setSleepRecovery,
+    achievements,
     plan,
     isLoading: planLoading,
     workoutHistory,
@@ -166,6 +158,7 @@ export default function App() {
     resetPlan: handleReset,
     startTracking: handleStartTracking,
     updatePlan: handleUpdatePlan,
+    saveSleep: handleSaveSleep,
     completeWorkout: handleCompleteWorkoutWithSleep,
     completeNutrition: handleCompleteNutrition,
     deleteHistoryItem: handleDeleteHistoryItem,

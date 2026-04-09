@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { WorkoutHistoryItem, UserInput, UserStats, DailyPlan, ExerciseLog } from '../types';
-import { deletePlanByDate, deleteWorkoutHistoryItemFromSupabase, loadWorkoutHistoryFromSupabase, savePlanToSupabase, syncUserStatsToSupabase, upsertWorkoutHistoryItemToSupabase } from '../services/supabasePlanSync';
+import { deletePlanByDate, deleteWorkoutHistoryItemFromSupabase, loadWorkoutHistoryFromSupabase, savePlanToSupabase, syncUserStatsToSupabase, upsertWorkoutHistoryItemToSupabase, upsertSleepLogToWorkoutLogs } from '../services/supabasePlanSync';
 import { canPerformOnlineAction } from '../services/onlineGuard';
 import { useOnlineStatus } from './useOnlineStatus';
 
@@ -69,6 +69,7 @@ export interface UseWorkoutHistoryReturn {
   handleDeleteHistoryItem: (timestamp: number) => Promise<void>;
   handleRefreshHistory: () => Promise<void>;
   handleSickDay: () => Promise<void>;
+  handleSaveSleep: (sleepHours: number) => Promise<void>;
   isRefreshing: boolean;
   calculateStreak: () => number;
 }
@@ -309,6 +310,7 @@ export function useWorkoutHistory(
 
     const todayStr = getTodayString();
     const sickDayEntry: WorkoutHistoryItem = {
+      recordType: 'workout',
       date: todayStr,
       timestamp: Date.now(),
       levelSelected: 'Ốm/Bệnh',
@@ -333,6 +335,18 @@ export function useWorkoutHistory(
     showToast(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
   }, [workoutHistory, userData.weight, userStats, setUserStats, showToast, userId]);
 
+  const handleSaveSleep = useCallback(async (sleepHours: number) => {
+    if (!userId) return;
+    if (!canPerformOnlineAction('history-save-sleep', showToast)) return;
+    const saved = await upsertSleepLogToWorkoutLogs(userId, sleepHours);
+    if (!saved) {
+      showToast('Không thể lưu giấc ngủ lên máy chủ.', 'error');
+      return;
+    }
+    const refreshed = await loadWorkoutHistoryFromSupabase(userId);
+    setWorkoutHistory(refreshed);
+  }, [showToast, userId]);
+
   return {
     workoutHistory,
     setWorkoutHistory,
@@ -341,6 +355,7 @@ export function useWorkoutHistory(
     handleDeleteHistoryItem,
     handleRefreshHistory,
     handleSickDay,
+    handleSaveSleep,
     isRefreshing,
     calculateStreak,
   };

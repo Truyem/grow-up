@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import type { ExerciseLog, UserGoals, UserInput, UserStats, WorkoutHistoryItem, DailyPlan, SleepRecoveryEntry } from '../types';
+import type { ExerciseLog, UserGoals, UserInput, UserStats, WorkoutHistoryItem, DailyPlan, AchievementBadge } from '../types';
 
 type GenerateType = 'workout' | 'nutrition' | 'history' | 'settings';
 
@@ -10,8 +10,7 @@ export interface AppContextValue {
   userStats: UserStats;
   userGoals: UserGoals | null;
   setUserGoals: React.Dispatch<React.SetStateAction<UserGoals | null>>;
-  sleepRecovery: SleepRecoveryEntry[];
-  setSleepRecovery: React.Dispatch<React.SetStateAction<SleepRecoveryEntry[]>>;
+  achievements: AchievementBadge[];
   plan: DailyPlan | null;
   isLoading: boolean;
   workoutHistory: WorkoutHistoryItem[];
@@ -20,6 +19,7 @@ export interface AppContextValue {
   resetPlan: (type: 'workout' | 'nutrition') => void;
   startTracking: () => void;
   updatePlan: (updatedPlan: DailyPlan) => void;
+  saveSleep: (sleepHours: number) => Promise<void>;
   completeWorkout: (
     levelSelected: string,
     summary: string,

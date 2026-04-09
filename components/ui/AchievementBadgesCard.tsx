@@ -1,14 +1,12 @@
 import React from 'react';
-import type { WorkoutHistoryItem } from '../../types';
-import { calculateAchievements } from '../../services/achievementService';
+import type { AchievementBadge } from '../../types';
 import { Award, Lock } from 'lucide-react';
 
 interface AchievementBadgesCardProps {
-  history: WorkoutHistoryItem[];
+  badges: AchievementBadge[];
 }
 
-export const AchievementBadgesCard: React.FC<AchievementBadgesCardProps> = ({ history }) => {
-  const badges = calculateAchievements(history);
+export const AchievementBadgesCard: React.FC<AchievementBadgesCardProps> = ({ badges }) => {
 
   return (
     <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-3">

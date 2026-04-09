@@ -4,4 +4,4 @@ export { useWorkoutHistory } from './useWorkoutHistory';
 export { usePlanManager } from './usePlanManager';
 export { useTour } from './useTour';
 export { useOnlineStatus } from './useOnlineStatus';
-export { useSupabaseProfileSync, useSupabaseSleepRecoverySync } from './useUserData';
+export { useSupabaseProfileSync } from './useUserData';
