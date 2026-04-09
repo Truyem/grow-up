@@ -4,13 +4,15 @@ import { GlassCard } from '../ui/GlassCard';
 import { Utensils, Refrigerator, Leaf, Plus, X, Loader2, Beef, Carrot, Egg, Droplets, Nut, Trash2 } from 'lucide-react';
 import { fridgeService } from '../../services/fridgeService';
 import { parseAndDeductFridge } from '../../services/geminiService';
+import { canPerformOnlineAction } from '../../services/onlineGuard';
 
 interface NutritionInputProps {
     userData: UserInput;
     setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
+    showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
 }
 
-export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUserData }) => {
+export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUserData, showToast }) => {
     const [newConsumedFood, setNewConsumedFood] = useState('');
     
     // Fridge State
@@ -76,6 +78,8 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
     const handleAddConsumedFood = async () => {
         const foodName = newConsumedFood.trim();
         if (foodName) {
+            if (!canPerformOnlineAction('nutrition-consumed-food-add', showToast)) return;
+
             setUserData(prev => ({
                 ...prev,
                 consumedFood: [...(prev.consumedFood || []), foodName]
@@ -88,6 +92,8 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
     };
 
     const handleRemoveConsumedFood = (indexToRemove: number) => {
+        if (!canPerformOnlineAction('nutrition-consumed-food-remove', showToast)) return;
+
         setUserData(prev => ({
             ...prev,
             consumedFood: (prev.consumedFood || []).filter((_, index) => index !== indexToRemove)

@@ -2,6 +2,34 @@ import { supabase } from './supabase';
 import { DailyPlan, SleepRecoveryEntry, UserGoals, UserInput, UserStats, WorkoutHistoryItem } from '../types';
 import { clampSleepHours, inferSleepQuality } from './sleepRecoveryService';
 
+const getTodayDateKey = (): string => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+const getPlanDateKey = (planDateText?: string): string => {
+    if (planDateText) {
+        const parsed = parseVietnameseDateToISO(planDateText);
+        if (parsed) return parsed;
+    }
+    return getTodayDateKey();
+};
+
+const parseVietnameseDateToISO = (value: string): string | null => {
+    const match = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!match) return null;
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900) {
+        return null;
+    }
+
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
 // ========================================
 // Debounce utility
 // ========================================
@@ -15,7 +43,7 @@ export const debouncedSavePlan = (
 ) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-        savePlanToSupabase(userId, plan, workoutProgress);
+        void savePlanToSupabase(userId, plan, workoutProgress);
     }, delay);
 };
 
@@ -25,11 +53,11 @@ export const debouncedSavePlan = (
 export const savePlanToSupabase = async (
     userId: string,
     plan: DailyPlan,
-    workoutProgress?: Record<string, any>
-) => {
+    workoutProgress?: Record<string, any>,
+    planDateKey?: string
+) : Promise<boolean> => {
     try {
-        const now = new Date();
-        const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const dateKey = planDateKey || getPlanDateKey(plan?.date);
 
         // Extract workoutProgress from plan if embedded (from PlanDisplay toggle)
         const progressToSave = workoutProgress || (plan as any).workoutProgress || {};
@@ -50,11 +78,14 @@ export const savePlanToSupabase = async (
 
         if (error) {
             console.error('[PlanSync] Save error:', error);
+            return false;
         } else {
             console.log('[PlanSync] Plan saved to Supabase');
+            return true;
         }
     } catch (err) {
         console.error('[PlanSync] Unexpected error:', err);
+        return false;
     }
 };
 
@@ -62,11 +93,11 @@ export const savePlanToSupabase = async (
 // Load plan from Supabase for today
 // ========================================
 export const loadPlanFromSupabase = async (
-    userId: string
+    userId: string,
+    planDateKey?: string
 ): Promise<{ plan: DailyPlan | null; workoutProgress: Record<string, any> | null }> => {
     try {
-        const now = new Date();
-        const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const dateKey = planDateKey || getTodayDateKey();
 
         const { data, error } = await supabase
             .from('daily_plans')
@@ -362,7 +393,7 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
     try {
         const rows = history.map((item) => ({
             user_id: userId,
-            date: item.date,
+            date: parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0],
             data: item,
         }));
 
@@ -381,6 +412,116 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
         }
     } catch (err) {
         console.error('[HistorySync] workout history unexpected error:', err);
+    }
+};
+
+export const deletePlanByDate = async (userId: string, dateKey: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase
+            .from('daily_plans')
+            .delete()
+            .eq('user_id', userId)
+            .eq('date', dateKey);
+
+        if (error) {
+            console.error('[PlanSync] Delete plan error:', error);
+            return false;
+        }
+
+        return true;
+    } catch (err) {
+        console.error('[PlanSync] Unexpected delete plan error:', err);
+        return false;
+    }
+};
+
+export const upsertWorkoutHistoryItemToSupabase = async (userId: string, item: WorkoutHistoryItem): Promise<boolean> => {
+    try {
+        const dateKey = parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0];
+        const { error } = await supabase
+            .from('workout_logs')
+            .upsert(
+                {
+                    user_id: userId,
+                    date: dateKey,
+                    data: item,
+                },
+                { onConflict: 'user_id,date' }
+            );
+
+        if (error) {
+            const code = (error as any)?.code;
+            if (code === 'PGRST204' || code === 'PGRST205') {
+                console.warn('[HistorySync] workout_logs table/columns not available. Skipping save.');
+                return false;
+            }
+            console.error('[HistorySync] upsert item error:', error);
+            return false;
+        }
+
+        return true;
+    } catch (err) {
+        console.error('[HistorySync] upsert item unexpected error:', err);
+        return false;
+    }
+};
+
+export const deleteWorkoutHistoryItemFromSupabase = async (userId: string, timestamp: number): Promise<boolean> => {
+    try {
+        const dateKey = new Date(timestamp).toISOString().split('T')[0];
+        const { error } = await supabase
+            .from('workout_logs')
+            .delete()
+            .eq('user_id', userId)
+            .eq('date', dateKey);
+
+        if (error) {
+            console.error('[HistorySync] delete item error:', error);
+            return false;
+        }
+
+        return true;
+    } catch (err) {
+        console.error('[HistorySync] delete item unexpected error:', err);
+        return false;
+    }
+};
+
+export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<WorkoutHistoryItem[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('workout_logs')
+            .select('data')
+            .eq('user_id', userId)
+            .order('date', { ascending: false });
+
+        if (error) {
+            const code = (error as any)?.code;
+            if (code === 'PGRST204' || code === 'PGRST205') {
+                console.warn('[HistorySync] workout_logs table/columns not available. Returning empty history.');
+                return [];
+            }
+            console.error('[HistorySync] load history error:', error);
+            return [];
+        }
+
+        const history = (data || [])
+            .map((row: any) => row?.data)
+            .filter((item: any) => item && typeof item.timestamp === 'number');
+
+        const dedupByDate = new Map<string, WorkoutHistoryItem>();
+        history.forEach((item: WorkoutHistoryItem) => {
+            const key = parseVietnameseDateToISO(item.date) || new Date(item.timestamp).toISOString().split('T')[0];
+            const existing = dedupByDate.get(key);
+            if (!existing || item.timestamp > existing.timestamp) {
+                dedupByDate.set(key, item);
+            }
+        });
+
+        return Array.from(dedupByDate.values()).sort((a, b) => b.timestamp - a.timestamp);
+    } catch (err) {
+        console.error('[HistorySync] load history unexpected error:', err);
+        return [];
     }
 };
 
@@ -484,6 +625,92 @@ export const loadProfileSettingsFromSupabase = async (userId: string) => {
         return (data?.settings && typeof data.settings === 'object') ? data.settings as any : null;
     } catch (err) {
         console.error('[ProfileSync] profile settings unexpected error:', err);
+        return null;
+    }
+};
+
+export interface SupplementLogRecord {
+    date: string;
+    water_ml: number;
+    whey: boolean;
+    creatine: boolean;
+    vitamin: boolean;
+    omega3: boolean;
+    lastUpdated: number;
+}
+
+export const syncSupplementLogToSupabase = async (userId: string, supplementLog: SupplementLogRecord): Promise<boolean> => {
+    try {
+        const { data: existing } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
+            ? existing.settings
+            : {};
+
+        const mergedSettings = {
+            ...existingSettings,
+            supplementLog,
+        };
+
+        const { error } = await supabase
+            .from('profiles')
+            .upsert(
+                {
+                    id: userId,
+                    settings: mergedSettings,
+                    updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+            );
+
+        if (error) {
+            console.error('[ProfileSync] supplement log sync error:', error);
+            return false;
+        }
+
+        return true;
+    } catch (err) {
+        console.error('[ProfileSync] supplement log unexpected error:', err);
+        return false;
+    }
+};
+
+export const loadSupplementLogFromSupabase = async (userId: string): Promise<SupplementLogRecord | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[ProfileSync] supplement log load error:', error);
+            return null;
+        }
+
+        const settings = (data?.settings && typeof data.settings === 'object') ? data.settings as any : {};
+        const log = settings?.supplementLog;
+        if (!log || typeof log !== 'object') return null;
+
+        if (typeof log.date !== 'string' || typeof log.water_ml !== 'number' || typeof log.lastUpdated !== 'number') {
+            return null;
+        }
+
+        return {
+            date: log.date,
+            water_ml: log.water_ml,
+            whey: !!log.whey,
+            creatine: !!log.creatine,
+            vitamin: !!log.vitamin,
+            omega3: !!log.omega3,
+            lastUpdated: log.lastUpdated,
+        };
+    } catch (err) {
+        console.error('[ProfileSync] supplement log load unexpected error:', err);
         return null;
     }
 };

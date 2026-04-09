@@ -1,28 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Generic hook for reading/writing any localStorage key with type safety.
- * Syncs state to localStorage automatically on change.
+ * Legacy hook kept for compatibility.
+ * In strict online-only mode, this behaves as in-memory state only.
  */
 export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void] {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(`[useLocalStorage] Failed to load "${key}":`, error);
-      return initialValue;
-    }
-  });
-
-  // Write to localStorage whenever value changes
+  void key;
+  const [storedValue, setStoredValue] = useState<T>(initialValue);
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(`[useLocalStorage] Failed to save "${key}":`, error);
-    }
-  }, [key, storedValue]);
+    // No persistence in strict online-only mode.
+  }, [storedValue]);
 
   const setValue = useCallback((value: T | ((prev: T) => T)) => {
     setStoredValue(prev => {

@@ -172,7 +172,6 @@ export function useTour(
     setIsTourOpen(false);
     const newUserData = { ...userData, hasSeenOnboarding: true };
     setUserData(newUserData);
-    localStorage.setItem('user_settings', JSON.stringify(newUserData));
     showToast("Chào mừng bạn đến với Grow Up! Chúc bạn tập luyện hiệu quả.");
   }, [userData, setUserData, showToast]);
 

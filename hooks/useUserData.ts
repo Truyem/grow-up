@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserInput, UserStats, Expense, UserGoals, FatigueLevel, Intensity, HealthCondition, MuscleGroup, SleepRecoveryEntry } from '../types';
 import { loadSleepRecoveryFromSupabase, syncSleepRecoveryToSupabase, syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase, loadProfileSettingsFromSupabase } from '../services/supabasePlanSync';
+import { useOnlineStatus } from './useOnlineStatus';
 
 const DEFAULT_EQUIPMENT = [
   "Board chống đẩy",
@@ -44,8 +45,8 @@ export interface UseUserDataReturn {
 }
 
 /**
- * Hook for managing all user-related data with localStorage persistence.
- * Handles: userData, userStats, expenses, userGoals.
+ * Hook for managing all user-related data in memory.
+ * Persistence is handled by Supabase sync hooks.
  */
 export function useUserData(): UseUserDataReturn {
   const [userData, setUserData] = useState<UserInput>(INITIAL_USER_DATA);
@@ -53,73 +54,6 @@ export function useUserData(): UseUserDataReturn {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [userGoals, setUserGoals] = useState<UserGoals | null>(null);
   const [sleepRecovery, setSleepRecovery] = useState<SleepRecoveryEntry[]>([]);
-
-  // Load all user data from localStorage on mount
-  useEffect(() => {
-    // Load user settings
-    const savedUserData = localStorage.getItem('user_settings');
-    if (savedUserData) {
-      try {
-        const parsed = JSON.parse(savedUserData);
-        setUserData(prev => ({ ...prev, ...parsed }));
-      } catch (e) {
-        console.error("Failed to load user settings", e);
-      }
-    }
-
-    // Load stats
-    const savedStats = localStorage.getItem('user_stats');
-    if (savedStats) {
-      try {
-        setUserStats(JSON.parse(savedStats));
-      } catch (e) {
-        console.error("Failed to load stats", e);
-      }
-    }
-
-    // Load expenses
-    const savedExpenses = localStorage.getItem('user_expenses');
-    if (savedExpenses) {
-      try {
-        setExpenses(JSON.parse(savedExpenses));
-      } catch (e) {
-        console.error("Failed to load expenses", e);
-      }
-    }
-
-    // Load goals
-    const savedGoals = localStorage.getItem('user_goals');
-    if (savedGoals) {
-      try {
-        setUserGoals(JSON.parse(savedGoals));
-      } catch (e) {
-        console.error("Failed to load goals", e);
-      }
-    }
-
-  }, []);
-
-  // Persist userData
-  useEffect(() => {
-    localStorage.setItem('user_settings', JSON.stringify(userData));
-  }, [userData]);
-
-  // Persist expenses
-  useEffect(() => {
-    localStorage.setItem('user_expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
-  // Persist userStats
-  useEffect(() => {
-    localStorage.setItem('user_stats', JSON.stringify(userStats));
-  }, [userStats]);
-
-  // Persist goals
-  useEffect(() => {
-    if (userGoals) {
-      localStorage.setItem('user_goals', JSON.stringify(userGoals));
-    }
-  }, [userGoals]);
 
   return {
     userData,
@@ -144,10 +78,13 @@ export function useSupabaseProfileSync(
   userGoals?: UserGoals | null,
   setUserGoals?: React.Dispatch<React.SetStateAction<UserGoals | null>>
 ) {
+  const online = useOnlineStatus();
   const isHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !online) return;
+
+    isHydratedRef.current = false;
 
     let isCancelled = false;
     (async () => {
@@ -171,22 +108,25 @@ export function useSupabaseProfileSync(
     return () => {
       isCancelled = true;
     };
-  }, [userId, setUserData, setUserStats, setUserGoals]);
+  }, [userId, setUserData, setUserStats, setUserGoals, online]);
 
   useEffect(() => {
     if (!userId || !userData || !isHydratedRef.current) return;
+    if (!online) return;
     syncUserSettingsToSupabase(userId, userData);
-  }, [userId, userData]);
+  }, [userId, userData, online]);
 
   useEffect(() => {
     if (!userId || !userStats || !isHydratedRef.current) return;
+    if (!online) return;
     syncUserStatsToSupabase(userId, userStats);
-  }, [userId, userStats]);
+  }, [userId, userStats, online]);
 
   useEffect(() => {
     if (!userId || !isHydratedRef.current) return;
+    if (!online) return;
     syncUserGoalsToSupabase(userId, userGoals || null);
-  }, [userId, userGoals]);
+  }, [userId, userGoals, online]);
 }
 
 export function useSupabaseSleepRecoverySync(
@@ -194,10 +134,13 @@ export function useSupabaseSleepRecoverySync(
   sleepRecovery?: SleepRecoveryEntry[],
   setSleepRecovery?: React.Dispatch<React.SetStateAction<SleepRecoveryEntry[]>>
 ) {
+  const online = useOnlineStatus();
   const isHydratedRef = useRef(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !online) return;
+
+    isHydratedRef.current = false;
 
     let isCancelled = false;
     (async () => {
@@ -214,13 +157,14 @@ export function useSupabaseSleepRecoverySync(
     return () => {
       isCancelled = true;
     };
-  }, [userId, setSleepRecovery]);
+  }, [userId, setSleepRecovery, online]);
 
   useEffect(() => {
     if (!userId || !sleepRecovery) return;
     if (!isHydratedRef.current) return;
+    if (!online) return;
     syncSleepRecoveryToSupabase(userId, sleepRecovery);
-  }, [userId, sleepRecovery]);
+  }, [userId, sleepRecovery, online]);
 }
 
 export { INITIAL_USER_DATA, INITIAL_STATS, DEFAULT_EQUIPMENT };

@@ -4,6 +4,7 @@ import type { ExerciseLog, UserGoals, UserInput, UserStats, WorkoutHistoryItem, 
 type GenerateType = 'workout' | 'nutrition' | 'history' | 'settings';
 
 export interface AppContextValue {
+  userId?: string;
   userData: UserInput;
   setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
   userStats: UserStats;
@@ -26,11 +27,12 @@ export interface AppContextValue {
     userNotes: string,
     nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
-  ) => void;
-  completeNutrition: (nutrition: DailyPlan['nutrition']) => void;
-  deleteHistoryItem: (timestamp: number) => void;
+  ) => Promise<void>;
+  completeNutrition: (nutrition: DailyPlan['nutrition']) => Promise<void>;
+  deleteHistoryItem: (timestamp: number) => Promise<void>;
   refreshHistory: () => Promise<void>;
-  sickDay: () => void;
+  sickDay: () => Promise<void>;
+  showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);

@@ -7,11 +7,7 @@ export const OnlineCounter: React.FC = () => {
 
     // Generate a unique session ID for this visitor
     const [sessionId] = useState(() => {
-        const saved = localStorage.getItem('presence_session_id');
-        if (saved) return saved;
-        const newId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-        localStorage.setItem('presence_session_id', newId);
-        return newId;
+        return Math.random().toString(36).substring(2) + Date.now().toString(36);
     });
 
     const sendHeartbeat = async () => {

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Droplets, Pill, Check, Clock, AlertCircle } from 'lucide-react';
+import { useAppContext } from '../../context';
+import { loadSupplementLogFromSupabase, syncSupplementLogToSupabase } from '../../services/supabasePlanSync';
+import { canPerformOnlineAction } from '../../services/onlineGuard';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 interface SupplementLog {
     date: string; // YYYY-MM-DD
@@ -52,33 +56,46 @@ function getTodayKey(): string {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function loadTodayLog(): SupplementLog {
-    const todayKey = getTodayKey();
-    const saved = localStorage.getItem('supplement_log');
-    if (saved) {
-        try {
-            const log: SupplementLog = JSON.parse(saved);
-            if (log.date === todayKey) return log;
-        } catch { /* ignore */ }
-    }
-    return {
-        date: todayKey,
-        water_ml: 0,
+function createTodayLog(): SupplementLog {
+  const todayKey = getTodayKey();
+  return {
+      date: todayKey,
+      water_ml: 0,
         whey: false,
         creatine: false,
         vitamin: false,
         omega3: false,
-        lastUpdated: Date.now(),
-    };
-}
-
-function saveLog(log: SupplementLog) {
-    localStorage.setItem('supplement_log', JSON.stringify(log));
+      lastUpdated: Date.now(),
+  };
 }
 
 export const SupplementTracker: React.FC = () => {
-    const [log, setLog] = useState<SupplementLog>(loadTodayLog);
+    const { userId, showToast } = useAppContext();
+    const [log, setLog] = useState<SupplementLog>(createTodayLog);
     const [isExpanded, setIsExpanded] = useState(false);
+    const online = useOnlineStatus();
+
+    useEffect(() => {
+        if (!userId || !online) return;
+
+        let isCancelled = false;
+        (async () => {
+            const remoteLog = await loadSupplementLogFromSupabase(userId);
+            if (isCancelled) return;
+            if (remoteLog && remoteLog.date === getTodayKey()) {
+                setLog(remoteLog);
+                return;
+            }
+
+            const fresh = createTodayLog();
+            setLog(fresh);
+            await syncSupplementLogToSupabase(userId, fresh);
+        })();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [userId, online]);
 
     // Auto-reset at midnight
     useEffect(() => {
@@ -87,16 +104,30 @@ export const SupplementTracker: React.FC = () => {
             if (log.date !== todayKey) {
                 const fresh = { date: todayKey, water_ml: 0, whey: false, creatine: false, vitamin: false, omega3: false, lastUpdated: Date.now() };
                 setLog(fresh);
-                saveLog(fresh);
+                if (userId && online) {
+                    syncSupplementLogToSupabase(userId, fresh);
+                }
             }
         }, 60000);
         return () => clearInterval(interval);
-    }, [log.date]);
+    }, [log.date, userId, online]);
 
-    const update = (partial: Partial<SupplementLog>) => {
+    const update = async (partial: Partial<SupplementLog>) => {
+        if (!userId) {
+            showToast('Bạn cần đăng nhập để lưu supplement.', 'error');
+            return;
+        }
+        if (!canPerformOnlineAction('supplement-update', showToast)) return;
+
         const updated = { ...log, ...partial, lastUpdated: Date.now() };
+
+        const saved = await syncSupplementLogToSupabase(userId, updated);
+        if (!saved) {
+            showToast('Không thể lưu nhật ký supplement.', 'error');
+            return;
+        }
+
         setLog(updated);
-        saveLog(updated);
     };
 
     const addWater = (ml: number) => {

@@ -6,7 +6,7 @@ import { Swords, BrainCircuit, Dumbbell, BatteryCharging, BatteryFull, Activity,
 interface WorkoutInputProps {
     userData: UserInput;
     setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
-    onSickDay: () => void;
+    onSickDay: () => Promise<void>;
 }
 
 export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserData, onSickDay }) => {
@@ -56,7 +56,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                 <GlassCard title="Chế độ tập luyện" icon={<Swords className="w-6 h-6 text-cyan-400" />}>
                     <div className="grid grid-cols-3 gap-3">
                         <button
-                            onClick={() => setUserData({ ...userData, trainingMode: 'calis' })}
+                            onClick={() => setUserData(prev => ({ ...prev, trainingMode: 'calis' }))}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden ${userData.trainingMode === 'calis'
                                 ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
                                 : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
@@ -70,7 +70,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                         </button>
 
                         <button
-                            onClick={() => setUserData({ ...userData, trainingMode: 'gym' })}
+                            onClick={() => setUserData(prev => ({ ...prev, trainingMode: 'gym' }))}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'gym'
                                 ? 'bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
                                 : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
@@ -87,7 +87,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                         </button>
 
                         <button
-                            onClick={() => setUserData({ ...userData, trainingMode: 'home' })}
+                            onClick={() => setUserData(prev => ({ ...prev, trainingMode: 'home' }))}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer relative overflow-hidden group ${userData.trainingMode === 'home'
                                 ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.3)]'
                                 : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
@@ -111,7 +111,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                 <GlassCard title="Cường độ tập luyện" icon={<BatteryCharging className="w-6 h-6 text-cyan-400" />}>
                     <div className="grid grid-cols-1 gap-3">
                         <button
-                            onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Medium })}
+                            onClick={() => setUserData(prev => ({ ...prev, selectedIntensity: Intensity.Medium }))}
                             className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Medium
                                 ? 'bg-blue-500/20 border-blue-500 text-blue-300'
                                 : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
@@ -125,7 +125,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                         </button>
 
                         <button
-                            onClick={() => setUserData({ ...userData, selectedIntensity: Intensity.Hard })}
+                            onClick={() => setUserData(prev => ({ ...prev, selectedIntensity: Intensity.Hard }))}
                             className={`p-4 rounded-xl border flex items-center gap-4 transition-all cursor-pointer ${userData.selectedIntensity === Intensity.Hard
                                 ? 'bg-red-500/20 border-red-500 text-red-300'
                                 : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
@@ -149,7 +149,7 @@ export const WorkoutInput: React.FC<WorkoutInputProps> = ({ userData, setUserDat
                         {Object.values(FatigueLevel).map((level) => (
                             <button
                                 key={level}
-                                onClick={() => setUserData({ ...userData, fatigue: level })}
+                                onClick={() => setUserData(prev => ({ ...prev, fatigue: level }))}
                                 className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${userData.fatigue === level
                                     ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 border shadow-[0_0_15px_rgba(6,182,212,0.3)]'
                                     : 'bg-black/20 border-transparent text-gray-400 hover:bg-black/30 border'

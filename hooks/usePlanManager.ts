@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
-import type { WorkoutHistoryItem } from '../types';
-import { DailyPlan, UserInput } from '../types';
+import { useState, useCallback, useEffect } from 'react';
+import { DailyPlan, ExerciseLog, UserInput, WorkoutHistoryItem } from '../types';
 import { generateDailyPlan, getBasicNutritionPlan } from '../services/geminiService';
-import { debouncedSavePlan } from '../services/supabasePlanSync';
+import { debouncedSavePlan, deletePlanByDate, loadPlanFromSupabase, savePlanToSupabase } from '../services/supabasePlanSync';
 import { enrichWorkoutWithWarmupCooldown } from '../services/warmupCooldownService';
+import { canPerformOnlineAction } from '../services/onlineGuard';
+import { useOnlineStatus } from './useOnlineStatus';
 
 type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
 
@@ -27,13 +28,46 @@ export interface UsePlanManagerReturn {
  */
 export function usePlanManager(
   userData: UserInput,
-  session: any
+  session: any,
+  showToast: (msg: string, type?: 'success' | 'info' | 'error') => void
 ): UsePlanManagerReturn {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>('workout');
+  const userId = session?.user?.id as string | undefined;
+  const online = useOnlineStatus();
+
+  useEffect(() => {
+    if (!userId) {
+      setPlan(null);
+      return;
+    }
+    if (!online) return;
+
+    let isCancelled = false;
+    (async () => {
+      const { plan: cloudPlan, workoutProgress } = await loadPlanFromSupabase(userId);
+      if (isCancelled) return;
+
+      if (!cloudPlan) {
+        setPlan(null);
+        return;
+      }
+
+      setPlan({
+        ...cloudPlan,
+        workoutProgress: workoutProgress && typeof workoutProgress === 'object' && 'checkedState' in workoutProgress
+          ? workoutProgress as { checkedState: Record<string, boolean>; userNote?: string; exerciseLogs?: Record<string, ExerciseLog> }
+          : cloudPlan.workoutProgress,
+      });
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId, online]);
 
   const handleGenerate = useCallback(async (type: ViewMode, currentHistory: WorkoutHistoryItem[]) => {
     if (type === 'history') {
@@ -44,6 +78,12 @@ export function usePlanManager(
       setViewMode('settings');
       return;
     }
+
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để tạo kế hoạch.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('plan-generate', showToast)) return;
 
     setLoading(true);
     setIsStreaming(true);
@@ -63,95 +103,112 @@ export function usePlanManager(
     }
 
     let finalPlan: DailyPlan;
-    setPlan(currentPlan => {
-      if (!currentPlan) {
-        finalPlan = generatedPartial;
-      } else {
-        finalPlan = { ...currentPlan };
-        if (generationType === 'workout') {
-          finalPlan.workout = generatedPartial.workout;
-        }
-        if (generationType === 'nutrition') {
-          finalPlan.nutrition = generatedPartial.nutrition;
-        }
-        finalPlan.date = generatedPartial.date || currentPlan.date;
-      }
-
+    if (!plan) {
+      finalPlan = generatedPartial;
+    } else {
+      finalPlan = { ...plan };
       if (generationType === 'workout') {
-        finalPlan = enrichWorkoutWithWarmupCooldown(finalPlan, userData);
+        finalPlan.workout = generatedPartial.workout;
       }
+      if (generationType === 'nutrition') {
+        finalPlan.nutrition = generatedPartial.nutrition;
+      }
+      finalPlan.date = generatedPartial.date || plan.date;
+    }
 
-      localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
-      localStorage.removeItem('workout_progress');
-      return finalPlan;
-    });
+    if (generationType === 'workout') {
+      finalPlan = enrichWorkoutWithWarmupCooldown(finalPlan, userData);
+      finalPlan.workoutProgress = undefined;
+    }
+
+    setPlan(finalPlan);
+    const saved = await savePlanToSupabase(userId, finalPlan, undefined);
+    if (saved === false) {
+      showToast('Không thể lưu kế hoạch lên máy chủ.', 'error');
+      setLoading(false);
+      setIsStreaming(false);
+      return;
+    }
 
     setViewMode(generationType);
     setLoading(false);
     setIsStreaming(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [session?.user?.id, userData]);
+  }, [plan, showToast, userData, userId]);
 
   const handleReset = useCallback((type: 'workout' | 'nutrition') => {
-    setPlan(currentPlan => {
-      if (!currentPlan) {
-        localStorage.removeItem('daily_plan_cache');
-        localStorage.removeItem('workout_progress');
-        return null;
-      }
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để reset kế hoạch.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('plan-reset', showToast)) return;
 
-      const updatedPlan = { ...currentPlan };
+    if (!plan) {
+      const dateKey = new Date().toISOString().split('T')[0];
+      void deletePlanByDate(userId, dateKey);
+      setPlan(null);
+      return;
+    }
 
-      if (type === 'workout') {
-        updatedPlan.workout = {
-          summary: '', detail: { levelName: '', description: '', warmup: [], morning: [], evening: [], cooldown: [] },
-          isGenerated: false
-        };
-        updatedPlan.workoutProgress = undefined;
-        localStorage.removeItem('workout_progress');
-      }
+    const updatedPlan = { ...plan };
 
-      if (type === 'nutrition') {
-        updatedPlan.nutrition = {
-          totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
-          advice: '', isGenerated: false, meals: []
-        };
-      }
+    if (type === 'workout') {
+      updatedPlan.workout = {
+        summary: '', detail: { levelName: '', description: '', warmup: [], morning: [], evening: [], cooldown: [] },
+        isGenerated: false
+      };
+      updatedPlan.workoutProgress = undefined;
+    }
 
-      const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
-      if (bothBlank) {
-        localStorage.removeItem('daily_plan_cache');
-        return null;
-      } else {
-        localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
-        return updatedPlan;
-      }
-    });
-  }, []);
+    if (type === 'nutrition') {
+      updatedPlan.nutrition = {
+        totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
+        advice: '', isGenerated: false, meals: []
+      };
+    }
+
+    const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
+    if (bothBlank) {
+      const dateKey = new Date().toISOString().split('T')[0];
+      void deletePlanByDate(userId, dateKey);
+      setPlan(null);
+    } else {
+      setPlan(updatedPlan);
+      void savePlanToSupabase(userId, updatedPlan, undefined);
+    }
+  }, [plan, showToast, userId]);
 
   const handleStartTracking = useCallback(() => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để lưu kế hoạch.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('plan-start-tracking', showToast)) return;
+
     const basicPlan = getBasicNutritionPlan(userData);
 
-    setPlan(currentPlan => {
-      let finalPlan = basicPlan;
-      if (currentPlan) {
-        finalPlan = { ...currentPlan, nutrition: basicPlan.nutrition };
-      }
-      localStorage.setItem('daily_plan_cache', JSON.stringify(finalPlan));
-      return finalPlan;
-    });
+    let finalPlan = basicPlan;
+    if (plan) {
+      finalPlan = { ...plan, nutrition: basicPlan.nutrition };
+    }
+
+    setPlan(finalPlan);
+    void savePlanToSupabase(userId, finalPlan, undefined);
 
     setViewMode('nutrition');
-  }, [userData]);
+  }, [plan, showToast, userData, userId]);
 
   const handleUpdatePlan = useCallback((updatedPlan: DailyPlan) => {
-    setPlan(updatedPlan);
-    localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
-
-    if (session?.user) {
-      debouncedSavePlan(session.user.id, updatedPlan);
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để cập nhật kế hoạch.', 'error');
+      return;
     }
-  }, [session]);
+    if (!canPerformOnlineAction('plan-update', showToast)) return;
+
+    setPlan(updatedPlan);
+
+    debouncedSavePlan(userId, updatedPlan);
+  }, [showToast, userId]);
 
   return {
     plan,

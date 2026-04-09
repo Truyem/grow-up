@@ -26,22 +26,26 @@ import { Sparkles, Settings } from 'lucide-react';
 
 import { scheduleAllDailyNotifications } from './services/scheduleNotifications';
 import { AppProvider } from './context';
+import { canPerformOnlineAction } from './services/onlineGuard';
 
 import {
   useAuth,
   useUserData,
   useWorkoutHistory,
   usePlanManager,
-  useAutoSave,
   useTour,
   useSupabaseSleepRecoverySync,
   useSupabaseProfileSync,
-  useSupabaseWorkoutHistorySync,
 } from './hooks';
+import { UserGoals, UserInput } from './types';
 
 export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => setToastMessage(msg);
+  const [toastType, setToastType] = useState<'success' | 'info' | 'error'>('success');
+  const showToast = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+  };
 
   // 1. Auth Hook
   const { session, isAuthChecking, signOut } = useAuth();
@@ -54,6 +58,16 @@ export default function App() {
     sleepRecovery, setSleepRecovery,
   } = useUserData();
 
+  const setUserDataOnline: React.Dispatch<React.SetStateAction<UserInput>> = (value) => {
+    if (!canPerformOnlineAction('user-settings-update', showToast)) return;
+    setUserData(value);
+  };
+
+  const setUserGoalsOnline: React.Dispatch<React.SetStateAction<UserGoals | null>> = (value) => {
+    if (!canPerformOnlineAction('user-goals-update', showToast)) return;
+    setUserGoals(value);
+  };
+
   // 3. Plan Manager Hook
   const {
     plan, setPlan,
@@ -65,11 +79,11 @@ export default function App() {
     handleReset,
     handleStartTracking,
     handleUpdatePlan
-  } = usePlanManager(userData, session);
+  } = usePlanManager(userData, session, showToast);
 
   // 4. Workout History Hook
   const {
-    workoutHistory, setWorkoutHistory,
+    workoutHistory,
     handleCompleteWorkout,
     handleCompleteNutrition,
     handleDeleteHistoryItem,
@@ -77,7 +91,7 @@ export default function App() {
     handleSickDay,
     isRefreshing,
     calculateStreak
-  } = useWorkoutHistory(userData, userStats, setUserStats, plan, setPlan, showToast);
+  } = useWorkoutHistory(userData, userStats, setUserStats, plan, setPlan, showToast, session?.user?.id);
 
   // Auto-update streak
   useEffect(() => {
@@ -88,22 +102,18 @@ export default function App() {
     }
   }, [workoutHistory, calculateStreak, userStats, setUserStats]);
 
-  // 5. Auto Save Hook
-  useAutoSave(workoutHistory, setWorkoutHistory, userData, setPlan, setViewMode, setUserData, showToast);
-
-  // 6. Tour Hook
+  // 5. Tour Hook
   const { isTourOpen, tourSteps, handleTourComplete } = useTour(
-    userData, setUserData, planLoading, setViewMode, setPlan, handleStartTracking, showToast
+    userData, setUserDataOnline, planLoading, setViewMode, setPlan, handleStartTracking, showToast
   );
 
-  // 7. Supabase background sync (localStorage -> cloud)
+  // 6. Supabase background sync (state -> cloud)
   useSupabaseProfileSync(
     session?.user?.id,
     userData, setUserData,
     userStats, setUserStats,
     userGoals, setUserGoals
   );
-  useSupabaseWorkoutHistorySync(session?.user?.id, workoutHistory);
   useSupabaseSleepRecoverySync(session?.user?.id, sleepRecovery, setSleepRecovery);
 
   // Native Notifications
@@ -115,7 +125,7 @@ export default function App() {
   }, [session?.user?.id, plan]);
 
   const isLoading = planLoading || isAuthChecking;
-  const handleCompleteWorkoutWithSleep = (
+  const handleCompleteWorkoutWithSleep = async (
     levelSelected: string,
     summary: string,
     completedExercises: string[],
@@ -123,7 +133,13 @@ export default function App() {
     nutrition: any,
     exerciseLogs?: any[]
   ) => {
-    handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
+    if (!canPerformOnlineAction('complete-workout', showToast)) return;
+
+    try {
+      await handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
+    } catch {
+      return;
+    }
 
     if (userData.tempSleepHours !== undefined && userData.tempSleepHours > 0) {
       const { createSleepRecoveryEntry } = require('./services/sleepRecoveryService');
@@ -134,11 +150,12 @@ export default function App() {
   };
 
   const appContextValue = {
+    userId: session?.user?.id,
     userData,
-    setUserData,
+    setUserData: setUserDataOnline,
     userStats,
     userGoals,
-    setUserGoals,
+    setUserGoals: setUserGoalsOnline,
     sleepRecovery,
     setSleepRecovery,
     plan,
@@ -154,6 +171,7 @@ export default function App() {
     deleteHistoryItem: handleDeleteHistoryItem,
     refreshHistory: handleRefreshHistory,
     sickDay: handleSickDay,
+    showToast,
   };
 
   return (
@@ -230,7 +248,7 @@ export default function App() {
                       <PlanDisplay
                         plan={plan}
                         onReset={handleReset}
-                        onComplete={handleCompleteWorkout}
+                        onComplete={handleCompleteWorkoutWithSleep}
                         onUpdatePlan={handleUpdatePlan}
                       />
                     </Suspense>
@@ -293,7 +311,7 @@ export default function App() {
           message={toastMessage || ''}
           isOpen={!!toastMessage}
           onClose={() => setToastMessage(null)}
-          type="success"
+          type={toastType}
           duration={6000}
         />
       </div>

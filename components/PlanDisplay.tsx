@@ -17,7 +17,7 @@ import { calculateWorkoutCalories, formatDuration } from '../services/metCalorie
 interface PlanDisplayProps {
   plan: DailyPlan;
   onReset: (type: 'workout' | 'nutrition') => void;
-  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => void;
+  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => Promise<void>;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
 }
 
@@ -324,7 +324,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
 
 
 export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete, onUpdatePlan }) => {
-  const { userData, workoutHistory } = useAppContext();
+  const { userData, workoutHistory, showToast } = useAppContext();
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -366,47 +366,24 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalExercises > 0 ? Math.round((checkedCount / totalExercises) * 100) : 0;
 
-  // Restore progress from local storage or plan.workoutProgress (Supabase cross-device)
+  // Restore progress from Supabase-backed plan payload
   useEffect(() => {
-    const savedProgressStr = localStorage.getItem('workout_progress');
-    if (savedProgressStr) {
-      try {
-        const savedProgress = JSON.parse(savedProgressStr);
-        if (savedProgress.planDate === plan.date) {
-          setCheckedState(savedProgress.checkedState || {});
-          setUserNote(savedProgress.userNote || '');
-          setExerciseLogs(savedProgress.exerciseLogs || {});
-          return; // Found local progress, skip Supabase fallback
-        }
-      } catch (e) {
-        console.error("Failed to restore progress", e);
-      }
-    }
-
-    // Fallback: restore from plan.workoutProgress (loaded from Supabase)
     if (plan.workoutProgress?.checkedState) {
       setCheckedState(plan.workoutProgress.checkedState);
       setUserNote(plan.workoutProgress.userNote || '');
       setExerciseLogs(plan.workoutProgress.exerciseLogs || {});
       console.log('[PlanDisplay] Restored progress from Supabase');
+    } else {
+      setCheckedState({});
+      setUserNote('');
+      setExerciseLogs({});
     }
   }, [plan.date]);
 
-  // Save progress to local storage + sync to Supabase whenever it changes
+  // Save progress to Supabase whenever it changes
   useEffect(() => {
     if (!isCompleted) {
-      const progressData = {
-        planDate: plan.date,
-        checkedState,
-        userNote,
-        exerciseLogs,
-        lastUpdated: Date.now()
-      };
-      // Save locally for offline fallback
-      localStorage.setItem('workout_progress', JSON.stringify(progressData));
-
-      // Sync to Supabase via onUpdatePlan (debounced in App.tsx)
-      // Only sync if there are actual checked items to avoid initial empty state overwrite
+      // Sync to Supabase via onUpdatePlan (debounced in hook)
       if (Object.keys(checkedState).length > 0) {
         const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote, exerciseLogs } };
         onUpdatePlan(updatedPlan);
@@ -548,9 +525,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
     const completedExercisesList = [...completedWarmup, ...completedMorning, ...completedEvening, ...completedCooldown];
 
-    // Clear the progress cache since we are finishing it
-    localStorage.removeItem('workout_progress');
-
     const finalNutrition = {
       ...plan.nutrition,
       // cost handled in NutritionDisplay if editable there, but here we just pass current
@@ -570,7 +544,10 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       userNote,
       finalNutrition,
       completedLogs.length > 0 ? completedLogs : undefined
-    );
+    ).catch(() => {
+      setIsCompleted(false);
+      showToast('Không thể hoàn thành buổi tập khi đang offline.', 'error');
+    });
   };
 
   const handleAutoAddExercise = async (section: 'morning' | 'evening') => {

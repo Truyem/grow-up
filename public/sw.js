@@ -1,52 +1,22 @@
 // Service Worker for Web Push Notifications - GrowUp App
-const CACHE_NAME = 'growup-v2';
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
+// Strict online-only mode: do not cache application assets/data.
 
 // ============================================================
 // Install & Activate
 // ============================================================
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+  event.waitUntil(Promise.resolve());
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Remove old caches
+  // Remove all old caches from previous versions.
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+        keys.map((key) => caches.delete(key))
       )
     ).then(() => clients.claim())
-  );
-});
-
-// ============================================================
-// Fetch: Network-first for API, Cache-first for assets
-// ============================================================
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // Skip cross-origin requests and non-GET
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  // Skip Supabase API calls
-  if (url.hostname.includes('supabase')) return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Clone & cache successful responses for static assets
-        if (response && response.status === 200 && url.pathname.startsWith('/assets/')) {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
   );
 });
 

@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { WorkoutHistoryItem, UserInput, UserStats, DailyPlan, ExerciseLog } from '../types';
-import { syncWorkoutHistoryToSupabase } from '../services/supabasePlanSync';
+import { deletePlanByDate, deleteWorkoutHistoryItemFromSupabase, loadWorkoutHistoryFromSupabase, savePlanToSupabase, syncUserStatsToSupabase, upsertWorkoutHistoryItemToSupabase } from '../services/supabasePlanSync';
+import { canPerformOnlineAction } from '../services/onlineGuard';
+import { useOnlineStatus } from './useOnlineStatus';
 
 // Helper: get today string in Vietnamese format (matches original App.tsx)
 const getTodayString = (): string => {
@@ -62,18 +64,17 @@ export interface UseWorkoutHistoryReturn {
     userNotes: string,
     nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
-  ) => void;
-  handleCompleteNutrition: (nutrition: DailyPlan['nutrition']) => void;
-  handleDeleteHistoryItem: (timestamp: number) => void;
+  ) => Promise<void>;
+  handleCompleteNutrition: (nutrition: DailyPlan['nutrition']) => Promise<void>;
+  handleDeleteHistoryItem: (timestamp: number) => Promise<void>;
   handleRefreshHistory: () => Promise<void>;
-  handleSickDay: () => void;
+  handleSickDay: () => Promise<void>;
   isRefreshing: boolean;
   calculateStreak: () => number;
 }
 
 /**
- * Hook for managing workout history CRUD operations.
- * All data persisted in localStorage key 'gym_history'.
+ * Hook for managing workout history CRUD operations backed by Supabase.
  */
 export function useWorkoutHistory(
   userData: UserInput,
@@ -81,43 +82,37 @@ export function useWorkoutHistory(
   setUserStats: React.Dispatch<React.SetStateAction<UserStats>>,
   plan: DailyPlan | null,
   setPlan: React.Dispatch<React.SetStateAction<DailyPlan | null>>,
-  showToast: (msg: string) => void
+  showToast: (msg: string, type?: 'success' | 'info' | 'error') => void,
+  userId?: string
 ): UseWorkoutHistoryReturn {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const online = useOnlineStatus();
 
   useEffect(() => {
-    const savedHistoryStr = localStorage.getItem('gym_history');
-    if (savedHistoryStr) {
-      try {
-        const loadedHistory: WorkoutHistoryItem[] = JSON.parse(savedHistoryStr);
-        const uniqueHistoryMap = new Map<string, WorkoutHistoryItem>();
-        loadedHistory.forEach(item => {
-          if (uniqueHistoryMap.has(item.date)) {
-            const existing = uniqueHistoryMap.get(item.date)!;
-            const existingCount = existing.completedExercises?.length || 0;
-            const newCount = item.completedExercises?.length || 0;
-            if (newCount > existingCount || (newCount === existingCount && item.timestamp > existing.timestamp)) {
-              uniqueHistoryMap.set(item.date, item);
-            }
-          } else {
-            uniqueHistoryMap.set(item.date, item);
-          }
-        });
-        const finalHistory = Array.from(uniqueHistoryMap.values())
-          .sort((a, b) => b.timestamp - a.timestamp);
-        setWorkoutHistory(finalHistory);
-      } catch (e) {
-        console.error("Failed to load workout history", e);
-      }
+    if (!userId || !online) {
+      setWorkoutHistory([]);
+      return;
     }
-  }, []);
+
+    let isCancelled = false;
+
+    (async () => {
+      const history = await loadWorkoutHistoryFromSupabase(userId);
+      if (isCancelled) return;
+      setWorkoutHistory(history);
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId, online]);
 
   const calculateStreak = useCallback(() => {
     return calculateWeeklyStreak(workoutHistory);
   }, [workoutHistory]);
 
-  const handleCompleteWorkout = useCallback((
+  const handleCompleteWorkout = useCallback(async (
     levelSelected: string,
     summary: string,
     completedExercises: string[],
@@ -125,6 +120,14 @@ export function useWorkoutHistory(
     nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
   ) => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để lưu dữ liệu.', 'error');
+      throw new Error('AUTH_REQUIRED');
+    }
+    if (!canPerformOnlineAction('history-complete-workout', showToast)) {
+      throw new Error('OFFLINE_BLOCKED');
+    }
+
     const now = new Date();
     const todayDateStr = getTodayString();
     const exercisesSummary = completedExercises.length > 0
@@ -164,33 +167,43 @@ export function useWorkoutHistory(
       }
     }
 
+    const savedHistory = await upsertWorkoutHistoryItemToSupabase(userId, itemToSave);
+    if (!savedHistory) {
+      showToast('Không thể lưu lịch sử tập lên máy chủ.', 'error');
+      throw new Error('SAVE_FAILED');
+    }
+
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
-    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
 
     // Mark workout as completed in plan
     if (plan) {
       const updatedPlan = { ...plan };
       updatedPlan.workout = { ...updatedPlan.workout, isGenerated: false };
       updatedPlan.workoutProgress = undefined;
+      const dateKey = now.toISOString().split('T')[0];
 
       const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
       if (bothBlank) {
         setPlan(null);
-        localStorage.removeItem('daily_plan_cache');
-        localStorage.removeItem('workout_progress');
+        await deletePlanByDate(userId, dateKey);
       } else {
         setPlan(updatedPlan);
-        localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
-        localStorage.removeItem('workout_progress');
+        await savePlanToSupabase(userId, updatedPlan, undefined, dateKey);
       }
     }
 
     showToast(`Đã lưu buổi tập: ${completedExercises.length} bài tập hoàn thành!`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [workoutHistory, userData.weight, plan, setPlan, showToast]);
+  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId]);
 
-  const handleCompleteNutrition = useCallback((nutrition: DailyPlan['nutrition']) => {
+  const handleCompleteNutrition = useCallback(async (nutrition: DailyPlan['nutrition']) => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để lưu dữ liệu.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('history-complete-nutrition', showToast)) return;
+
     const now = new Date();
     const todayDateStr = getTodayString();
     const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -225,64 +238,74 @@ export function useWorkoutHistory(
       };
     }
 
+    const savedHistory = await upsertWorkoutHistoryItemToSupabase(userId, itemToSave);
+    if (!savedHistory) {
+      showToast('Không thể lưu nhật ký dinh dưỡng lên máy chủ.', 'error');
+      return;
+    }
+
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
-    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
 
     if (plan) {
       const updatedPlan = { ...plan };
       updatedPlan.nutrition = { ...updatedPlan.nutrition, isGenerated: false };
       setPlan(updatedPlan);
-      localStorage.setItem('daily_plan_cache', JSON.stringify(updatedPlan));
+      const dateKey = now.toISOString().split('T')[0];
+      await savePlanToSupabase(userId, updatedPlan, undefined, dateKey);
     }
 
     showToast(`Đã lưu thực đơn dinh dưỡng: ${nutrition.totalCalories} kcal, ${nutrition.totalProtein}g protein!`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [workoutHistory, userData.weight, plan, setPlan, showToast]);
+  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId]);
 
-  const handleDeleteHistoryItem = useCallback((timestamp: number) => {
+  const handleDeleteHistoryItem = useCallback(async (timestamp: number) => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để xoá dữ liệu.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('history-delete-item', showToast)) return;
+
     const updatedHistory = workoutHistory.filter(item => item.timestamp !== timestamp);
+    const deleted = await deleteWorkoutHistoryItemFromSupabase(userId, timestamp);
+    if (!deleted) {
+      showToast('Không thể xoá lịch sử tập trên máy chủ.', 'error');
+      return;
+    }
     setWorkoutHistory(updatedHistory);
-    localStorage.setItem('gym_history', JSON.stringify(updatedHistory));
-  }, [workoutHistory]);
+  }, [workoutHistory, showToast, userId]);
 
   const handleRefreshHistory = useCallback(async () => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để làm mới lịch sử.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('history-refresh', showToast)) return;
+
     setIsRefreshing(true);
     try {
-      const savedHistoryStr = localStorage.getItem('gym_history');
-      if (savedHistoryStr) {
-        const loadedHistory: WorkoutHistoryItem[] = JSON.parse(savedHistoryStr);
-        const uniqueHistoryMap = new Map<string, WorkoutHistoryItem>();
-        loadedHistory.forEach(item => {
-          if (uniqueHistoryMap.has(item.date)) {
-            const existing = uniqueHistoryMap.get(item.date)!;
-            const existingCount = existing.completedExercises?.length || 0;
-            const newCount = item.completedExercises?.length || 0;
-            if (newCount > existingCount || (newCount === existingCount && item.timestamp > existing.timestamp)) {
-              uniqueHistoryMap.set(item.date, item);
-            }
-          } else {
-            uniqueHistoryMap.set(item.date, item);
-          }
-        });
-        const finalHistory = Array.from(uniqueHistoryMap.values())
-          .sort((a, b) => b.timestamp - a.timestamp);
-        setWorkoutHistory(finalHistory);
-        showToast("Đã làm mới lịch sử thành công!");
-      }
+      const finalHistory = await loadWorkoutHistoryFromSupabase(userId);
+      setWorkoutHistory(finalHistory);
+      showToast("Đã làm mới lịch sử thành công!");
     } catch (err) {
       console.error("Refresh error:", err);
-      showToast("Có lỗi xảy ra khi làm mới");
+      showToast("Có lỗi xảy ra khi làm mới", 'error');
     } finally {
       setIsRefreshing(false);
     }
-  }, [showToast]);
+  }, [showToast, userId]);
 
-  const handleSickDay = useCallback(() => {
+  const handleSickDay = useCallback(async () => {
+    if (!userId) {
+      showToast('Bạn cần đăng nhập để lưu ngày ốm.', 'error');
+      return;
+    }
+    if (!canPerformOnlineAction('history-sick-day', showToast)) return;
+
     const todayDate = new Date().toDateString();
     const updatedStats = { ...userStats, lastLoginDate: todayDate };
     setUserStats(updatedStats);
-    localStorage.setItem('user_stats', JSON.stringify(updatedStats));
+    await syncUserStatsToSupabase(userId, updatedStats);
 
     const todayStr = getTodayString();
     const sickDayEntry: WorkoutHistoryItem = {
@@ -299,12 +322,16 @@ export function useWorkoutHistory(
     const alreadySickToday = workoutHistory.some(h => h.date === todayStr && h.levelSelected === 'Ốm/Bệnh');
     if (!alreadySickToday) {
       const newHistory = [sickDayEntry, ...workoutHistory];
+      const saved = await upsertWorkoutHistoryItemToSupabase(userId, sickDayEntry);
+      if (!saved) {
+        showToast('Không thể lưu ngày ốm lên máy chủ.', 'error');
+        return;
+      }
       setWorkoutHistory(newHistory);
-      localStorage.setItem('gym_history', JSON.stringify(newHistory));
     }
 
     showToast(`Đã đánh dấu ngày ốm. Chuỗi ${userStats.streak} ngày của bạn được giữ nguyên! Hãy nghỉ ngơi và hồi phục nhé.`);
-  }, [workoutHistory, userData.weight, userStats, setUserStats, showToast]);
+  }, [workoutHistory, userData.weight, userStats, setUserStats, showToast, userId]);
 
   return {
     workoutHistory,
@@ -317,13 +344,6 @@ export function useWorkoutHistory(
     isRefreshing,
     calculateStreak,
   };
-}
-
-export function useSupabaseWorkoutHistorySync(userId?: string, workoutHistory?: WorkoutHistoryItem[]) {
-  useEffect(() => {
-    if (!userId || !workoutHistory) return;
-    syncWorkoutHistoryToSupabase(userId, workoutHistory);
-  }, [userId, workoutHistory]);
 }
 
 export { getTodayString, calculateWeeklyStreak };
