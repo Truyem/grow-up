@@ -4,9 +4,19 @@ export interface SleepRecoveryDraft {
   sleepHours: number;
 }
 
+export const MIN_SLEEP_HOURS = 3;
+export const MAX_SLEEP_HOURS = 12;
+export const DEFAULT_SLEEP_HOURS = 8;
+
+export const clampSleepHours = (sleepHours: number): number => {
+  if (!Number.isFinite(sleepHours)) return DEFAULT_SLEEP_HOURS;
+  return Math.min(MAX_SLEEP_HOURS, Math.max(MIN_SLEEP_HOURS, sleepHours));
+};
+
 export const inferSleepQuality = (sleepHours: number): SleepQuality => {
-  if (sleepHours < 6) return 'bad';
-  if (sleepHours < 7.5) return 'average';
+  const normalizedHours = clampSleepHours(sleepHours);
+  if (normalizedHours < 6) return 'bad';
+  if (normalizedHours < 7.5) return 'average';
   return 'good';
 };
 
@@ -26,12 +36,13 @@ const getDateLabel = (timestamp: number) => {
 
 export const createSleepRecoveryEntry = (draft: SleepRecoveryDraft): SleepRecoveryEntry => {
   const timestamp = Date.now();
+  const normalizedHours = clampSleepHours(draft.sleepHours);
   return {
     id: `sr-${timestamp}`,
     timestamp,
     date: getDateLabel(timestamp),
-    sleepHours: draft.sleepHours,
-    sleepQuality: inferSleepQuality(draft.sleepHours),
+    sleepHours: normalizedHours,
+    sleepQuality: inferSleepQuality(normalizedHours),
   };
 };
 

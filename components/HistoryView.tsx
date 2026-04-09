@@ -5,7 +5,7 @@ import { ActivityRings } from './ui/ActivityRings';
 import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { generateAIOverview } from '../services/geminiService';
-import { getSleepQualityLabel } from '../services/sleepRecoveryService';
+import { DEFAULT_SLEEP_HOURS, MAX_SLEEP_HOURS, MIN_SLEEP_HOURS, getSleepQualityLabel } from '../services/sleepRecoveryService';
 
 // Lazy load the heavy charts component (contains all recharts)
 const StatsCharts = lazy(() => import('./ui/StatsCharts'));
@@ -47,6 +47,8 @@ const RING_GOALS = {
   protein: 100,    // ~100g protein
 };
 
+const SLEEP_GOAL_HOURS = DEFAULT_SLEEP_HOURS;
+
 export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing, sleepRecovery = [] }) => {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
@@ -76,6 +78,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
     });
     return map;
   }, [history]);
+
+  const sleepByDate = useMemo(() => {
+    const map = new Map<string, SleepRecoveryEntry>();
+    sleepRecovery.forEach((entry) => {
+      const d = new Date(entry.timestamp);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const existing = map.get(key);
+      if (!existing || entry.timestamp > existing.timestamp) {
+        map.set(key, entry);
+      }
+    });
+    return map;
+  }, [sleepRecovery]);
 
   // --- Calendar grid ---
   const calendarGrid = useMemo(() => {
@@ -253,22 +268,90 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
     return [...sleepRecovery].sort((a, b) => b.timestamp - a.timestamp)[0];
   }, [sleepRecovery]);
 
+  const sleepStats = useMemo(() => {
+    if (!sleepRecovery.length) {
+      return {
+        averageHours: 0,
+        maxHours: 0,
+        minHours: 0,
+        totalEntries: 0,
+        goodNights: 0,
+      };
+    }
+
+    const totalHours = sleepRecovery.reduce((sum, item) => sum + item.sleepHours, 0);
+    const averageHours = Number((totalHours / sleepRecovery.length).toFixed(1));
+    const maxHours = Number(Math.max(...sleepRecovery.map((item) => item.sleepHours)).toFixed(1));
+    const minHours = Number(Math.min(...sleepRecovery.map((item) => item.sleepHours)).toFixed(1));
+    const goodNights = sleepRecovery.filter((item) => item.sleepQuality === 'good').length;
+
+    return {
+      averageHours,
+      maxHours,
+      minHours,
+      totalEntries: sleepRecovery.length,
+      goodNights,
+    };
+  }, [sleepRecovery]);
+
   return (
     <div id="tour-history-calendar" className="space-y-6 animate-fade-in relative pb-8">
 
       {/* --- HEADER & CONTROLS --- */}
       <div className="flex flex-col gap-4">
-        {latestRecovery && (
-          <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-2xl p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-2xl p-3 space-y-3 text-xs">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="text-indigo-300 uppercase tracking-wide">Giấc ngủ</div>
-              <div className="text-gray-400">{latestRecovery.date}</div>
+              <div className="text-indigo-300 uppercase tracking-wide">Thống kê giấc ngủ</div>
+              <div className="text-gray-400">
+                Mục tiêu vòng ngủ: {SLEEP_GOAL_HOURS}h (giới hạn {MIN_SLEEP_HOURS}h - {MAX_SLEEP_HOURS}h)
+              </div>
             </div>
-            <div className="text-white">Số giờ ngủ: {latestRecovery.sleepHours}h</div>
-            <div className="text-white">Chất lượng giấc ngủ: {getSleepQualityLabel(latestRecovery.sleepQuality)}</div>
-            <div className="text-white">Trạng thái: đã ghi nhận</div>
+            {latestRecovery && (
+              <div className="text-right text-gray-300">
+                <div>Gần nhất: {latestRecovery.sleepHours}h</div>
+                <div>{latestRecovery.date}</div>
+              </div>
+            )}
           </div>
-        )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="text-indigo-200/80 border-b border-indigo-500/20">
+                  <th className="py-1 pr-2 font-semibold">Chỉ số</th>
+                  <th className="py-1 pr-2 font-semibold">Giá trị</th>
+                </tr>
+              </thead>
+              <tbody className="text-white/90">
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-2">Số bản ghi</td>
+                  <td className="py-1 pr-2">{sleepStats.totalEntries}</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-2">Trung bình</td>
+                  <td className="py-1 pr-2">{sleepStats.totalEntries ? `${sleepStats.averageHours}h` : '--'}</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-2">Cao nhất</td>
+                  <td className="py-1 pr-2">{sleepStats.totalEntries ? `${sleepStats.maxHours}h` : '--'}</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-2">Thấp nhất</td>
+                  <td className="py-1 pr-2">{sleepStats.totalEntries ? `${sleepStats.minHours}h` : '--'}</td>
+                </tr>
+                <tr>
+                  <td className="py-1 pr-2">Đêm ngủ tốt</td>
+                  <td className="py-1 pr-2">{sleepStats.goodNights}/{sleepStats.totalEntries}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {latestRecovery && (
+            <div className="text-indigo-100 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-2.5 py-2">
+              Chất lượng gần nhất: <span className="font-semibold">{getSleepQualityLabel(latestRecovery.sleepQuality)}</span>
+            </div>
+          )}
+        </div>
         {/* Top Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-purple-900/20 border border-purple-500/20 rounded-2xl p-4 flex flex-col justify-center items-center shadow-lg">
@@ -411,6 +494,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             <div className="w-2.5 h-2.5 rounded-full bg-[#00d4aa]" />
             <span className="text-[10px] text-gray-400">Protein</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#60a5fa]" />
+            <span className="text-[10px] text-gray-400">Giấc ngủ</span>
+          </div>
         </div>
 
         {/* Weekday Headers */}
@@ -441,6 +528,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             const moveProgress = exercisesCount / RING_GOALS.exercises;
             const exerciseProgress = calories / RING_GOALS.calories;
             const standProgress = protein / RING_GOALS.protein;
+            const sleepEntry = sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${day}`);
+            const sleepProgress = (sleepEntry?.sleepHours || 0) / SLEEP_GOAL_HOURS;
 
             // Check if day is in the future
             const dayDate = new Date(calendarDate.year, calendarDate.month, day);
@@ -467,6 +556,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                     move={moveProgress}
                     exercise={exerciseProgress}
                     stand={standProgress}
+                    sleep={sleepProgress}
                     size={36}
                     isToday={today}
                   />
@@ -508,7 +598,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
               </div>
 
               {/* Ring Stats */}
-              <div className="grid grid-cols-5 gap-2 mt-2">
+              <div className="grid grid-cols-6 gap-2 mt-2">
                 <div className="text-center bg-black/30 rounded-lg p-2">
                   <div className="text-[10px] text-[#fa114f] font-bold">Bài tập</div>
                   <div className="text-sm font-bold text-white">{selectedDayItem.completedExercises?.length || 0}</div>
@@ -528,6 +618,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                 <div className="text-center bg-black/30 rounded-lg p-2">
                   <div className="text-[10px] text-yellow-400 font-bold">Fat</div>
                   <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalFat || 0}g</div>
+                </div>
+                <div className="text-center bg-black/30 rounded-lg p-2">
+                  <div className="text-[10px] text-[#60a5fa] font-bold">Giấc ngủ</div>
+                  <div className="text-sm font-bold text-white">
+                    {sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${selectedDay}`)?.sleepHours || 0}h
+                  </div>
                 </div>
               </div>
 

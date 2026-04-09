@@ -7,6 +7,8 @@ interface ActivityRingsProps {
     exercise: number;
     /** 0-1 progress for inner ring (protein) */
     stand: number;
+    /** 0-1 progress for sleep ring */
+    sleep?: number;
     /** Size in px */
     size?: number;
     /** Whether this is today */
@@ -17,17 +19,19 @@ export const ActivityRings: React.FC<ActivityRingsProps> = ({
     move,
     exercise,
     stand,
+    sleep = 0,
     size = 44,
     isToday = false,
 }) => {
     const center = size / 2;
-    const strokeWidth = size * 0.11;
+    const strokeWidth = size * 0.09;
     const gap = strokeWidth * 0.45;
 
-    // Radii for 3 rings (outer → inner)
+    // Radii for 4 rings (outer → inner)
     const r1 = center - strokeWidth / 2 - 1;
     const r2 = r1 - strokeWidth - gap;
     const r3 = r2 - strokeWidth - gap;
+    const r4 = r3 - strokeWidth - gap;
 
     const clamp = (v: number) => Math.min(Math.max(v, 0), 1);
 
@@ -35,6 +39,7 @@ export const ActivityRings: React.FC<ActivityRingsProps> = ({
         { r: r1, progress: clamp(move), color: '#fa114f', bgColor: '#3a0a1a' },      // Red
         { r: r2, progress: clamp(exercise), color: '#92e82a', bgColor: '#1a2a0a' },   // Green  
         { r: r3, progress: clamp(stand), color: '#00d4aa', bgColor: '#0a1a1a' },      // Teal/Cyan
+        { r: r4, progress: clamp(sleep), color: '#60a5fa', bgColor: '#0a1426' },      // Blue (Sleep)
     ];
 
     return (

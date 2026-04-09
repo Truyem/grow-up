@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { DailyPlan, SleepRecoveryEntry, UserGoals, UserInput, UserStats, WorkoutHistoryItem } from '../types';
+import { clampSleepHours, inferSleepQuality } from './sleepRecoveryService';
 
 // ========================================
 // Debounce utility
@@ -385,6 +386,15 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
 
 export const syncSleepRecoveryToSupabase = async (userId: string, sleepRecovery: SleepRecoveryEntry[]) => {
     try {
+        const normalizedSleepRecovery = (sleepRecovery || []).map((item) => {
+            const normalizedHours = clampSleepHours(item.sleepHours);
+            return {
+                ...item,
+                sleepHours: normalizedHours,
+                sleepQuality: inferSleepQuality(normalizedHours),
+            };
+        });
+
         const { data: existing } = await supabase
             .from('profiles')
             .select('settings')
@@ -397,7 +407,7 @@ export const syncSleepRecoveryToSupabase = async (userId: string, sleepRecovery:
 
         const mergedSettings = {
             ...existingSettings,
-            sleepRecovery,
+            sleepRecovery: normalizedSleepRecovery,
         };
 
         const { error } = await supabase
@@ -435,12 +445,23 @@ export const loadSleepRecoveryFromSupabase = async (userId: string): Promise<Sle
         const settings = (data?.settings && typeof data.settings === 'object') ? data.settings as any : {};
         const cloudSleep = Array.isArray(settings.sleepRecovery) ? settings.sleepRecovery : [];
 
-        return cloudSleep.filter((item: any) =>
-            item &&
-            typeof item.timestamp === 'number' &&
-            typeof item.sleepHours === 'number' &&
-            typeof item.sleepQuality === 'string'
-        ) as SleepRecoveryEntry[];
+        return cloudSleep
+            .filter((item: any) =>
+                item &&
+                typeof item.timestamp === 'number' &&
+                typeof item.sleepHours === 'number'
+            )
+            .map((item: any) => {
+                const normalizedHours = clampSleepHours(item.sleepHours);
+                return {
+                    id: typeof item.id === 'string' ? item.id : `sr-${item.timestamp}`,
+                    timestamp: item.timestamp,
+                    date: typeof item.date === 'string' ? item.date : new Date(item.timestamp).toLocaleDateString('vi-VN'),
+                    sleepHours: normalizedHours,
+                    sleepQuality: inferSleepQuality(normalizedHours),
+                } as SleepRecoveryEntry;
+            })
+            .sort((a, b) => b.timestamp - a.timestamp);
     } catch (err) {
         console.error('[ProfileSync] sleep recovery load unexpected error:', err);
         return [];
