@@ -181,6 +181,7 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
                             >
                                 <option value="g">Gam</option>
                                 <option value="ml">Lít/ml</option>
+                                <option value="qty">Số lượng</option>
                             </select>
                             <button
                                 onClick={handleAddFridgeItem}
@@ -201,7 +202,9 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
                                 <div key={item.id} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5 group">
                                     <span className="font-medium text-white text-sm">{item.name}</span>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-blue-300 font-bold text-sm">{item.quantity}{item.unit === 'g' ? 'g' : 'ml'}</span>
+                                        <span className="text-blue-300 font-bold text-sm">
+                                            {item.quantity}{item.unit === 'g' ? 'g' : item.unit === 'ml' ? 'ml' : ' (đơn vị)'}
+                                        </span>
                                         <button 
                                             onClick={() => handleDeleteFridgeItem(item.id)}
                                             className="text-gray-600 hover:text-red-400 p-1 rounded-lg transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"

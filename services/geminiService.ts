@@ -1541,8 +1541,13 @@ export const parseAndDeductFridge = async (
     TASK:
     Identify if the user meal/ingredient consumes any items from the fridge inventory.
     Estimate how much quantity is consumed for each matching item based on the food name.
-    Units convention: 1 is gam (g), 2 is lít (l) / ml. Make sure the deducted amount matches the fridge item's unit.
+    Units convention: 
+    - "g", "kg" -> convert to gam (g)
+    - "ml", "l" -> convert to ml
+    - "qty" or "số lượng" (quả, trái, chùm, con, chiếc, cái...) -> quantity/pieces (e.g. 1 quả trứng = 1, 2 trái chuối = 2, 1 chùm nho = 1).
+    Make sure the deducted amount matches the fridge item's unit.
     If the text says "500g thit bo" and there is "thịt bò" (unit: g) in the fridge, deduct 500. 
+    If the text says "2 quả trứng" and there is "trứng" (unit: qty) in the fridge, deduct 2.
     If the text says "1 tô phở bò", estimate the beef (e.g. 100) and deduct it if beef is in the fridge.
     
     CRITICAL: Return ONLY a valid JSON array of deductions: [{ "id": "string", "amount": number }]
