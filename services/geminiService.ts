@@ -1425,4 +1425,85 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
   }
 };
 
+/**
+ * Generate food calories analysis prompt for Nemotron
+ * Used by Edge Functions to calculate nutrition from food input
+ */
+export const generateFoodCaloriesPrompt = (foodDescription: string): string => {
+  return `Bạn là một nutritionist chuyên gia. Phân tích các thức ăn sau:
+"${foodDescription}"
+
+Hãy:
+1. Xác định các loại thức phẩm và khối lượng
+2. Tính toán tổng calo và macro (protein, carbs, fats)
+3. Sử dụng dữ liệu từ bảng thành phần thức phẩm phổ biến
+
+Vui lòng trả về JSON dạng:
+{
+  "foods": [
+    {"name": "...", "quantity": "...", "unit": "..."},
+    ...
+  ],
+  "total_calories": 0,
+  "macros": {
+    "protein": 0,
+    "carbs": 0,
+    "fats": 0
+  }
+}`;
+};
+
+/**
+ * Generate daily workout plan prompt for Nemotron
+ * Incorporates muscle group conflict detection and weight goal optimization
+ */
+export const generateDailyWorkoutPrompt = (
+  userProfile: {
+    weight: number;
+    height: number;
+    age: number;
+    trainingMode: string;
+    goal: 'bulking' | 'cutting';
+    experienceLevel: string;
+  },
+  analysisData: {
+    recommendedSplit: string;
+    sessionsThisWeek: number;
+    focusMuscles: string[];
+    yesterdayWorkout: string;
+    tdee: number;
+    dailyCalories: number;
+    macroTargets: { protein: number; carbs: number; fats: number };
+  },
+  date: string
+): string => {
+  const calorieStrategy = analysisData.tdee > 2500 
+    ? "tập trọng lượng nhẹ hơn, tập nhiều reps hơn để tránh mất cơ"
+    : "ưu tiên compound movements để tối ưu calorie burn";
+
+  return `ACT AS A WORLD-CLASS PERSONAL TRAINER.
+GENERATE A 1-DAY WORKOUT PLAN FOR: ${date}.
+
+NGUYÊN TẮC BẮT BUỘC:
+- KHÔNG tập các nhóm cơ từ hôm qua: "${analysisData.yesterdayWorkout}"
+- Dựa trên training split: ${analysisData.recommendedSplit.toUpperCase()}
+- Focus muscles hôm nay: ${analysisData.focusMuscles.join(', ')}
+- Progressive overload dựa trên 7 ngày gần nhất
+- Phù hợp với mục tiêu: ${analysisData.tdee > 2500 ? 'CUTTING (Giảm cân)' : 'BULKING (Tăng cân)'}
+
+THÔNG TIN NGƯỜI DÙNG:
+- Cân nặng: ${userProfile.weight}kg
+- Tuổi: ${userProfile.age}
+- Chiều cao: ${userProfile.height}cm
+- Trình độ: ${userProfile.experienceLevel}
+- Training mode: ${userProfile.trainingMode}
+- Calo mục tiêu hôm nay: ${analysisData.dailyCalories} kcal
+- Macros: P/${analysisData.macroTargets.protein}g C/${analysisData.macroTargets.carbs}g F/${analysisData.macroTargets.fats}g
+
+CHIẾN LƯỢC:
+${calorieStrategy}
+
+Xuất ra 5 bài tập chính cho hôm nay với sets/reps/notes rõ ràng.`;
+};
+
 

@@ -2,7 +2,7 @@ import { UserInput, FatigueLevel, MuscleGroup } from '../types';
 
 export type PlanDuration = 4 | 8 | 12;
 export type TrainingPhase = 'base' | 'build' | 'peak' | 'deload';
-export type SplitType = 'full_body' | 'upper_lower' | 'ppl';
+export type SplitType = 'full_body' | 'upper_lower' | 'ppl' | 'ppls';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export interface PeriodizationPhase {
@@ -25,8 +25,9 @@ export interface PeriodizationPlan {
 export const determineOptimalSplit = (daysPerWeek: number, experienceLevel: ExperienceLevel): SplitType => {
   if (daysPerWeek <= 3) return 'full_body';
   if (daysPerWeek === 4) return 'upper_lower';
-  if (daysPerWeek >= 5) {
-    return experienceLevel === 'beginner' ? 'upper_lower' : 'ppl';
+  if (daysPerWeek === 5) return 'ppl';
+  if (daysPerWeek >= 6) {
+    return experienceLevel === 'beginner' ? 'ppl' : 'ppls';
   }
   return 'full_body'; // Fallback
 };
