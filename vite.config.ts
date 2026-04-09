@@ -44,6 +44,7 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             outDir: 'dist',
+            modulePreload: false,
             // Optimize chunk splitting for better caching
             rollupOptions: {
                 output: {
