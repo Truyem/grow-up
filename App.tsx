@@ -269,6 +269,15 @@ export default function App() {
 
                 <div className="flex items-center justify-center gap-4">
                   <button
+                    onClick={handleSyncAll}
+                    disabled={isRefreshing || planLoading}
+                    className="text-lg text-gray-400 hover:text-cyan-400 transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                    title="Đồng bộ lại toàn bộ dữ liệu"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${(isRefreshing || planLoading) ? 'animate-spin' : ''}`} />
+                  </button>
+
+                  <button
                     id="tour-settings"
                     onClick={() => setViewMode('settings')}
                     className="text-lg text-gray-300 font-light hover:text-white transition-colors duration-200 cursor-pointer group flex items-center gap-2"

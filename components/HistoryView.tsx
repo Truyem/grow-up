@@ -461,16 +461,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             {MONTH_NAMES[calendarDate.month]} {calendarDate.year !== now.getFullYear() ? calendarDate.year : ''}
           </h3>
           <div className="flex items-center gap-1">
-            {onRefresh && (
-              <button
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-                title="Làm mới"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </button>
-            )}
             <button
               onClick={() => goMonth(1)}
               className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
