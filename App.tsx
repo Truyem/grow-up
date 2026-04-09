@@ -97,19 +97,42 @@ export default function App() {
   );
 
   // 7. Supabase background sync (localStorage -> cloud)
-  useSupabaseProfileSync(session?.user?.id, userData, userStats, userGoals);
+  useSupabaseProfileSync(
+    session?.user?.id,
+    userData, setUserData,
+    userStats, setUserStats,
+    userGoals, setUserGoals
+  );
   useSupabaseWorkoutHistorySync(session?.user?.id, workoutHistory);
   useSupabaseSleepRecoverySync(session?.user?.id, sleepRecovery, setSleepRecovery);
 
   // Native Notifications
   useEffect(() => {
     if (!session?.user) return;
-    scheduleAllDailyNotifications().catch((e) => {
+    scheduleAllDailyNotifications(plan || undefined).catch((e) => {
       console.warn('[Notifications] Failed to schedule daily notifications:', e);
     });
-  }, [session?.user?.id]);
+  }, [session?.user?.id, plan]);
 
   const isLoading = planLoading || isAuthChecking;
+  const handleCompleteWorkoutWithSleep = (
+    levelSelected: string,
+    summary: string,
+    completedExercises: string[],
+    userNotes: string,
+    nutrition: any,
+    exerciseLogs?: any[]
+  ) => {
+    handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
+
+    if (userData.tempSleepHours !== undefined && userData.tempSleepHours > 0) {
+      const { createSleepRecoveryEntry } = require('./services/sleepRecoveryService');
+      const entry = createSleepRecoveryEntry({ sleepHours: userData.tempSleepHours });
+      setSleepRecovery((prev) => [entry, ...prev].sort((a, b) => b.timestamp - a.timestamp));
+      setUserData(prev => ({ ...prev, tempSleepHours: undefined }));
+    }
+  };
+
   const appContextValue = {
     userData,
     setUserData,
@@ -126,7 +149,7 @@ export default function App() {
     resetPlan: handleReset,
     startTracking: handleStartTracking,
     updatePlan: handleUpdatePlan,
-    completeWorkout: handleCompleteWorkout,
+    completeWorkout: handleCompleteWorkoutWithSleep,
     completeNutrition: handleCompleteNutrition,
     deleteHistoryItem: handleDeleteHistoryItem,
     refreshHistory: handleRefreshHistory,

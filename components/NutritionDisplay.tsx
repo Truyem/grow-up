@@ -826,37 +826,39 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                         {/* Suggested Food Items Section Removed */}
 
                         {/* Footer Actions */}
-                        <div className="text-center pt-8 border-t border-white/5 space-y-4">
+                        <div className="text-center pt-8 border-t border-white/5">
                             <p className="text-xs text-gray-500 mb-4 italic">
                                 *Mẹo: Chạm vào món ăn để xem chi tiết
                             </p>
 
-                            {/* Complete Nutrition Button */}
-                            {onCompleteNutrition && (
+                            <div className="flex justify-center items-center gap-3">
+                                {/* Complete Nutrition Button */}
+                                {onCompleteNutrition && (
+                                    <button
+                                        onClick={() => onCompleteNutrition(plan.nutrition)}
+                                        className="group relative flex-1 px-4 py-3.5 sm:py-4 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-emerald-600 to-cyan-600 shadow-lg shadow-emerald-500/25"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-0 group-hover:opacity-30 transition-opacity" />
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
+                                        <div className="relative flex items-center justify-center gap-2 text-white">
+                                            <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                            <span className="font-bold text-sm sm:text-base">Hoàn Thành Thực Đơn</span>
+                                        </div>
+                                    </button>
+                                )}
+
                                 <button
-                                    onClick={() => onCompleteNutrition(plan.nutrition)}
-                                    className="group relative w-full max-w-xs mx-auto px-8 py-4 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-emerald-600 to-cyan-600 shadow-lg shadow-emerald-500/25"
+                                    id="tour-nutri-reset"
+                                    onClick={() => onReset('nutrition')}
+                                    className="group relative flex-1 px-4 py-3.5 sm:py-4 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-0 group-hover:opacity-30 transition-opacity" />
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
-                                    <div className="relative flex items-center justify-center gap-3 text-white">
-                                        <CheckCircle2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                        <span className="font-bold text-base">Hoàn Thành Thực Đơn</span>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
+                                        <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                                        <span className="font-medium text-sm sm:text-base">Tạo Kế Hoạch Mới</span>
                                     </div>
                                 </button>
-                            )}
-
-                            <button
-                                id="tour-nutri-reset"
-                                onClick={() => onReset('nutrition')}
-                                className="group relative px-8 py-3 rounded-2xl bg-white/5 overflow-hidden transition-all hover:scale-105 active:scale-95"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="relative flex items-center justify-center gap-2 text-gray-400 group-hover:text-emerald-300 transition-colors">
-                                    <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                                    <span className="font-medium">Tạo Kế Hoạch Mới</span>
-                                </div>
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </>

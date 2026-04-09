@@ -20,6 +20,7 @@ const SCHEDULE = [
     { id: 'smor-3', hour: 5, minute: 0, title: '🍳 05:00 - Ăn sáng', body: 'Đến giờ ăn sáng rồi!' },
     { id: 'smor-4', hour: 6, minute: 30, title: '🏋️ 06:30 - Đến phòng tập!', body: 'Trời mưa thì tập ở nhà nhé.' },
     { id: 'smor-5', hour: 7, minute: 0, title: '💪 07:00 - Tập luyện chính', body: 'Hãy cho thấy tinh thần của mày!' },
+    { id: 'plan-am', hour: 8, minute: 30, title: '📝 08:30 - Nhắc nhở Kế Hoạch', body: 'Đã tạo lịch tập và dinh dưỡng chưa? Nhớ làm sớm!' },
     { id: 'smor-6', hour: 9, minute: 0, title: '🏠 09:00 - Về nhà & Caffeine 2', body: 'Đã về nhà chưa? Uống Caffeine (lần 2) nào.' },
     { id: 'smor-7', hour: 9, minute: 15, title: '🛒 09:15 - Mua đồ ăn trưa', body: 'Đi mua đồ ăn trưa thôi.' },
     { id: 'smor-8', hour: 9, minute: 30, title: '🥘 09:30 - Chuẩn bị đồ ăn', body: 'Chuẩn bị nguyên liệu.' },
@@ -27,6 +28,7 @@ const SCHEDULE = [
     { id: 'smor-10', hour: 10, minute: 30, title: '🍱 10:30 - Ăn trưa', body: 'Ăn trưa ngon miệng!' },
     { id: 'smor-11', hour: 11, minute: 0, title: '💊 11:00 - Nghỉ ngơi & Omega 3', body: 'Rửa bát, nghỉ ngơi. Nhớ uống Omega 3 (lần 1).' },
     { id: 'smor-12', hour: 11, minute: 30, title: '🎒 11:30 - Đến trường', body: 'Chuẩn bị đi học ngay!' },
+    { id: 'plan-noon', hour: 12, minute: 30, title: '📝 12:30 - Nhắc nhở Kế Hoạch', body: 'Nghỉ trưa rảnh rỗi, lên lịch tập và thực đơn cho hôm nay/ngày mai đi!' },
     // Water reminders
     { id: 'water-1', hour: 8, minute: 0, title: '💧 08:00 - Uống nước!', body: 'Nhớ uống 300ml nước. Mục tiêu 2.5-3L/ngày.' },
     { id: 'water-2', hour: 12, minute: 0, title: '💧 12:00 - Uống nước!', body: 'Đã uống đủ nước chưa? Uống thêm 300ml nhé.' },
@@ -45,6 +47,9 @@ const SCHEDULE = [
     // Supplement reminder
     { id: 'whey-1', hour: 19, minute: 30, title: '🥤 19:30 - Whey Protein!', body: 'Uống 1 scoop Whey sau tập để phục hồi cơ bắp.' },
     { id: 'saft-9', hour: 20, minute: 0, title: '💊 20:00 - Giải trí & Creatine', body: 'Uống 5g Creatine và Magnesium (lần 2).' },
+    { id: 'plan-1', hour: 20, minute: 30, title: '📝 20:30 - Lên kế hoạch ngày mai', body: 'Đừng quên tạo lịch tập và lên thực đơn dinh dưỡng cho ngày mai nhé!' },
+    { id: 'plan-2', hour: 20, minute: 45, title: '⚠️ 20:45 - NHẮC LẠI: Lên kế hoạch!', body: 'Mày đã tạo lịch tập và thực đơn cho ngày mai chưa? Làm ngay đi!' },
+    { id: 'plan-3', hour: 20, minute: 55, title: '🚨 20:55 - CẢNH BÁO CUỐI: Kế hoạch!', body: 'Sắp đến giờ tắt màn hình rồi! Lên lịch tập và dinh dưỡng đi!!' },
     { id: 'saft-10', hour: 21, minute: 0, title: '📵 21:00 - Screen-off!', body: 'Tắt toàn bộ máy tính và điện thoại.' },
     { id: 'saft-11', hour: 21, minute: 30, title: '😴 21:30 - Đi ngủ', body: 'Chúc ngủ ngon! Ngày mai tiếp tục bứt phá.' },
 ];
@@ -104,6 +109,68 @@ async function notifyAll(payload: object): Promise<{ sent: number; failed: numbe
     return { sent, failed };
 }
 
+async function checkPlansAndNotifyContinuous(): Promise<{ sent: number; failed: number }> {
+    const vnTime = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+    const dateKey = `${vnTime.getFullYear()}-${String(vnTime.getMonth() + 1).padStart(2, '0')}-${String(vnTime.getDate()).padStart(2, '0')}`;
+
+    const { data: subs, error } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id');
+
+    if (error || !subs || subs.length === 0) return { sent: 0, failed: 0 };
+
+    const usersSubs = subs.reduce((acc: any, sub: any) => {
+        if (sub.user_id) {
+            if (!acc[sub.user_id]) acc[sub.user_id] = [];
+            acc[sub.user_id].push(sub);
+        }
+        return acc;
+    }, {});
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const userId of Object.keys(usersSubs)) {
+        const { data: planData } = await supabase
+            .from('daily_plans')
+            .select('plan_data')
+            .eq('user_id', userId)
+            .eq('date', dateKey)
+            .maybeSingle();
+
+        let needsReminder = false;
+        if (!planData || !planData.plan_data) {
+            needsReminder = true;
+        } else {
+            const pd = planData.plan_data as any;
+            const hasWorkout = pd.workout?.isGenerated === true || pd.workout?.detail?.morning?.length > 0 || pd.workout?.detail?.evening?.length > 0;
+            const hasNutrition = pd.nutrition?.isGenerated === true || pd.nutrition?.meals?.length > 0;
+            
+            if (!hasWorkout && !hasNutrition) {
+                needsReminder = true;
+            }
+        }
+
+        if (needsReminder) {
+            const payload = {
+                title: '🚨 CHƯA CÓ LỊCH TRÌNH!',
+                body: 'Phát hiện m chưa tạo lịch tập hoặc dinh dưỡng cho hôm nay! Vào app làm ngay đi!',
+                tag: 'continuous-plan-reminder',
+                url: '/#schedule',
+                icon: '/icons/icon-192.webp',
+                badge: '/icons/icon-96.webp',
+            };
+
+            for (const sub of usersSubs[userId]) {
+                const success = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload);
+                if (success) sent++;
+                else failed++;
+            }
+        }
+    }
+    return { sent, failed };
+}
+
 export default async (req: Request, context: Context) => {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
         console.error('[DailyReminder] VAPID keys missing!');
@@ -123,6 +190,16 @@ export default async (req: Request, context: Context) => {
     );
 
     if (!activeEvent) {
+        // Nếu không có event cố định, kiểm tra liên tục mỗi 15/45 phút
+        const isContinuousCheckTime = currentHour >= 8 && currentHour <= 21 && 
+            (Math.abs(currentMinute - 15) <= 4 || Math.abs(currentMinute - 45) <= 4);
+            
+        if (isContinuousCheckTime) {
+            console.log(`[DailyReminder] Running continuous plan check at ${currentHour}:${currentMinute}`);
+            const { sent, failed } = await checkPlansAndNotifyContinuous();
+            return new Response(`Continuous Check: Sent ${sent}, Failed ${failed}`, { status: 200 });
+        }
+
         return new Response('No active event at this time', { status: 200 });
     }
 

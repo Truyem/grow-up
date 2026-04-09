@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry, FridgeItem } from "../types";
 import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
@@ -115,7 +115,8 @@ const callNemotronAPI = async (
         messages: messages,
         max_tokens: options?.maxTokens ?? 100000,
         temperature: options?.temperature ?? 0.2,
-        plain_text: true
+        plain_text: true,
+        stream: false
       })
     });
 
@@ -142,79 +143,6 @@ const callNemotronAPI = async (
     return responseText;
   } catch (error) {
     console.error("Nemotron API call failed:", error);
-    throw error;
-  }
-};
-
-// Helper function to call Nemotron API with stream support
-const streamNemotronAPI = async (
-  messages: Array<{ role: string; content: string }>,
-  options?: { maxTokens?: number; temperature?: number; onProgress?: (text: string) => void }
-): Promise<string> => {
-  try {
-    const response = await fetch(NEMOTRON_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-        "x-model": GPT_OSS_MODEL
-      },
-      body: JSON.stringify({
-        model: GPT_OSS_MODEL,
-        messages: messages,
-        max_tokens: options?.maxTokens ?? 100000,
-        temperature: options?.temperature ?? 0.2,
-        stream: true,
-        plain_text: true
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Nemotron API error (${response.status}):`, errorText);
-      throw new Error(`Nemotron API error: ${response.status}`);
-    }
-
-    if (!response.body) throw new Error("No response body");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let fullText = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("data: ") && line !== "data: [DONE]") {
-          try {
-            const data = JSON.parse(line.replace("data: ", ""));
-            const content = data.choices?.[0]?.delta?.content || "";
-            if (content) {
-              fullText += content;
-              
-              if (options?.onProgress) {
-                // Try to find if we entered the JSON block to stop streaming raw markdown
-                const jsonStartIndex = fullText.indexOf("\`\`\`json");
-                if (jsonStartIndex !== -1) {
-                  options.onProgress(fullText.substring(0, jsonStartIndex).trim());
-                } else {
-                  options.onProgress(fullText);
-                }
-              }
-            }
-          } catch (e) {
-            // Ignore parse errors for incomplete chunks
-          }
-        }
-      }
-    }
-    return fullText;
-  } catch (error) {
-    console.error("Nemotron API stream failed:", error);
     throw error;
   }
 };
@@ -330,11 +258,29 @@ const cleanAndParseJSON = (text: string, context: string): any => {
       cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
     }
     
-    // Sometimes the AI might add some text before the `{`, let's find the first `{` and last `}`
+    // Sometimes the AI might add some text before the JSON, let's find the first `{` or `[` and last `}` or `]`
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    const firstBracket = cleaned.indexOf('[');
+    const lastBracket = cleaned.lastIndexOf(']');
+    
+    // Determine which bracket type is the outermost
+    let firstIndex = firstBrace;
+    let lastIndex = lastBrace;
+    
+    if (firstBracket !== -1 && firstBrace !== -1) {
+      firstIndex = Math.min(firstBracket, firstBrace);
+      lastIndex = Math.max(lastBracket, lastBrace);
+    } else if (firstBracket !== -1) {
+      firstIndex = firstBracket;
+      lastIndex = lastBracket;
+    } else if (firstBrace !== -1) {
+      firstIndex = firstBrace;
+      lastIndex = lastBrace;
+    }
+    
+    if (firstIndex !== -1 && lastIndex !== -1 && lastIndex >= firstIndex) {
+      cleaned = cleaned.substring(firstIndex, lastIndex + 1);
     }
     
     return JSON.parse(cleaned);
@@ -793,19 +739,19 @@ const generateWorkoutPart = async (
     - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp, và cảnh báo nếu cần tăng intake.
 
     YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
-    1. ĐẦU TIÊN, viết một đoạn văn bản ngắn (Markdown) chào hỏi, động viên người dùng và tóm tắt nhanh kế hoạch tập hôm nay bằng tiếng Việt.
-    2. SAU ĐÓ, xuất ra ĐÚNG 1 khối mã JSON chứa dữ liệu như sau (nằm trong \`\`\`json và \`\`\`):
+    CHỈ XUẤT RA ĐÚNG 1 MẢNG JSON CÓ 1 OBJECT (KHÔNG giải thích, KHÔNG chào hỏi, KHÔNG có văn bản nào khác ngoài JSON):
     \`\`\`json
-    { "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [{ "name": "...", "sets": 0, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": false, "primaryMuscleGroups": ["..."], "secondaryMuscleGroups": ["..."] }], "evening": [] } } }
+    [{ "date": "...", "schedule": { "suggestedWorkoutTime": "...", "suggestedSleepTime": "...", "reasoning": "..." }, "workout": { "summary": "...", "detail": { "levelName": "...", "description": "...", "morning": [{ "name": "...", "sets": 0, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": false, "primaryMuscleGroups": ["..."], "secondaryMuscleGroups": ["..."] }], "evening": [] } } }]
     \`\`\`
   `;
 
-  const responseText = await streamNemotronAPI([
+  const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
-  ], { maxTokens: 50000, temperature: 0.2, onProgress });
+  ], { maxTokens: 50000, temperature: 0.2 });
 
   if (!responseText) throw new Error("Empty workout response");
-  return cleanAndParseJSON(responseText, "WorkoutPart");
+    const parsed = cleanAndParseJSON(responseText, "WorkoutPart");
+    return Array.isArray(parsed) ? parsed[0] : parsed;
 };
 
 const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7): string[] => {
@@ -920,37 +866,39 @@ RULES:
 - **FOOD INTAKE STATUS**: ${foodAssessment.reason}. ${foodAssessment.status === 'Ăn ít' ? 'Suggest smaller meals that are nutrient-dense.' : foodAssessment.status === 'Ăn đủ' ? 'Good intake so far, continue balanced meals.' : 'Ensure remaining meals are well-distributed.'}
 
 YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
-1. ĐẦU TIÊN, viết một đoạn văn bản ngắn (Markdown) động viên, nhận xét về tình trạng dinh dưỡng hiện tại và tóm tắt nhanh thực đơn hôm nay bằng tiếng Việt.
-2. SAU ĐÓ, xuất ra ĐÚNG 1 khối mã JSON chứa dữ liệu như sau (nằm trong \`\`\`json và \`\`\`):
+CHỈ XUẤT RA ĐÚNG 1 MẢNG JSON CÓ 1 OBJECT (KHÔNG giải thích, KHÔNG chào hỏi, KHÔNG có văn bản nào khác ngoài JSON):
 \`\`\`json
-{
-  "nutrition": {
-    "totalCalories": number,
-    "totalProtein": number,
-    "totalCarbs": number,
-    "totalFat": number,
-    "advice": "string (Vietnamese, mention time-based meal tips, weight trend awareness, and when to eat based on current time)",
-    "meals": [
-      {
-        "name": "string (include meal time: Sáng/Trưa/Chiều/Tối/Snack)",
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fat": number,
-        "description": "string (Vietnamese, include portion sizes)"
-      }
-    ]
+[
+  {
+    "nutrition": {
+      "totalCalories": number,
+      "totalProtein": number,
+      "totalCarbs": number,
+      "totalFat": number,
+      "advice": "string (Vietnamese, mention time-based meal tips, weight trend awareness, and when to eat based on current time)",
+      "meals": [
+        {
+          "name": "string (include meal time: Sáng/Trưa/Chiều/Tối/Snack)",
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fat": number,
+          "description": "string (Vietnamese, include portion sizes)"
+        }
+      ]
+    }
   }
-}
+]
 \`\`\`
   `;
 
-  const responseText = await streamNemotronAPI([
+  const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
-  ], { maxTokens: 50000, temperature: 0.2, onProgress });
+  ], { maxTokens: 50000, temperature: 0.2 });
 
   if (!responseText) throw new Error("Empty nutrition response");
-  return cleanAndParseJSON(responseText, "NutritionPart");
+    const parsed = cleanAndParseJSON(responseText, "NutritionPart");
+    return Array.isArray(parsed) ? parsed[0] : parsed;
 };
 
 export const generateDailyPlan = async (
@@ -1093,7 +1041,7 @@ RULES:
 - motivationalQuote: Quote tiếng Việt từ David Goggins/bodybuilder nổi tiếng
 - weeklyStats: consistency = (workouts/7)*100
 
-Generate JSON response with: { "summary": "...", "strengths": [...], "improvements": [...], "recommendation": "...", "motivationalQuote": "...", "weeklyStats": { "workoutsCompleted": number, "totalExercises": number, "estimatedCaloriesBurned": number, "consistency": number } }
+Generate JSON response ONLY as a JSON Array with exactly 1 object inside: [{ "summary": "...", "strengths": [...], "improvements": [...], "recommendation": "...", "motivationalQuote": "...", "weeklyStats": { "workoutsCompleted": number, "totalExercises": number, "estimatedCaloriesBurned": number, "consistency": number } }]
     `;
 
     const responseText = await callNemotronAPI([
@@ -1102,7 +1050,8 @@ Generate JSON response with: { "summary": "...", "strengths": [...], "improvemen
 
     if (!responseText) throw new Error("Empty response");
 
-    const parsed = cleanAndParseJSON(responseText, "AIOverview");
+    let parsed = cleanAndParseJSON(responseText, "AIOverview");
+    if (Array.isArray(parsed)) parsed = parsed[0];
     return {
       ...parsed,
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
@@ -1167,7 +1116,7 @@ export const suggestNextExercises = async (
       3. TUY NHIÊN, bài tập mới BẮT BUỘC PHẢI THUỘC ĐÚNG NHÓM CƠ CỦA BUỔI TẬP HÔM NAY (tuân thủ nguyên tắc Upper/Lower). Ví dụ: nếu danh sách hôm nay toàn bài Upper Body, bài mới cũng phải là Upper Body (nhưng là một chuyển động/nhóm cơ Upper chưa được tập kỹ). KHÔNG được lấy nhóm cơ của ngày mai sang tập.
       4. Đối với bài tập BODYWEIGHT (không dùng tạ ngoài), 'equipment' BẮT BUỘC ghi là 'None'.
       
-      OUTPUT FORMAT: JSON Array with 1 Exercise object.
+      OUTPUT FORMAT: JSON Array with 1 Exercise object. NO EXPLANATIONS. NO MARKDOWN TEXT OUTSIDE JSON.
       
       REQUIRED FIELDS: name (English), sets (number), reps (string), notes (Vietnamese, short motivation), colorCode, primaryMuscleGroups, secondaryMuscleGroups.
       
@@ -1237,7 +1186,7 @@ export const suggestAlternativeExercise = async (
       5. Đánh dấu isBFR: true nếu đề xuất bài tập dùng BFR.
       6. Đối với bài tập BODYWEIGHT (không dùng tạ ngoài), 'equipment' BẮT BUỘC ghi là 'None'.
 
-      OUTPUT FORMAT: JSON Array with 1 Exercise object.
+      OUTPUT FORMAT: JSON Array with 1 Exercise object. NO EXPLANATIONS. NO MARKDOWN TEXT OUTSIDE JSON.
       REQUIRED FIELDS: name (English), sets (number), reps (string), notes (Vietnamese, explain why this is a good alternative), colorCode, primaryMuscleGroups, secondaryMuscleGroups, equipment, isBFR.
 
       Return as: [{ "name": "...", "sets": number, "reps": "...", "notes": "...", "equipment": "...", "colorCode": "...", "isBFR": boolean, "primaryMuscleGroups": [...], "secondaryMuscleGroups": [...] }]
@@ -1369,13 +1318,15 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
         Based on this food description: "${foodDescription}"
         
         Estimate nutritional content.
-        Return the result in JSON format.
+        Return the result in JSON format AS A SINGLE-ELEMENT ARRAY.
         
         RULES:
         - Name: Standard Vietnamese name.
         - Calories: Estimated total.
         - Macros: Protein, Carbs, Fat in grams.
         - Description: Use the input description but refine it to be short and clear.
+        
+        Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
       `;
 
       try {
@@ -1383,7 +1334,9 @@ export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = f
           { role: "user", content: macroPrompt }
         ]);
         if (!responseText) throw new Error("Empty macro response");
-        return cleanAndParseJSON(responseText, "FoodAnalysis");
+        let parsed = cleanAndParseJSON(responseText, "FoodAnalysis");
+        if (Array.isArray(parsed)) parsed = parsed[0];
+        return parsed;
       } catch (error) {
         console.error("Macro Calc Error:", error);
         throw error;
@@ -1432,7 +1385,7 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
     
     Be accurate with Vietnamese portion sizes and common ingredients.
     
-    Return format: { "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }
+    Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
   `;
 
   try {
@@ -1442,7 +1395,8 @@ export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
 
     if (!responseText) throw new Error("Empty food analysis response");
 
-    const result = cleanAndParseJSON(responseText, "FoodTextAnalysis");
+    let result = cleanAndParseJSON(responseText, "FoodTextAnalysis");
+    if (Array.isArray(result)) result = result[0];
     console.log("Analyzed food text:", result);
     return result;
   } catch (error) {
@@ -1483,7 +1437,46 @@ Vui lòng trả về JSON dạng:
  * Generate daily workout plan prompt for Nemotron
  * Incorporates muscle group conflict detection and weight goal optimization
  */
+export const parseAndDeductFridge = async (
+  mealName: string, 
+  fridgeItems: FridgeItem[]
+): Promise<{ id: string, amount: number }[]> => {
+  if (fridgeItems.length === 0) return [];
+
+  const prompt = `
+    USER MEAL/INGREDIENT: "${mealName}"
+    
+    FRIDGE INVENTORY:
+    ${JSON.stringify(fridgeItems.map(f => ({ id: f.id, name: f.name, quantity: f.quantity, unit: f.unit })))}
+    
+    TASK:
+    Identify if the user meal/ingredient consumes any items from the fridge inventory.
+    Estimate how much quantity is consumed for each matching item based on the food name.
+    Units convention: 1 is gam (g), 2 is lít (l) / ml. Make sure the deducted amount matches the fridge item's unit.
+    If the text says "500g thit bo" and there is "thịt bò" (unit: g) in the fridge, deduct 500. 
+    If the text says "1 tô phở bò", estimate the beef (e.g. 100) and deduct it if beef is in the fridge.
+    
+    CRITICAL: Return ONLY a valid JSON array of deductions: [{ "id": "string", "amount": number }]
+    Do not include markdown blocks like \`\`\`json, just the raw JSON array.
+    If nothing matches, return [].
+  `;
+
+  try {
+    const response = await callNemotronAPI([{ role: 'user', content: prompt }]);
+    const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
+    const result = JSON.parse(jsonStr);
+    
+    if (Array.isArray(result)) {
+      return result;
+    }
+  } catch (err) {
+    console.error('Error parsing fridge deductions:', err);
+  }
+  return [];
+};
+
 export const generateDailyWorkoutPrompt = (
+
   userProfile: {
     weight: number;
     height: number;

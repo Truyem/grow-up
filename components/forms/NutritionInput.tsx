@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { UserInput } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { UserInput, FridgeItem } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
-import { Utensils, Refrigerator, TrendingUp, TrendingDown, Leaf, Plus, X, Loader2, Beef, Carrot, Egg, Droplets, Nut } from 'lucide-react';
-
-
+import { Utensils, Refrigerator, Leaf, Plus, X, Loader2, Beef, Carrot, Egg, Droplets, Nut, Trash2 } from 'lucide-react';
+import { fridgeService } from '../../services/fridgeService';
+import { parseAndDeductFridge } from '../../services/geminiService';
 
 interface NutritionInputProps {
     userData: UserInput;
@@ -12,15 +12,78 @@ interface NutritionInputProps {
 
 export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUserData }) => {
     const [newConsumedFood, setNewConsumedFood] = useState('');
+    
+    // Fridge State
+    const [fridgeItems, setFridgeItems] = useState<FridgeItem[]>([]);
+    const [newFridgeItem, setNewFridgeItem] = useState({ name: '', quantity: '', unit: 'g' });
+    const [isUpdatingFridge, setIsUpdatingFridge] = useState(false);
+
+    useEffect(() => {
+        loadFridge();
+    }, []);
+
+    const loadFridge = async () => {
+        const items = await fridgeService.getFridgeItems();
+        setFridgeItems(items);
+    };
+
+    const handleAddFridgeItem = async () => {
+        if (!newFridgeItem.name || !newFridgeItem.quantity) return;
+        setIsUpdatingFridge(true);
+        const added = await fridgeService.addFridgeItem({
+            name: newFridgeItem.name,
+            quantity: Number(newFridgeItem.quantity),
+            unit: newFridgeItem.unit
+        });
+        if (added) {
+            setFridgeItems(prev => [added, ...prev]);
+            setNewFridgeItem({ name: '', quantity: '', unit: 'g' });
+        }
+        setIsUpdatingFridge(false);
+    };
+
+    const handleDeleteFridgeItem = async (id: string) => {
+        setIsUpdatingFridge(true);
+        const success = await fridgeService.deleteFridgeItem(id);
+        if (success) {
+            setFridgeItems(prev => prev.filter(item => item.id !== id));
+        }
+        setIsUpdatingFridge(false);
+    };
+
+    const processFridgeDeductions = async (mealName: string) => {
+        if (fridgeItems.length === 0) return;
+        const deductions = await parseAndDeductFridge(mealName, fridgeItems);
+        
+        let updatedItems = [...fridgeItems];
+        for (const d of deductions) {
+            const item = updatedItems.find(i => i.id === d.id);
+            if (item) {
+                const newQuantity = item.quantity - d.amount;
+                if (newQuantity <= 0) {
+                    await fridgeService.deleteFridgeItem(d.id);
+                    updatedItems = updatedItems.filter(i => i.id !== d.id);
+                } else {
+                    await fridgeService.updateFridgeItem(d.id, { quantity: newQuantity });
+                    item.quantity = newQuantity;
+                }
+            }
+        }
+        setFridgeItems(updatedItems);
+    };
 
     // --- Handlers ---
-    const handleAddConsumedFood = () => {
-        if (newConsumedFood.trim()) {
+    const handleAddConsumedFood = async () => {
+        const foodName = newConsumedFood.trim();
+        if (foodName) {
             setUserData(prev => ({
                 ...prev,
-                consumedFood: [...(prev.consumedFood || []), newConsumedFood.trim()]
+                consumedFood: [...(prev.consumedFood || []), foodName]
             }));
             setNewConsumedFood('');
+            
+            // Deduct from fridge in background
+            processFridgeDeductions(foodName);
         }
     };
 
@@ -45,47 +108,6 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
 
     return (
         <div className="space-y-6 animate-fade-in pb-20">
-
-            {/* 1. GOAL DASHBOARD (Top) */}
-            <GlassCard id="tour-nutri-goals" title="Mục tiêu dinh dưỡng" icon={<Leaf className="w-6 h-6 text-emerald-400" />}>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    {/* Bulking Toggle */}
-                    <button
-                        onClick={() => setUserData({ ...userData, nutritionGoal: 'bulking' })}
-                        className={`relative overflow-hidden p-4 rounded-2xl border transition-all duration-300 group ${userData.nutritionGoal === 'bulking'
-                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="relative z-10 flex flex-col items-center gap-2">
-                            <div className={`p-3 rounded-full ${userData.nutritionGoal === 'bulking' ? 'bg-emerald-500 text-white' : 'bg-white/10'}`}>
-                                <TrendingUp className="w-6 h-6" />
-                            </div>
-                            <span className="font-bold">Bulking (Tăng cân)</span>
-                            <span className="text-[10px] opacity-70">Calo dư thừa, Cơm trắng</span>
-                        </div>
-                    </button>
-
-                    {/* Cutting Toggle */}
-                    <button
-                        onClick={() => setUserData({ ...userData, nutritionGoal: 'cutting' })}
-                        className={`relative overflow-hidden p-4 rounded-2xl border transition-all duration-300 group ${userData.nutritionGoal === 'cutting'
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
-                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="relative z-10 flex flex-col items-center gap-2">
-                            <div className={`p-3 rounded-full ${userData.nutritionGoal === 'cutting' ? 'bg-amber-500 text-white' : 'bg-white/10'}`}>
-                                <TrendingDown className="w-6 h-6" />
-                            </div>
-                            <span className="font-bold">Cutting (Giảm cân)</span>
-                            <span className="text-[10px] opacity-70">Thâm hụt Calo, Giữ cơ</span>
-                        </div>
-                    </button>
-                </div>
-            </GlassCard>
-
-
 
             {/* 3. MEAL LOG (Bottom) */}
             < GlassCard id="tour-nutri-diary" title="Nhật ký ăn uống" icon={< Utensils className="w-6 h-6 text-amber-400" />}>
@@ -126,6 +148,68 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
                     </div>
                 </div>
             </GlassCard >
+
+            {/* 4. FRIDGE (Bottom) */}
+            <GlassCard id="tour-nutri-fridge" title="Tủ Lạnh" icon={<Refrigerator className="w-6 h-6 text-blue-400" />}>
+                <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="text"
+                            value={newFridgeItem.name}
+                            onChange={(e) => setNewFridgeItem({...newFridgeItem, name: e.target.value})}
+                            placeholder="Tên nguyên liệu..."
+                            className="flex-1 bg-black/20 text-white placeholder-gray-500 px-3 py-2.5 rounded-xl outline-none border border-white/10"
+                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="number"
+                                value={newFridgeItem.quantity}
+                                onChange={(e) => setNewFridgeItem({...newFridgeItem, quantity: e.target.value})}
+                                placeholder="SL"
+                                className="w-20 bg-black/20 text-white placeholder-gray-500 px-3 py-2.5 rounded-xl outline-none border border-white/10"
+                            />
+                            <select
+                                value={newFridgeItem.unit}
+                                onChange={(e) => setNewFridgeItem({...newFridgeItem, unit: e.target.value})}
+                                className="w-20 bg-black/20 text-white px-2 py-2.5 rounded-xl outline-none border border-white/10"
+                            >
+                                <option value="g">Gam</option>
+                                <option value="ml">Lít/ml</option>
+                            </select>
+                            <button
+                                onClick={handleAddFridgeItem}
+                                disabled={isUpdatingFridge || !newFridgeItem.name || !newFridgeItem.quantity}
+                                className="px-4 py-2.5 bg-blue-500 text-white font-medium rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-all flex items-center justify-center"
+                            >
+                                {isUpdatingFridge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Fridge List */}
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {fridgeItems.length === 0 ? (
+                            <p className="text-center text-gray-500 text-xs py-4">Tủ lạnh trống</p>
+                        ) : (
+                            fridgeItems.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5 group">
+                                    <span className="font-medium text-white text-sm">{item.name}</span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-blue-300 font-bold text-sm">{item.quantity}{item.unit === 'g' ? 'g' : 'ml'}</span>
+                                        <button 
+                                            onClick={() => handleDeleteFridgeItem(item.id)}
+                                            className="text-gray-600 hover:text-red-400 p-1 rounded-lg transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </GlassCard>
+
         </div >
     );
 };

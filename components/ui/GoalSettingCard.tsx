@@ -61,9 +61,29 @@ export const GoalSettingCard: React.FC<GoalSettingProps> = ({ goals, onSave, his
     const monthSessions = monthHistory.length;
 
     // Weight progress
-    const weightDiff = goals?.weekly?.targetWeightKg
-        ? Math.round((userData.weight - goals.weekly.targetWeightKg) * 10) / 10
-        : null;
+    const targetWeightVal = goals?.weekly?.targetWeightKg;
+    let weightDiffStr = "—";
+    let weightDiffLabel = "Mục tiêu cân";
+    let weightDiffColor = "text-gray-500";
+
+    if (targetWeightVal) {
+        const diff = Math.round((userData.weight - targetWeightVal) * 10) / 10;
+        if (diff > 0) {
+            // Need to lose
+            weightDiffStr = `${diff}`;
+            weightDiffLabel = "Cần giảm thêm";
+            weightDiffColor = "text-amber-400";
+        } else if (diff < 0) {
+            // Need to gain
+            weightDiffStr = `${Math.abs(diff)}`;
+            weightDiffLabel = "Cần tăng thêm";
+            weightDiffColor = "text-emerald-400";
+        } else {
+            weightDiffStr = "0";
+            weightDiffLabel = "Đã đạt mục tiêu";
+            weightDiffColor = "text-blue-400";
+        }
+    }
 
     // Days left to target date
     const daysLeft = goals?.weekly?.targetDate
@@ -141,14 +161,14 @@ export const GoalSettingCard: React.FC<GoalSettingProps> = ({ goals, onSave, his
                         <p className="text-[10px] text-gray-500">Buổi tháng này</p>
                     </div>
                     <div className="p-3 text-center">
-                        {weightDiff !== null ? (
+                        {targetWeightVal !== undefined && targetWeightVal !== null ? (
                             <>
-                                <p className={`text-lg font-bold ${weightDiff > 0 ? 'text-red-400' : weightDiff < 0 ? 'text-emerald-400' : 'text-white'}`}>
-                                    {weightDiff > 0 ? '+' : ''}{weightDiff}
+                                <p className={`text-lg font-bold ${weightDiffColor}`}>
+                                    {weightDiffStr}
                                     <span className="text-gray-400 text-sm">kg</span>
                                 </p>
                                 <p className="text-[10px] text-gray-500">
-                                    {userData.nutritionGoal === 'cutting' ? 'Cần giảm thêm' : 'Cần tăng thêm'}
+                                    {weightDiffLabel}
                                 </p>
                             </>
                         ) : daysLeft !== null ? (
@@ -222,7 +242,7 @@ export const GoalSettingCard: React.FC<GoalSettingProps> = ({ goals, onSave, his
                         <div>
                             <label className="block text-xs text-gray-400 mb-1.5 flex items-center gap-1">
                                 <Calendar className="w-3 h-3 text-blue-400" />
-                                Ngày mục tiêu
+                                Ngày kết thúc mục tiêu
                             </label>
                             <input
                                 type="date"

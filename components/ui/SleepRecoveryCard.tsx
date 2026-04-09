@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Moon, BedDouble } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Moon } from 'lucide-react';
 import { SleepRecoveryEntry } from '../../types';
 import {
   createSleepRecoveryEntry,
@@ -15,9 +15,10 @@ interface SleepRecoveryCardProps {
   entries: SleepRecoveryEntry[];
   onAddEntry: (entry: SleepRecoveryEntry) => void;
   suggestedSleepTime?: string;
+  onSleepChange?: (hours: number) => void;
 }
 
-export const SleepRecoveryCard: React.FC<SleepRecoveryCardProps> = ({ entries, onAddEntry, suggestedSleepTime }) => {
+export const SleepRecoveryCard: React.FC<SleepRecoveryCardProps> = ({ entries, onAddEntry, suggestedSleepTime, onSleepChange }) => {
   const [sleepHours, setSleepHours] = useState(String(DEFAULT_SLEEP_HOURS));
 
   const latest = useMemo(() => getLatestSleepRecovery(entries), [entries]);
@@ -27,16 +28,13 @@ export const SleepRecoveryCard: React.FC<SleepRecoveryCardProps> = ({ entries, o
     return inferSleepQuality(parsed);
   }, [sleepHours]);
 
-  const handleSave = () => {
-    const normalizedInput = sleepHours.trim().replace(',', '.');
-    const parsed = Number(normalizedInput);
-    const nextHours = normalizedInput === '' || !Number.isFinite(parsed) ? DEFAULT_SLEEP_HOURS : parsed;
-    const entry = createSleepRecoveryEntry({
-      sleepHours: nextHours,
-    });
-    onAddEntry(entry);
-    setSleepHours(String(DEFAULT_SLEEP_HOURS));
-  };
+  useEffect(() => {
+    const parsed = Number(sleepHours.replace(',', '.'));
+    if (Number.isFinite(parsed) && parsed > 0 && onSleepChange) {
+      onSleepChange(parsed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sleepHours]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md p-4 space-y-4">
@@ -85,14 +83,6 @@ export const SleepRecoveryCard: React.FC<SleepRecoveryCardProps> = ({ entries, o
           Chất lượng giấc ngủ: <span className="font-semibold">{getSleepQualityLabel(inferredQuality)}</span>
         </div>
       )}
-
-      <button
-        onClick={handleSave}
-        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-      >
-        <BedDouble className="w-4 h-4" />
-        Lưu giấc ngủ
-      </button>
     </div>
   );
 };

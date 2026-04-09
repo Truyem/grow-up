@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserInput, UserStats, Expense, UserGoals, FatigueLevel, Intensity, HealthCondition, MuscleGroup, SleepRecoveryEntry } from '../types';
-import { loadSleepRecoveryFromSupabase, syncSleepRecoveryToSupabase, syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase } from '../services/supabasePlanSync';
+import { loadSleepRecoveryFromSupabase, syncSleepRecoveryToSupabase, syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase, loadProfileSettingsFromSupabase } from '../services/supabasePlanSync';
 
 const DEFAULT_EQUIPMENT = [
   "Board chống đẩy",
   "BFR Bands",
-  "Tạ đơn 4kg",
-  "Tạ đơn 8kg",
-  "Tạ đơn 10kg",
-  "Dây kháng lực 15kg",
+  "Tạ đơn",
+  "Dây kháng lực",
 ];
 
 const INITIAL_USER_DATA: UserInput = {
@@ -137,19 +135,56 @@ export function useUserData(): UseUserDataReturn {
   };
 }
 
-export function useSupabaseProfileSync(userId?: string, userData?: UserInput, userStats?: UserStats, userGoals?: UserGoals | null) {
+export function useSupabaseProfileSync(
+  userId?: string,
+  userData?: UserInput,
+  setUserData?: React.Dispatch<React.SetStateAction<UserInput>>,
+  userStats?: UserStats,
+  setUserStats?: React.Dispatch<React.SetStateAction<UserStats>>,
+  userGoals?: UserGoals | null,
+  setUserGoals?: React.Dispatch<React.SetStateAction<UserGoals | null>>
+) {
+  const isHydratedRef = useRef(false);
+
   useEffect(() => {
-    if (!userId || !userData) return;
+    if (!userId) return;
+
+    let isCancelled = false;
+    (async () => {
+      const cloudSettings = await loadProfileSettingsFromSupabase(userId);
+      if (isCancelled) return;
+
+      if (cloudSettings) {
+        if (cloudSettings.userData && setUserData) {
+          setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
+        }
+        if (cloudSettings.userStats && setUserStats) {
+          setUserStats(cloudSettings.userStats);
+        }
+        if (cloudSettings.userGoals && setUserGoals) {
+          setUserGoals(cloudSettings.userGoals);
+        }
+      }
+      isHydratedRef.current = true;
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId, setUserData, setUserStats, setUserGoals]);
+
+  useEffect(() => {
+    if (!userId || !userData || !isHydratedRef.current) return;
     syncUserSettingsToSupabase(userId, userData);
   }, [userId, userData]);
 
   useEffect(() => {
-    if (!userId || !userStats) return;
+    if (!userId || !userStats || !isHydratedRef.current) return;
     syncUserStatsToSupabase(userId, userStats);
   }, [userId, userStats]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isHydratedRef.current) return;
     syncUserGoalsToSupabase(userId, userGoals || null);
   }, [userId, userGoals]);
 }

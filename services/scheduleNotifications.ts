@@ -18,6 +18,7 @@ const morningSchedule: ScheduleItem[] = [
     { time: '05:00', label: 'Ăn sáng' },
     { time: '06:30', label: 'Đến phòng tập' },
     { time: '07:00', label: 'Tập luyện chính' },
+    { time: '08:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Đã tạo lịch tập và dinh dưỡng chưa? Nhớ làm sớm!' },
     { time: '09:00', label: 'Về nhà', detail: 'Uống Caffeine (lần 2)' },
     { time: '09:15', label: 'Mua đồ ăn trưa' },
     { time: '09:30', label: 'Chuẩn bị đồ ăn' },
@@ -25,10 +26,12 @@ const morningSchedule: ScheduleItem[] = [
     { time: '10:30', label: 'Ăn trưa' },
     { time: '11:00', label: 'Nghỉ ngơi', detail: 'Uống Omega 3 (lần 1) sau khi ăn' },
     { time: '11:30', label: 'Đến trường' },
+    { time: '12:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Nghỉ trưa rảnh rỗi, lên lịch tập và thực đơn cho hôm nay/ngày mai đi!' },
 ];
 
 const afternoonSchedule: ScheduleItem[] = [
     { time: '14:30', label: 'Về nhà', detail: 'Uống Magnesium (lần 1)' },
+    { time: '15:15', label: 'Nhắc nhở Kế Hoạch', detail: 'Nhắc lần 3 trong ngày! Lên lịch tập và dinh dưỡng đi nhé!' },
     { time: '15:30', label: 'Chuẩn bị bữa tối' },
     { time: '16:00', label: 'Bật nóng lạnh, cắm cơm' },
     { time: '16:15', label: 'Nấu ăn' },
@@ -38,6 +41,9 @@ const afternoonSchedule: ScheduleItem[] = [
     { time: '18:15', label: 'Ôn bài' },
     { time: '19:00', label: 'Tập Isolation', detail: 'Plank hoặc Abs tại nhà' },
     { time: '20:00', label: 'Giải trí & TPBS', detail: 'Uống 5g Creatine, Magnesium (lần 2)' },
+    { time: '20:30', label: 'Lên kế hoạch', detail: 'Tạo lịch tập và lên thực đơn dinh dưỡng cho ngày mai' },
+    { time: '20:45', label: 'NHẮC LẠI', detail: 'Chưa lên lịch tập và thực đơn thì làm ngay đi!' },
+    { time: '20:55', label: 'CẢNH BÁO', detail: 'Sắp 21h rồi! Chuẩn bị ngay cho ngày mai!!' },
     { time: '21:00', label: 'Screen-off', detail: 'Tắt toàn bộ màn hình' },
     { time: '21:30', label: 'Đi ngủ' },
 ];
@@ -65,9 +71,9 @@ function parseTimeToday(timeStr: string): Date | null {
 
 /**
  * Schedule local notifications cho tất cả lịch trình hôm nay.
- * Gọi hàm này sau khi user đăng nhập.
+ * Gọi hàm này sau khi user đăng nhập hoặc khi thay đổi plan.
  */
-export async function scheduleAllDailyNotifications(): Promise<void> {
+export async function scheduleAllDailyNotifications(plan?: any): Promise<void> {
     const ln = (window as any).Capacitor?.Plugins?.LocalNotifications;
     if (!ln) {
         // Không có Capacitor bridge → đang chạy trên web, bỏ qua
@@ -93,7 +99,21 @@ export async function scheduleAllDailyNotifications(): Promise<void> {
         return;
     }
 
-    const allItems = [...morningSchedule, ...afternoonSchedule];
+    const hasWorkout = plan?.workout?.isGenerated === true || plan?.workout?.detail?.morning?.length > 0 || plan?.workout?.detail?.evening?.length > 0;
+    const hasNutrition = plan?.nutrition?.isGenerated === true || plan?.nutrition?.meals?.length > 0;
+    const hasPlan = hasWorkout || hasNutrition;
+
+    let allItems = [...morningSchedule, ...afternoonSchedule];
+
+    // Nếu đã có lịch trình, bỏ qua các thông báo nhắc nhở lên kế hoạch
+    if (hasPlan) {
+        allItems = allItems.filter(item => 
+            item.label !== 'Nhắc nhở Kế Hoạch' && 
+            item.label !== 'NHẮC LẠI' && 
+            item.label !== 'CẢNH BÁO'
+        );
+    }
+
     const notifications: object[] = [];
 
     allItems.forEach((item, index) => {

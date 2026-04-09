@@ -433,35 +433,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   }, 0);
   const sessionTotalVolume = morningVolume + eveningVolume;
 
-  // --- MET Calories Computation ---
-  const metCalorieResult = (() => {
-    const allExs = [
-      ...warmupExercises.map((ex, i) => ({
-        name: ex.name,
-        sets: checkedState[`warm-${i}`] ? (exerciseLogs[`warm-${i}`]?.sets?.length || ex.sets || 1) : (ex.sets || 1),
-        reps: ex.reps || '60s',
-      })),
-      ...morningExercises.map((ex, i) => ({
-        name: ex.name,
-        sets: checkedState[`mor-${i}`] ? (exerciseLogs[`mor-${i}`]?.sets?.length || ex.sets) : ex.sets,
-        reps: ex.reps,
-      })),
-      ...eveningExercises.map((ex, i) => ({
-        name: ex.name,
-        sets: checkedState[`eve-${i}`] ? (exerciseLogs[`eve-${i}`]?.sets?.length || ex.sets) : ex.sets,
-        reps: ex.reps,
-      })),
-      ...cooldownExercises.map((ex, i) => ({
-        name: ex.name,
-        sets: checkedState[`cool-${i}`] ? (exerciseLogs[`cool-${i}`]?.sets?.length || ex.sets || 1) : (ex.sets || 1),
-        reps: ex.reps || '60s',
-      })),
-    ];
-    const warmupMinutes = warmupExercises.length > 0 ? 0 : 10;
-    const cooldownMinutes = cooldownExercises.length > 0 ? 0 : 5;
-    return calculateWorkoutCalories(allExs, userData.weight || 65, warmupMinutes, cooldownMinutes);
-  })();
-
   // Find previous session's total volume (most recent history entry with any exerciseLogs)
   const previousSessionVolume = (() => {
     const sortedHistory = [...workoutHistory].sort((a, b) => b.timestamp - a.timestamp);
@@ -778,6 +749,45 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
                 return Array.from(muscleSet);
               })()}
+              muscleExercises={(() => {
+                const map: Record<string, string[]> = {};
+                const allExercises = [...currentWorkout.morning, ...currentWorkout.evening];
+                
+                const mapMuscleString = (muscleStr: string): MuscleGroup | null => {
+                  if (muscleStr.includes('Chest')) return MuscleGroup.Chest;
+                  if (muscleStr.includes('Front Delts')) return MuscleGroup.FrontDelts;
+                  if (muscleStr.includes('Side Delts')) return MuscleGroup.SideDelts;
+                  if (muscleStr.includes('Rear Delts')) return MuscleGroup.RearDelts;
+                  if (muscleStr.includes('Lats')) return MuscleGroup.Lats;
+                  if (muscleStr.includes('Upper Back')) return MuscleGroup.UpperBack;
+                  if (muscleStr.includes('Lower Back')) return MuscleGroup.LowerBack;
+                  if (muscleStr.includes('Traps')) return MuscleGroup.Traps;
+                  if (muscleStr === 'Biceps') return MuscleGroup.Biceps;
+                  if (muscleStr.includes('Triceps - Long Head')) return MuscleGroup.TricepsLong;
+                  if (muscleStr.includes('Triceps - Lateral Head')) return MuscleGroup.TricepsLateral;
+                  if (muscleStr.includes('Forearms')) return MuscleGroup.Forearms;
+                  if (muscleStr.includes('Quads')) return MuscleGroup.Quads;
+                  if (muscleStr.includes('Hamstrings')) return MuscleGroup.Hamstrings;
+                  if (muscleStr.includes('Glutes')) return MuscleGroup.Glutes;
+                  if (muscleStr.includes('Calves')) return MuscleGroup.Calves;
+                  if (muscleStr.includes('Abs - Upper')) return MuscleGroup.UpperAbs;
+                  if (muscleStr.includes('Abs - Lower')) return MuscleGroup.LowerAbs;
+                  if (muscleStr.includes('Obliques')) return MuscleGroup.Obliques;
+                  return null;
+                };
+
+                allExercises.forEach(ex => {
+                  const muscles = [...(ex.primaryMuscleGroups || []), ...(ex.secondaryMuscleGroups || [])];
+                  muscles.forEach(m => {
+                    const mapped = mapMuscleString(m);
+                    if (mapped) {
+                      if (!map[mapped]) map[mapped] = [];
+                      map[mapped].push(ex.name);
+                    }
+                  });
+                });
+                return map;
+              })()}
               onMuscleToggle={() => { }} // Read-only, no toggle
               showLabels={true}
               interactive={false} // Not interactive in plan view
@@ -847,55 +857,27 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
             </div>
           )}
 
-          {/* MET Calories Estimate Card */}
-          <div className="mb-4 p-3 bg-orange-500/5 rounded-xl border border-orange-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Flame className="w-4 h-4 text-orange-400" />
-              <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">Calo Ước Tính (MET)</span>
-              <span className="ml-auto text-[10px] text-gray-500">{formatDuration(metCalorieResult.totalDurationMinutes)}</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center flex-1">
-                <div className="text-2xl font-black text-white">{metCalorieResult.totalCalories.toLocaleString()}</div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider">kcal đốt cháy</div>
-              </div>
-              <div className="flex-1 space-y-1">
-                {metCalorieResult.exerciseBreakdown.slice(0, 3).map((ex, i) => (
-                  <div key={i} className="flex items-center justify-between text-[10px]">
-                    <span className="text-gray-400 truncate max-w-[100px]">{ex.name}</span>
-                    <span className="text-orange-300 font-bold">{ex.calories} kcal</span>
-                  </div>
-                ))}
-                {metCalorieResult.exerciseBreakdown.length > 3 && (
-                  <div className="text-[10px] text-gray-600 text-right">
-                    +{metCalorieResult.exerciseBreakdown.length - 3} bài khác
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           {warmupExercises.length > 0 && (
-            renderSection("Khoi dong", <Footprints className="w-4 h-4 text-emerald-300" />, warmupExercises, 'warm')
+            renderSection("Khởi động", <Footprints className="w-4 h-4 text-emerald-300" />, warmupExercises, 'warm')
           )}
 
           {eveningExercises.length > 0 ? (
             <>
               {/* Render Morning Session */}
-              {renderSection("Buoi sang (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, morningExercises, 'mor', 'morning', true)}
+              {renderSection("Buổi sáng (Morning)", <Sun className="w-4 h-4 text-yellow-400" />, morningExercises, 'mor', 'morning', true)}
 
               {/* Render Evening Session */}
-              {renderSection("Buoi toi (Evening)", <Moon className="w-4 h-4 text-blue-300" />, eveningExercises, 'eve', 'evening', true)}
+              {renderSection("Buổi tối (Evening)", <Moon className="w-4 h-4 text-blue-300" />, eveningExercises, 'eve', 'evening', true)}
             </>
           ) : (
             <>
               {/* Single Session Render (No Morning/Evening Header needed, or generic header) */}
-              {renderSection("Bai tap trong ngay", <Dumbbell className="w-4 h-4 text-emerald-400" />, morningExercises, 'mor', 'morning', true)}
+              {renderSection("Bài tập trong ngày", <Dumbbell className="w-4 h-4 text-emerald-400" />, morningExercises, 'mor', 'morning', true)}
             </>
           )}
 
           {cooldownExercises.length > 0 && (
-            renderSection("Hoi phuc", <Moon className="w-4 h-4 text-cyan-300" />, cooldownExercises, 'cool')
+            renderSection("Hồi phục", <Moon className="w-4 h-4 text-cyan-300" />, cooldownExercises, 'cool')
           )}
 
           <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-4">

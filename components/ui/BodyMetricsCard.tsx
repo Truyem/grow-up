@@ -7,37 +7,34 @@ interface BodyMetricsCardProps {
     userData: UserInput;
 }
 
+const MetricBox = ({
+    label, value, unit, sub, color, icon,
+}: {
+    label: string; value: string | number; unit: string; sub?: string; color: string; icon: React.ReactNode;
+}) => (
+    <div className="flex flex-col gap-1 p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <span style={{ color }} className="opacity-80">{icon}</span>
+            <span>{label}</span>
+        </div>
+        <div className="flex items-end gap-1">
+            <span className="text-xl font-bold text-white">{value}</span>
+            <span className="text-xs text-gray-400 mb-0.5">{unit}</span>
+        </div>
+        {sub && <span className="text-[10px] text-gray-500 leading-tight">{sub}</span>}
+    </div>
+);
+
 export const BodyMetricsCard: React.FC<BodyMetricsCardProps> = ({ userData }) => {
-    const metrics = useMemo(() => {
-        if (!userData.weight || !userData.height || !userData.age) return null;
-        return computeBodyMetrics(
-            userData.weight,
-            userData.height,
-            userData.age,
-            userData.selectedIntensity,
-            userData.nutritionGoal,
-        );
-    }, [userData.weight, userData.height, userData.age, userData.selectedIntensity, userData.nutritionGoal]);
+    const metrics = useMemo(() => computeBodyMetrics(
+        userData.weight,
+        userData.height,
+        userData.age,
+        userData.selectedIntensity,
+        userData.nutritionGoal
+    ), [userData]);
 
     if (!metrics) return null;
-
-    const MetricBox = ({
-        label, value, unit, sub, color, icon,
-    }: {
-        label: string; value: string | number; unit: string; sub?: string; color: string; icon: React.ReactNode;
-    }) => (
-        <div className="flex flex-col gap-1 p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <span style={{ color }} className="opacity-80">{icon}</span>
-                <span>{label}</span>
-            </div>
-            <div className="flex items-end gap-1">
-                <span className="text-xl font-bold text-white">{value}</span>
-                <span className="text-xs text-gray-400 mb-0.5">{unit}</span>
-            </div>
-            {sub && <span className="text-[10px] text-gray-500 leading-tight">{sub}</span>}
-        </div>
-    );
 
     return (
         <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md p-4 space-y-3">

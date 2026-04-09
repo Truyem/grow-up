@@ -87,7 +87,8 @@ export interface UserInput {
   useCreatine: boolean; // New field
   equipment: string[];
   consumedFood: string[];
-  hasSeenOnboarding?: boolean;
+  hasSeenOnboarding: boolean;
+  tempSleepHours?: number; // Used to hold temporary sleep input before workout completion
 }
 
 export interface Expense {
@@ -137,6 +138,15 @@ export interface Meal {
   carbs?: number;
   fat?: number;
   consumed?: boolean;
+}
+
+export interface FridgeItem {
+  id: string;
+  user_id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  created_at?: string;
 }
 
 export interface WorkoutLevel {

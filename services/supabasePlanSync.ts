@@ -468,6 +468,26 @@ export const loadSleepRecoveryFromSupabase = async (userId: string): Promise<Sle
     }
 };
 
+export const loadProfileSettingsFromSupabase = async (userId: string) => {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('settings')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[ProfileSync] profile settings load error:', error);
+            return null;
+        }
+
+        return (data?.settings && typeof data.settings === 'object') ? data.settings as any : null;
+    } catch (err) {
+        console.error('[ProfileSync] profile settings unexpected error:', err);
+        return null;
+    }
+};
+
 // ========================================
 // Helper: Get device info string
 // ========================================

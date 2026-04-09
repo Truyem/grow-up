@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MuscleGroup } from '../../types'
 import styles from './Muscles.module.css'
 
@@ -10,12 +10,14 @@ interface HumanBodyMuscleMapProps {
   title?: string
   description?: string
   hideHeader?: boolean
+  muscleExercises?: Record<string, string[]>
 }
 
 const HumanBodyMuscleMap = ({
   selectedMuscles,
   onMuscleToggle,
   interactive = true,
+  muscleExercises = {},
 }: HumanBodyMuscleMapProps) => {
   const muscleToSvgElem = {
     [MuscleGroup.Chest]: 'Chest',
@@ -82,41 +84,132 @@ const HumanBodyMuscleMap = ({
     })
   }, [mappedMuscles])
 
+  const [activeInfo, setActiveInfo] = useState<{
+    show: boolean
+    muscleName: string
+    exercises: string[]
+  }>({
+    show: false,
+    muscleName: '',
+    exercises: [],
+  })
+
+  const translateMuscle = (name: string) => {
+    const map: Record<string, string> = {
+      'Chest': 'Cơ ngực',
+      'Shoulders': 'Cơ vai',
+      'Traps': 'Cơ cầu vai (Traps)',
+      'Lats': 'Cơ xô',
+      'Lower back': 'Lưng dưới',
+      'Biceps': 'Cơ nhị đầu (Tay trước)',
+      'Triceps': 'Cơ tam đầu (Tay sau)',
+      'Forearms': 'Cơ cẳng tay',
+      'Abdominals': 'Cơ bụng',
+      'Obliques': 'Cơ liên sườn',
+      'Quads': 'Cơ đùi trước (Quads)',
+      'Hamstrings': 'Cơ đùi sau (Hamstrings)',
+      'Glutes': 'Cơ mông',
+      'Calves': 'Cơ bắp chân',
+    }
+    return map[name] || name
+  }
+
   useEffect(() => {
     const parentElement = document.getElementById('muscle-illustration')
     if (!parentElement) return
 
-    const handleHover = (event) => {
+    const handleInteraction = (event: any) => {
       const dataElemValue = event.target.dataset.elem
+      if (!dataElemValue) return
+
       const elements = parentElement.querySelectorAll(
         `.${styles.muscle}[data-elem="${dataElemValue}"]`
       )
 
       elements.forEach((element) => {
-        element.classList.toggle(styles.hover)
+        element.classList.add(styles.hover)
+      })
+
+      const matchingMuscleGroups = Object.entries(muscleToSvgElem)
+        .filter(([_, svgElem]) => svgElem === dataElemValue)
+        .map(([muscleGroup, _]) => muscleGroup)
+
+      const exercises = matchingMuscleGroups.flatMap(
+        (mg) => muscleExercises[mg] || []
+      )
+
+      if (muscleExercises[dataElemValue]) {
+        exercises.push(...muscleExercises[dataElemValue])
+      }
+
+      setActiveInfo({
+        show: true,
+        muscleName: translateMuscle(dataElemValue),
+        exercises: Array.from(new Set(exercises))
       })
     }
 
-    const handleClick = (event) => {
+    const handleMouseOut = (event: any) => {
       const dataElemValue = event.target.dataset.elem
-      const muscle = svgElemToMuscle[dataElemValue]
+      if (!dataElemValue) return
+
+      const elements = parentElement.querySelectorAll(
+        `.${styles.muscle}[data-elem="${dataElemValue}"]`
+      )
+
+      elements.forEach((element) => {
+        element.classList.remove(styles.hover)
+      })
+      
+      setActiveInfo((prev) => ({ ...prev, show: false }))
+    }
+
+    const handleClick = (event: any) => {
+      const dataElemValue = event.target.dataset.elem
+      if (!dataElemValue) {
+        // If clicking outside muscle, close info (for mobile)
+        setActiveInfo((prev) => ({ ...prev, show: false }))
+        return
+      }
+
+      // Show info if tapped on mobile (as click fires on touch end)
+      handleInteraction(event)
+
+      const muscle = svgElemToMuscle[dataElemValue as keyof typeof svgElemToMuscle]
       if (muscle && interactive) {
         onMuscleToggle(muscle)
       }
     }
 
-    parentElement.addEventListener('mouseover', handleHover)
-    parentElement.addEventListener('mouseout', handleHover)
+    parentElement.addEventListener('mouseover', handleInteraction)
+    parentElement.addEventListener('mouseout', handleMouseOut)
     parentElement.addEventListener('click', handleClick)
-    // // Clean up the event listeners when the component unmounts
-    return () => {
-      parentElement.removeEventListener('mouseover', handleHover)
-      parentElement.removeEventListener('mouseout', handleHover)
-      parentElement.removeEventListener('click', handleClick)
+    parentElement.addEventListener('touchstart', handleInteraction, { passive: true })
+    parentElement.addEventListener('touchend', (e) => {
+       // Keep info showing for a brief moment or until they click elsewhere on mobile
+       // We let the global/outside click handle dismissal.
+    }, { passive: true })
+
+    const handleGlobalTouch = (event: any) => {
+      // If clicking outside of the SVG, close info
+      if (!parentElement.contains(event.target)) {
+        setActiveInfo((prev) => ({ ...prev, show: false }))
+      }
     }
-  }, [onMuscleToggle, interactive])
+    document.addEventListener('touchstart', handleGlobalTouch)
+
+    // Clean up the event listeners when the component unmounts
+    return () => {
+      document.removeEventListener('touchstart', handleGlobalTouch)
+      parentElement.removeEventListener('mouseover', handleInteraction)
+      parentElement.removeEventListener('mouseout', handleMouseOut)
+      parentElement.removeEventListener('click', handleClick)
+      parentElement.removeEventListener('touchstart', handleInteraction)
+    }
+  }, [onMuscleToggle, interactive, muscleExercises])
 
   return (
+    <div className="flex flex-col items-center w-full">
     <svg
       id='muscle-illustration'
       xmlns='http://www.w3.org/2000/svg'
@@ -4044,6 +4137,28 @@ const HumanBodyMuscleMap = ({
              415.25,135.50 411.00,143.00 411.00,142.75'
       />
     </svg>
+
+    <div className={`w-full max-w-sm mt-4 rounded-xl border border-white/10 bg-black/20 overflow-hidden transition-all duration-300 ${activeInfo.show ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0'}`}>
+      <div className="p-4">
+        <h4 className="text-md font-bold text-cyan-300 mb-2 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          {activeInfo.muscleName}
+        </h4>
+        {activeInfo.exercises && activeInfo.exercises.length > 0 ? (
+          <ul className="text-sm text-gray-300 space-y-2">
+            {activeInfo.exercises.map((ex, idx) => (
+              <li key={idx} className="flex items-start gap-2 bg-white/5 p-2 rounded-lg">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                <span>{ex}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500 italic p-2 bg-white/5 rounded-lg text-center">Chưa có bài tập nào cho nhóm cơ này trong buổi tập hôm nay.</p>
+        )}
+      </div>
+    </div>
+    </div>
   )
 }
 

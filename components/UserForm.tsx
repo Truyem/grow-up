@@ -56,9 +56,7 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
     setCurrentDate(now.toLocaleDateString('vi-VN', options));
   }, []);
 
-  const handleAddSleepRecovery = (entry: SleepRecoveryEntry) => {
-    setSleepRecovery((prev) => [entry, ...prev].sort((a, b) => b.timestamp - a.timestamp));
-  };
+  // Removed internal handleAddSleepRecovery since we will pass it dynamically or handle on complete
 
   return (
     <div className="space-y-6 animate-fade-in relative pb-32">
@@ -89,44 +87,58 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
       </div>
 
       {/* --- GOAL SETTING CARD --- */}
-      {activeTab !== 'history' && (
+      {activeTab === 'nutrition' && (
         <GoalSettingCard
           goals={userGoals}
-          onSave={setUserGoals}
+          onSave={(newGoals) => {
+            setUserGoals(newGoals);
+            if (newGoals.weekly.targetWeightKg) {
+              const diff = userData.weight - newGoals.weekly.targetWeightKg;
+              if (diff > 0) {
+                setUserData(prev => ({ ...prev, nutritionGoal: 'cutting' }));
+              } else if (diff < 0) {
+                setUserData(prev => ({ ...prev, nutritionGoal: 'bulking' }));
+              }
+            }
+          }}
           history={workoutHistory}
           userData={userData}
         />
       )}
 
-      {activeTab !== 'history' && (
+      {activeTab === 'history' && (
         <PersonalRecordCard records={calculatePersonalRecords(workoutHistory)} />
       )}
 
-      {activeTab !== 'history' && (
+      {activeTab === 'workout' && (
         <SleepRecoveryCard
           entries={sleepRecovery}
-          onAddEntry={handleAddSleepRecovery}
+          onAddEntry={() => {}} // No longer used directly here
+          onSleepChange={(hours) => {
+             // We can store this in userData temporarily or AppContext, 
+             // but let's just add it to userData so it can be saved later
+             setUserData(prev => ({ ...prev, tempSleepHours: hours }));
+          }}
           suggestedSleepTime={plan?.schedule?.suggestedSleepTime}
         />
       )}
 
-      {activeTab !== 'history' && (
+      {activeTab === 'history' && (
         <ActiveRecoveryCard history={workoutHistory} />
       )}
 
-      {activeTab !== 'history' && (
+      {activeTab === 'history' && (
         <AchievementBadgesCard history={workoutHistory} />
       )}
 
       {/* --- SUPPLEMENT & WATER TRACKER --- */}
-      {activeTab !== 'history' && (
+      {activeTab === 'nutrition' && (
         <SupplementTracker />
       )}
 
 
-      {/* --- COMMON INFO (Visible only on Workout/Nutrition Tabs) --- */}
-      {/* Hide Body Profile on History Tab to save space */}
-      {activeTab !== 'history' && (
+      {/* --- COMMON INFO (Visible only on Workout Tabs) --- */}
+      {activeTab === 'workout' && (
         <div id="tour-body-stats">
           <GlassCard title="Hồ sơ cơ thể" icon={<Ruler className="w-6 h-6" />}>
             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -143,7 +155,15 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
                       setWeightInput(val);
                       const parsed = parseFloat(val.replace(',', '.'));
                       if (!isNaN(parsed)) {
-                        setUserData(prev => ({ ...prev, weight: parsed }));
+                        setUserData(prev => {
+                          const newState = { ...prev, weight: parsed };
+                          if (userGoals?.weekly?.targetWeightKg) {
+                            const diff = parsed - userGoals.weekly.targetWeightKg;
+                            if (diff > 0) newState.nutritionGoal = 'cutting';
+                            else if (diff < 0) newState.nutritionGoal = 'bulking';
+                          }
+                          return newState;
+                        });
                       }
                     }}
                     className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
