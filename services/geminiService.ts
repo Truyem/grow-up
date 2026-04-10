@@ -777,6 +777,8 @@ const generateMealForTime = async (
   targetCarbs: number,
   targetFat: number,
   recentMealsStr: string,
+  avoidCurrentPlanMealsStr: string,
+  dislikedFoodsStr: string,
   dayPeriod: string,
   weightTrendDirection: string,
   foodAssessment: any,
@@ -808,12 +810,21 @@ ${fridgeStr}
 MEALS CONSUMED RECENTLY (DO NOT REPEAT):
 ${recentMealsStr}
 
+MEALS ALREADY GENERATED IN THIS PLAN (DO NOT REPEAT):
+${avoidCurrentPlanMealsStr}
+
+DISLIKED FOODS / EXCLUDED FOODS (ABSOLUTELY AVOID):
+${dislikedFoodsStr}
+
 RULES:
 - MỖI MEAL PHẢI CÓ TỐI ĐA 2-3 MÓN/THÀNH PHẦN.
 - **VERY IMPORTANT**: ƯU TIÊN SỬ DỤNG CÁC NGUYÊN LIỆU TRONG FRIDGE INVENTORY ĐỂ LÊN THỰC ĐƠN.
 - Nếu bạn sử dụng nguyên liệu từ FRIDGE INVENTORY, hãy trừ số lượng đi và liệt kê vào mảng "usedFridgeItems" (sử dụng đúng ID được cung cấp).
+- **VERY IMPORTANT**: KHÔNG được đề xuất món có chứa bất kỳ nguyên liệu nào trong "DISLIKED FOODS / EXCLUDED FOODS" (bao gồm tên đồng nghĩa như oats/yến mạch, cacao/ca cao).
 ${extraRules}
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
+- **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS ALREADY GENERATED IN THIS PLAN" list.
+- Nếu một nguyên liệu trong tủ lạnh chỉ còn số lượng giới hạn (ví dụ còn 1 quả chuối), chỉ được dùng đúng phần còn lại và không dùng lặp ở các bữa tiếp theo.
 
 YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
 \`\`\`json
@@ -886,6 +897,8 @@ const generateNutritionPart = async (
   const recentMeals = extractMealsFromHistory(fullHistory, 7);
   const uniqueRecentMeals = Array.from(new Set(recentMeals));
   const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join(', ') : 'none';
+  const dislikedFoods = Array.isArray(userData.dislikedFoods) ? userData.dislikedFoods : [];
+  const dislikedFoodsStr = dislikedFoods.length > 0 ? dislikedFoods.join(', ') : 'none';
 
   let adjustedCalories = Math.round(target);
   if (weightTrend.direction === 'giảm' && userData.nutritionGoal === 'bulking') {
@@ -910,49 +923,53 @@ const generateNutritionPart = async (
 
   try {
     if (onProgress) onProgress("Đang tính toán thực đơn Sáng, Trưa, Tối...");
-    
-    const breakfastPromise = generateMealForTime(
-      "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
-      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Breakfast (Sáng)**: NO rice/bread if cutting. Use eggs, yogurt, oats, fruit, nuts.",
-      localFridgeItems
-    );
+    let usedMealNamesInCurrentPlan: string[] = [];
+    const getAvoidCurrentPlanMealsStr = () => usedMealNamesInCurrentPlan.length > 0
+      ? usedMealNamesInCurrentPlan.join(', ')
+      : 'none';
 
-    const lunchPromise = generateMealForTime(
-      "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
-      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.",
-      localFridgeItems
-    );
-
-    const dinnerPromise = generateMealForTime(
-      "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
-      recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Dinner (Tối)**: Rice allowed but lighter than lunch. Lean protein preferred. NO snacks.",
-      localFridgeItems
-    );
-
-    const [breakfastData, lunchData, dinnerData] = await Promise.all([breakfastPromise, lunchPromise, dinnerPromise]);
-
-    // Apply all deductions to update localFridgeItems for the optional extra meal
-    let remainingFridgeItems = applyDeductions(localFridgeItems, breakfastData.usedFridgeItems);
-    remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
-    remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
-
-    // Ensure we parse correctly if AI wraps in extra arrays
     const parseMealsWithDeductions = (m: any, used: any[]) => {
       const arr = Array.isArray(m) ? m : [];
       if (arr.length > 0 && used && used.length > 0) {
-        // Attach all deductions for this meal block to the first item
         arr[0] = { ...arr[0], usedFridgeItems: used };
       }
       return arr;
     };
 
+    const breakfastData = await generateMealForTime(
+      "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
+      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Breakfast (Sáng)**: NO rice/bread if cutting. Use eggs, yogurt, oats, fruit, nuts.",
+      localFridgeItems
+    );
+    const breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
+    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...breakfastMeals.map((m: any) => m?.name).filter(Boolean)];
+    let remainingFridgeItems = applyDeductions(localFridgeItems, breakfastData.usedFridgeItems);
+
+    const lunchData = await generateMealForTime(
+      "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
+      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.",
+      remainingFridgeItems
+    );
+    const lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
+    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...lunchMeals.map((m: any) => m?.name).filter(Boolean)];
+    remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
+
+    const dinnerData = await generateMealForTime(
+      "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
+      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+      "- **Dinner (Tối)**: Rice allowed but lighter than lunch. Lean protein preferred. NO snacks.",
+      remainingFridgeItems
+    );
+    const dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
+    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...dinnerMeals.map((m: any) => m?.name).filter(Boolean)];
+    remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
+
     let allMeals = [
-      ...parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems),
-      ...parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems),
-      ...parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems)
+      ...breakfastMeals,
+      ...lunchMeals,
+      ...dinnerMeals
     ].flat().filter(m => m && m.name);
 
     // API call to calculate missing calories/protein and adjust if needed
@@ -967,7 +984,7 @@ const generateNutritionPart = async (
       
       const extraMealData = await generateMealForTime(
         "Bữa Phụ", missingCal, missingPro, Math.round(missingCal / 8), Math.round(missingCal / 18),
-        recentMealsStr, dayPeriod, weightTrend.direction, foodAssessment,
+        recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
         "- Tạo MỘT bữa phụ cực nhanh gọn để bù đắp lượng protein/calo còn thiếu.",
         remainingFridgeItems
       );
@@ -1060,30 +1077,73 @@ export const generateDailyPlan = async (
 
 // --- AI OVERVIEW GENERATION ---
 
-const getFallbackAIOverview = (history: WorkoutHistoryItem[]): AIOverview => {
-  const lastWeek = history.filter(h => {
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    return h.timestamp >= weekAgo;
-  });
+const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
+
+const calculateOverviewWeeklyStats = (history: WorkoutHistoryItem[]): AIOverview["weeklyStats"] => {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const lastWeek = history
+    .filter((h) => h.timestamp >= weekAgo)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   const workoutsCompleted = lastWeek.length;
+  const activeDays = new Set(lastWeek.map((h) => h.date)).size;
   const totalExercises = lastWeek.reduce((acc, h) => acc + (h.completedExercises?.length || 0), 0);
-  const consistency = Math.round((workoutsCompleted / 7) * 100);
+  const avgExercisesPerWorkout = workoutsCompleted > 0 ? roundToOneDecimal(totalExercises / workoutsCompleted) : 0;
+
+  const totalVolumeKg = lastWeek.reduce((acc, h) => {
+    const workoutVolume = (h.exerciseLogs || []).reduce((sum, log) => sum + (log.totalVolume || 0), 0);
+    return acc + workoutVolume;
+  }, 0);
+  const averageVolumePerWorkout = workoutsCompleted > 0 ? Math.round(totalVolumeKg / workoutsCompleted) : 0;
+
+  const totalCaloriesIntake = lastWeek.reduce((acc, h) => acc + (h.nutrition?.totalCalories || 0), 0);
+  const totalProteinIntake = lastWeek.reduce((acc, h) => acc + (h.nutrition?.totalProtein || 0), 0);
+
+  const averageCaloriesPerDay = Math.round(totalCaloriesIntake / 7);
+  const averageProteinPerDay = roundToOneDecimal(totalProteinIntake / 7);
+
+  const sleepEntries = lastWeek
+    .map((h) => h.sleepHours)
+    .filter((hours): hours is number => typeof hours === 'number' && Number.isFinite(hours) && hours > 0);
+  const averageSleepHours = sleepEntries.length > 0
+    ? roundToOneDecimal(sleepEntries.reduce((sum, h) => sum + h, 0) / sleepEntries.length)
+    : 0;
+
+  const weightEntries = lastWeek
+    .filter((h) => typeof h.weight === 'number' && Number.isFinite(h.weight) && h.weight > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const weightTrendKg = weightEntries.length >= 2
+    ? roundToOneDecimal((weightEntries[weightEntries.length - 1].weight || 0) - (weightEntries[0].weight || 0))
+    : 0;
+
+  return {
+    workoutsCompleted,
+    activeDays,
+    totalExercises,
+    avgExercisesPerWorkout,
+    estimatedCaloriesBurned: workoutsCompleted * 350,
+    totalVolumeKg: Math.round(totalVolumeKg),
+    averageVolumePerWorkout,
+    averageCaloriesPerDay,
+    averageProteinPerDay,
+    averageSleepHours,
+    weightTrendKg,
+    consistency: Math.round((activeDays / 7) * 100),
+  };
+};
+
+const getFallbackAIOverview = (history: WorkoutHistoryItem[]): AIOverview => {
+  const weeklyStats = calculateOverviewWeeklyStats(history);
 
   return {
     summary: history.length === 0
       ? "Chưa có dữ liệu tập luyện. Hãy bắt đầu lịch trình đầu tiên của bạn!"
-      : `Bạn đã hoàn thành ${workoutsCompleted} buổi tập trong tuần này với ${totalExercises} bài tập.`,
+      : `Tuần này bạn hoàn thành ${weeklyStats.workoutsCompleted} buổi, tổng ${weeklyStats.totalExercises} bài tập, độ đều đặn ${weeklyStats.consistency}%.`,
     strengths: history.length > 0 ? ["Đã bắt đầu hành trình tập luyện"] : [],
-    improvements: workoutsCompleted < 4 ? ["Tăng tần suất tập luyện lên 4-5 ngày/tuần"] : [],
+    improvements: weeklyStats.workoutsCompleted < 4 ? ["Tăng tần suất tập luyện lên 4-5 ngày/tuần"] : [],
     recommendation: "Tiếp tục duy trì lịch tập đều đặn và tập trung vào progressive overload.",
     motivationalQuote: "\"Điều duy nhất đáng sợ là sự sợ hãi chính nó.\" - David Goggins",
-    weeklyStats: {
-      workoutsCompleted,
-      totalExercises,
-      estimatedCaloriesBurned: workoutsCompleted * 350,
-      consistency
-    }
+    weeklyStats
   };
 };
 
@@ -1097,6 +1157,7 @@ export const generateAIOverview = async (
 
   try {
     const model = MODELS.OVERVIEW;
+    const baselineStats = calculateOverviewWeeklyStats(history);
 
     // Prepare history summary for context
     const lastWeekHistory = history.filter(h => {
@@ -1108,7 +1169,12 @@ export const generateAIOverview = async (
       date: h.date,
       level: h.levelSelected,
       exercises: h.completedExercises?.length || 0,
-      exerciseNames: h.completedExercises?.slice(0, 5).join(', ') || 'N/A'
+      exerciseNames: h.completedExercises?.slice(0, 5).join(', ') || 'N/A',
+      totalVolumeKg: (h.exerciseLogs || []).reduce((sum, log) => sum + (log.totalVolume || 0), 0),
+      calories: h.nutrition?.totalCalories || 0,
+      protein: h.nutrition?.totalProtein || 0,
+      sleepHours: h.sleepHours || 0,
+      weight: h.weight || 0,
     }));
 
     const prompt = `
@@ -1123,14 +1189,27 @@ ${userData ? `Mục tiêu: ${userData.nutritionGoal === 'bulking' ? 'Tăng cơ' 
 TASK: Phân tích tiến trình, tạo AI Overview bằng tiếng Việt.
 
 RULES:
+- Model đang dùng: ${model}
 - summary: 1-2 câu tóm tắt tiến trình tuần
 - strengths: 2-3 điểm mạnh (VD: "Tập đều đặn", "Focus compound movements")
 - improvements: 2-3 điểm cần cải thiện
 - recommendation: 1 gợi ý cụ thể cho tuần tới
 - motivationalQuote: Quote tiếng Việt từ David Goggins/bodybuilder nổi tiếng
-- weeklyStats: consistency = (workouts/7)*100
+- weeklyStats phải có đủ các field sau:
+  - workoutsCompleted (number)
+  - activeDays (number)
+  - totalExercises (number)
+  - avgExercisesPerWorkout (number)
+  - estimatedCaloriesBurned (number)
+  - totalVolumeKg (number)
+  - averageVolumePerWorkout (number)
+  - averageCaloriesPerDay (number)
+  - averageProteinPerDay (number)
+  - averageSleepHours (number)
+  - weightTrendKg (number, tăng là dương, giảm là âm)
+  - consistency (number, công thức = activeDays/7*100)
 
-Generate JSON response ONLY as a JSON Array with exactly 1 object inside: [{ "summary": "...", "strengths": [...], "improvements": [...], "recommendation": "...", "motivationalQuote": "...", "weeklyStats": { "workoutsCompleted": number, "totalExercises": number, "estimatedCaloriesBurned": number, "consistency": number } }]
+Generate JSON response ONLY as a JSON Array with exactly 1 object inside: [{ "summary": "...", "strengths": [...], "improvements": [...], "recommendation": "...", "motivationalQuote": "...", "weeklyStats": { "workoutsCompleted": number, "activeDays": number, "totalExercises": number, "avgExercisesPerWorkout": number, "estimatedCaloriesBurned": number, "totalVolumeKg": number, "averageVolumePerWorkout": number, "averageCaloriesPerDay": number, "averageProteinPerDay": number, "averageSleepHours": number, "weightTrendKg": number, "consistency": number } }]
     `;
 
     const responseText = await callNemotronAPI([
@@ -1141,10 +1220,33 @@ Generate JSON response ONLY as a JSON Array with exactly 1 object inside: [{ "su
 
     let parsed = cleanAndParseJSON(responseText, "AIOverview");
     if (Array.isArray(parsed)) parsed = parsed[0];
+
+    const aiStats = parsed?.weeklyStats || {};
+    const safeNumber = (value: unknown, fallback: number): number => (
+      typeof value === 'number' && Number.isFinite(value) ? value : fallback
+    );
+
     return {
       ...parsed,
+      summary: typeof parsed?.summary === 'string' ? parsed.summary : getFallbackAIOverview(history).summary,
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      improvements: Array.isArray(parsed.improvements) ? parsed.improvements : []
+      improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+      recommendation: typeof parsed?.recommendation === 'string' ? parsed.recommendation : getFallbackAIOverview(history).recommendation,
+      motivationalQuote: typeof parsed?.motivationalQuote === 'string' ? parsed.motivationalQuote : getFallbackAIOverview(history).motivationalQuote,
+      weeklyStats: {
+        workoutsCompleted: safeNumber(aiStats.workoutsCompleted, baselineStats.workoutsCompleted),
+        activeDays: safeNumber(aiStats.activeDays, baselineStats.activeDays),
+        totalExercises: safeNumber(aiStats.totalExercises, baselineStats.totalExercises),
+        avgExercisesPerWorkout: safeNumber(aiStats.avgExercisesPerWorkout, baselineStats.avgExercisesPerWorkout),
+        estimatedCaloriesBurned: safeNumber(aiStats.estimatedCaloriesBurned, baselineStats.estimatedCaloriesBurned),
+        totalVolumeKg: safeNumber(aiStats.totalVolumeKg, baselineStats.totalVolumeKg),
+        averageVolumePerWorkout: safeNumber(aiStats.averageVolumePerWorkout, baselineStats.averageVolumePerWorkout),
+        averageCaloriesPerDay: safeNumber(aiStats.averageCaloriesPerDay, baselineStats.averageCaloriesPerDay),
+        averageProteinPerDay: safeNumber(aiStats.averageProteinPerDay, baselineStats.averageProteinPerDay),
+        averageSleepHours: safeNumber(aiStats.averageSleepHours, baselineStats.averageSleepHours),
+        weightTrendKg: safeNumber(aiStats.weightTrendKg, baselineStats.weightTrendKg),
+        consistency: safeNumber(aiStats.consistency, baselineStats.consistency),
+      }
     };
   } catch (error) {
     console.error("AI Overview Error:", error);

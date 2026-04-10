@@ -23,6 +23,7 @@ const INITIAL_USER_DATA: UserInput = {
   useCreatine: false,
   equipment: DEFAULT_EQUIPMENT,
   consumedFood: [],
+  dislikedFoods: [],
   hasSeenOnboarding: false,
 };
 

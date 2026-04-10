@@ -383,7 +383,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             ) : (
               <Sparkles className="w-6 h-6 mb-2" />
             )}
-            <span className="text-sm font-bold">{showAIOverview ? 'Đóng AI' : 'AI Phân Tích'}</span>
+            <span className="text-sm font-bold">{showAIOverview ? 'Đóng AI' : 'Nemotron Phân Tích'}</span>
           </button>
         </div>
 
@@ -439,6 +439,61 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
               </div>
               <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 text-sm text-indigo-100 italic text-center">
                 "{aiOverview.recommendation}"
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-indigo-500/20">
+                <div className="text-xs font-bold text-indigo-300 mb-2 uppercase">Chỉ số 7 ngày</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Buổi tập</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.workoutsCompleted}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Ngày active</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.activeDays}/7</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Consistency</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.consistency}%</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Tổng bài tập</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.totalExercises}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">TB bài/buổi</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.avgExercisesPerWorkout}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Calo đốt ước tính</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.estimatedCaloriesBurned}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Tổng volume</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.totalVolumeKg.toLocaleString()} kg</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">TB volume/buổi</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.averageVolumePerWorkout.toLocaleString()} kg</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">TB calo/ngày</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.averageCaloriesPerDay}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">TB protein/ngày</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.averageProteinPerDay} g</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">TB giấc ngủ</div>
+                    <div className="text-white font-bold">{aiOverview.weeklyStats.averageSleepHours} h</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2">
+                    <div className="text-gray-400">Xu hướng cân nặng</div>
+                    <div className={`font-bold ${aiOverview.weeklyStats.weightTrendKg > 0 ? 'text-emerald-400' : aiOverview.weeklyStats.weightTrendKg < 0 ? 'text-orange-400' : 'text-white'}`}>
+                      {aiOverview.weeklyStats.weightTrendKg > 0 ? '+' : ''}{aiOverview.weeklyStats.weightTrendKg} kg
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </GlassCard>

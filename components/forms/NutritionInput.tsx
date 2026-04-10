@@ -14,6 +14,7 @@ interface NutritionInputProps {
 
 export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUserData, showToast }) => {
     const [newConsumedFood, setNewConsumedFood] = useState('');
+    const [newDislikedFood, setNewDislikedFood] = useState('');
     
     // Fridge State
     const [fridgeItems, setFridgeItems] = useState<FridgeItem[]>([]);
@@ -100,6 +101,31 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
         }));
     };
 
+    const handleAddDislikedFood = () => {
+        const foodName = newDislikedFood.trim();
+        if (!foodName) return;
+
+        setUserData(prev => {
+            const current = prev.dislikedFoods || [];
+            const exists = current.some(item => item.toLowerCase() === foodName.toLowerCase());
+            if (exists) return prev;
+
+            return {
+                ...prev,
+                dislikedFoods: [...current, foodName]
+            };
+        });
+
+        setNewDislikedFood('');
+    };
+
+    const handleRemoveDislikedFood = (indexToRemove: number) => {
+        setUserData(prev => ({
+            ...prev,
+            dislikedFoods: (prev.dislikedFoods || []).filter((_, index) => index !== indexToRemove)
+        }));
+    };
+
     const getCategoryIcon = (category?: string) => {
         switch (category) {
             case 'protein': return <Beef className="text-red-400" />;
@@ -151,6 +177,44 @@ export const NutritionInput: React.FC<NutritionInputProps> = ({ userData, setUse
                         ) : (
                             <p className="text-center text-xs text-gray-600 py-2">Chưa ăn gì hôm nay.</p>
                         )}
+                    </div>
+
+                    <div className="border-t border-white/10 pt-3 space-y-2">
+                        <p className="text-xs text-gray-400">Món không thích (AI sẽ không gợi ý)</p>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newDislikedFood}
+                                onChange={(e) => setNewDislikedFood(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddDislikedFood()}
+                                placeholder="VD: yến mạch, ca cao..."
+                                className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                            />
+                            <button
+                                onClick={handleAddDislikedFood}
+                                className="p-2.5 bg-rose-500/20 text-rose-300 rounded-xl border border-rose-500/30 hover:bg-rose-500/30 transition-all active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {(userData.dislikedFoods || []).length > 0 ? (
+                                (userData.dislikedFoods || []).map((item, index) => (
+                                    <div key={`${item}-${index}`} className="flex items-center justify-between p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                                        <span className="text-sm text-rose-200">{item}</span>
+                                        <button
+                                            onClick={() => handleRemoveDislikedFood(index)}
+                                            className="text-gray-600 hover:text-rose-300 transition-colors px-2"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-center text-xs text-gray-600 py-1">Chưa có món cần tránh.</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             </GlassCard >

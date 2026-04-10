@@ -87,6 +87,7 @@ export interface UserInput {
   useCreatine: boolean; // New field
   equipment: string[];
   consumedFood: string[];
+  dislikedFoods: string[];
   hasSeenOnboarding: boolean;
 }
 
@@ -250,7 +251,7 @@ export interface ProfileSettings {
   achievements?: AchievementBadge[];
 }
 
-// AI Overview - Insights from Gemini AI about workout progress
+// AI Overview - Insights from Nemotron AI about workout progress
 export interface AIOverview {
   summary: string;           // Tóm tắt tiến trình tổng quan
   strengths: string[];       // Điểm mạnh của user
@@ -259,8 +260,16 @@ export interface AIOverview {
   motivationalQuote: string; // Quote động viên
   weeklyStats: {
     workoutsCompleted: number;
+    activeDays: number;
     totalExercises: number;
+    avgExercisesPerWorkout: number;
     estimatedCaloriesBurned: number;
+    totalVolumeKg: number;
+    averageVolumePerWorkout: number;
+    averageCaloriesPerDay: number;
+    averageProteinPerDay: number;
+    averageSleepHours: number;
+    weightTrendKg: number;
     consistency: number;     // 0-100 percentage
   };
 }
