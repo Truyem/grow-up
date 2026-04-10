@@ -13,7 +13,6 @@ const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:admin@growup.app';
 
 const TIMEZONE = "Asia/Ho_Chi_Minh";
 
-// Send a Web Push notification using the web-push library (properly encrypted)
 async function sendWebPush(
     endpoint: string,
     p256dh: string,
@@ -32,7 +31,6 @@ async function sendWebPush(
         return true;
     } catch (err: any) {
         console.error(`[Push] Failed for ${endpoint.substring(0, 50)}:`, err?.statusCode, err?.body);
-        // 410 Gone or 404 = subscription expired
         if (err?.statusCode === 410 || err?.statusCode === 404) {
             await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
             console.log('[Push] Removed expired subscription');
@@ -77,7 +75,7 @@ async function checkPlansAndNotifyContinuous(): Promise<{ sent: number; failed: 
             const pd = planData.plan_data as any;
             const hasWorkout = pd.workout?.isGenerated === true || pd.workout?.detail?.morning?.length > 0 || pd.workout?.detail?.evening?.length > 0;
             const hasNutrition = pd.nutrition?.isGenerated === true || pd.nutrition?.meals?.length > 0;
-            
+
             if (!hasWorkout && !hasNutrition) {
                 needsReminder = true;
             }
@@ -87,7 +85,7 @@ async function checkPlansAndNotifyContinuous(): Promise<{ sent: number; failed: 
             const payload = {
                 title: '🚨 NHẮC NHỞ HÀNG NGÀY',
                 body: 'Hôm nay mày chưa lên lịch tập hoặc dinh dưỡng! Vào app làm ngay đi trước khi quá muộn!',
-                tag: 'continuous-plan-reminder',
+                tag: 'continuous-plan-reminder-v2',
                 url: '/#schedule',
                 icon: '/icons/icon-192.webp',
                 badge: '/icons/icon-96.webp',
@@ -105,7 +103,7 @@ async function checkPlansAndNotifyContinuous(): Promise<{ sent: number; failed: 
 
 export default async (req: Request, context: Context) => {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-        console.error('[DailyReminder] VAPID keys missing!');
+        console.error('[PlanReminderV2] VAPID keys missing!');
         return new Response('VAPID keys not configured', { status: 500 });
     }
 
@@ -114,17 +112,15 @@ export default async (req: Request, context: Context) => {
     const currentHour = vnTime.getHours();
     const currentMinute = vnTime.getMinutes();
 
-    console.log(`[DailyReminder] VN Time: ${vnTime.toLocaleString('vi-VN')}. Hour: ${currentHour}, Minute: ${currentMinute}`);
+    console.log(`[PlanReminderV2] VN Time: ${vnTime.toLocaleString('vi-VN')}. Hour: ${currentHour}, Minute: ${currentMinute}`);
 
-    // Chỉ thông báo từ 6h sáng đến 9h tối (6:00 - 21:00)
-    // Và kiểm tra liên tục mỗi 15/45 phút (hoặc cứ mỗi giờ tuỳ vào cron)
-    const isContinuousCheckTime = currentHour >= 6 && currentHour <= 21 && 
+    const isContinuousCheckTime = currentHour >= 6 && currentHour <= 21 &&
         (Math.abs(currentMinute - 15) <= 4 || Math.abs(currentMinute - 45) <= 4 || Math.abs(currentMinute - 0) <= 4 || Math.abs(currentMinute - 30) <= 4);
-        
+
     if (isContinuousCheckTime) {
-        console.log(`[DailyReminder] Running continuous plan check at ${currentHour}:${currentMinute}`);
+        console.log(`[PlanReminderV2] Running continuous plan check at ${currentHour}:${currentMinute}`);
         const { sent, failed } = await checkPlansAndNotifyContinuous();
-        return new Response(`Continuous Check: Sent ${sent}, Failed ${failed}`, { status: 200 });
+        return new Response(`PlanReminderV2: Sent ${sent}, Failed ${failed}`, { status: 200 });
     }
 
     return new Response('No active event at this time', { status: 200 });

@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { loadLoginHistory } from '../services/supabasePlanSync';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, getPushSupportStatus, listenForSubscriptionChanges } from '../services/pushNotification';
 import { User } from '@supabase/supabase-js';
-import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff, RefreshCw } from 'lucide-react';
 import { Toast } from './ui/Toast';
 
 interface LoginRecord {
@@ -19,9 +19,11 @@ interface LoginRecord {
 interface AccountSettingsProps {
     user: User;
     onLogout: () => void;
+    onSyncAll?: () => Promise<void>;
+    isSyncing?: boolean;
 }
 
-export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout }) => {
+export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout, onSyncAll, isSyncing = false }) => {
     const [fullName, setFullName] = useState(user.user_metadata?.full_name || '');
     const [currentPassword, setCurrentPassword] = useState('');
     const [password, setPassword] = useState('');
@@ -400,6 +402,23 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                         </button>
                     </div>
                 </form>
+
+                {onSyncAll && (
+                    <div className="pt-8 mt-8 border-t border-white/10">
+                        <h3 className="text-lg font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                            <RefreshCw className="w-5 h-5" /> Đồng Bộ Dữ Liệu
+                        </h3>
+                        <p className="text-sm text-gray-400 mb-4">Đồng bộ lại thông tin tài khoản, kế hoạch và lịch sử từ cloud.</p>
+                        <button
+                            onClick={onSyncAll}
+                            disabled={isSyncing}
+                            className="px-6 py-2 rounded-lg bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600/30 hover:text-cyan-300 transition-all font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                            {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay'}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Login History Section */}
