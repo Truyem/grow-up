@@ -64,6 +64,17 @@ export const savePlanToSupabase = async (
         // Remove workoutProgress from plan_data to avoid duplication
         const { workoutProgress: _wp, ...cleanPlan } = plan as any;
 
+        // Xóa mô tả món ăn (description) khỏi meals để không lưu vào Supabase (cần copy sâu để không mất ở UI)
+        if (cleanPlan.nutrition && cleanPlan.nutrition.meals && Array.isArray(cleanPlan.nutrition.meals)) {
+            cleanPlan.nutrition = {
+                ...cleanPlan.nutrition,
+                meals: cleanPlan.nutrition.meals.map((meal: any) => {
+                    const { description, ...restMeal } = meal;
+                    return restMeal;
+                })
+            };
+        }
+
         // Xóa tất cả các bản ghi cũ của ngày này để ghi đè bản mới nhất
         const { error: deleteError } = await supabase
             .from('daily_plans')

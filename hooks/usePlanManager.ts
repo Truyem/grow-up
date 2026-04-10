@@ -29,6 +29,7 @@ export interface UsePlanManagerReturn {
  */
 export function usePlanManager(
   userData: UserInput,
+  userStats: any,
   session: any,
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void
 ): UsePlanManagerReturn {
@@ -60,6 +61,23 @@ export function usePlanManager(
       return;
     }
 
+    if (type === 'workout') {
+      if (!plan?.nutrition) {
+        showToast('Vui lòng tạo Dinh dưỡng trước khi tạo Bài tập!', 'error');
+        return;
+      }
+      
+      const meals = plan.nutrition.meals || [];
+      const mainMealsEaten = meals.some(m => 
+        (m.name.includes('Sáng') || m.name.includes('Trưa') || m.name.includes('Tối')) && m.consumed
+      );
+      
+      if (!mainMealsEaten) {
+        showToast('Bạn phải hoàn thành (ăn) ít nhất 1 bữa chính (Sáng/Trưa/Tối) mới được tạo bài tập!', 'error');
+        return;
+      }
+    }
+
     if (!userId) {
       showToast('Bạn cần đăng nhập để tạo kế hoạch.', 'error');
       return;
@@ -75,7 +93,7 @@ export function usePlanManager(
     try {
       generatedPartial = await generateDailyPlan(userData, currentHistory, session?.user?.id, generationType, (chunkText) => {
         setStreamingText(chunkText);
-      });
+      }, userStats?.streak);
     } catch (error) {
       console.error('[PlanManager] generateDailyPlan failed:', error);
       setLoading(false);
@@ -89,7 +107,6 @@ export function usePlanManager(
     // Xoá hoàn toàn dữ liệu kế hoạch cũ bằng cách ghi đè trực tiếp bằng kế hoạch mới được sinh ra.
 
     if (generationType === 'workout') {
-      finalPlan = enrichWorkoutWithWarmupCooldown(finalPlan, userData);
       finalPlan.workoutProgress = undefined;
     }
 

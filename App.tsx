@@ -16,7 +16,6 @@ const UserForm = lazy(() => import('./components/UserForm').then(m => ({ default
 const PlanDisplay = lazy(() => import('./components/PlanDisplay').then(m => ({ default: m.PlanDisplay })));
 const NutritionDisplay = lazy(() => import('./components/NutritionDisplay').then(m => ({ default: m.NutritionDisplay })));
 const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
-const OnboardingTour = lazy(() => import('./components/OnboardingTour').then(m => ({ default: m.OnboardingTour })));
 const AccountSettings = lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
 
 import { Toast } from './components/ui/Toast';
@@ -34,7 +33,6 @@ import {
   useUserData,
   useWorkoutHistory,
   usePlanManager,
-  useTour,
   useSupabaseProfileSync,
 } from './hooks';
 import { UserGoals, UserInput } from './types';
@@ -80,7 +78,7 @@ export default function App() {
     handleStartTracking,
     handleUpdatePlan,
     handleRefreshPlan
-  } = usePlanManager(userData, session, showToast);
+  } = usePlanManager(userData, userStats, session, showToast);
 
   // 4. Workout History Hook
   const {
@@ -103,11 +101,6 @@ export default function App() {
       setUserStats(updatedStats);
     }
   }, [workoutHistory, calculateStreak, userStats, setUserStats]);
-
-  // 5. Tour Hook
-  const { isTourOpen, tourSteps, handleTourComplete } = useTour(
-    userData, setUserDataOnline, planLoading, setViewMode, setPlan, handleStartTracking, showToast
-  );
 
   const isLoading = planLoading || isAuthChecking;
   const [hasInitialSynced, setHasInitialSynced] = useState(false);
@@ -347,17 +340,6 @@ export default function App() {
                       <UserForm activeTab="history" />
                     </Suspense>
                   </div>
-                )}
-
-                {isTourOpen && (
-                  <Suspense fallback={null}>
-                    <OnboardingTour
-                      steps={tourSteps}
-                      isOpen={isTourOpen}
-                      onComplete={handleTourComplete}
-                      onSkip={handleTourComplete}
-                    />
-                  </Suspense>
                 )}
               </div>
             </div>
