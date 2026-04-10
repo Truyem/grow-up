@@ -5,7 +5,7 @@ import { fridgeService } from './fridgeService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
-const GPT_OSS_MODEL = "@cf/openai/gpt-oss-120b";
+const GPT_OSS_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 // Gemini API keys from environment (for food image analysis)
 // Multiple keys are injected via vite.config.ts
@@ -15,10 +15,10 @@ const GEMINI_API_KEYS: string[] = (process.env.GEMINI_API_KEYS as unknown as str
 const MODELS = {
   WORKOUT: "nemotron",
   OVERVIEW: "nemotron",
-  MENU: "nemotron",
+  MENU: "@cf/google/gemma-4-26b-a4b-it",
   FOOD_RECOGNITION: "gemini-2.5-flash-lite",
   MACRO_CALC: "nemotron",
-  FOOD_SUGGEST: "nemotron",
+  FOOD_SUGGEST: "@cf/google/gemma-4-26b-a4b-it",
 };
 
 
@@ -828,7 +828,13 @@ ${extraRules}
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS ALREADY GENERATED IN THIS PLAN" list.
 - Nếu một nguyên liệu trong tủ lạnh chỉ còn số lượng giới hạn (ví dụ còn 1 quả chuối), chỉ được dùng đúng phần còn lại và không dùng lặp ở các bữa tiếp theo.
-- TÊN MÓN và DESCRIPTION phải viết TIẾNG VIỆT 100% (không dùng tiếng Anh trong nội dung món).
+- TÊN MÓN phải viết TIẾNG VIỆT 100% (không dùng tiếng Anh).
+- DESCRIPTION phải chứa HƯỚNG DẪN LÀM MÓN CHI TIẾT bằng tiếng Việt, bao gồm:
+  * Các bước làm món từ A-Z
+  * Thời gian chuẩn bị và nấu ăn cho mỗi bước
+  * Phương pháp chế biến (luộc, xào, hấp, nướng, v.v.)
+  * Lượng sử dụng của từng nguyên liệu (nếu không được chỉ định cụ thể trong meal)
+  * Mẹo nhỏ để món ngon hơn (tùy chọn)
 
 YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
 \`\`\`json
@@ -840,7 +846,7 @@ YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
       "protein": number,
       "carbs": number,
       "fat": number,
-      "description": "string"
+      "description": "string (Hướng dẫn làm món chi tiết bằng tiếng Việt)"
     }
   ],
   "usedFridgeItems": [
@@ -848,7 +854,7 @@ YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
   ]
 }
 \`\`\`
-  `;
+`;
 
   const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
