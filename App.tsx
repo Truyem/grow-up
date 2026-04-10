@@ -167,7 +167,7 @@ export default function App() {
     }
   };
 
-  // Native Notifications & App State
+  // Native Notifications
   useEffect(() => {
     if (!session?.user) return;
     
@@ -175,21 +175,7 @@ export default function App() {
     scheduleAllDailyNotifications(plan || undefined).catch((e) => {
       console.warn('[Notifications] Failed to schedule daily notifications:', e);
     });
-
-    // Listen for app coming to foreground to trigger sync
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && hasInitialSynced && !isAuthChecking) {
-        console.log('[App State] App came to foreground, triggering background sync...');
-        handleSyncAll();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [session?.user?.id, plan, hasInitialSynced, isAuthChecking, handleSyncAll]);
+  }, [session?.user?.id, plan]);
 
   useEffect(() => {
     if (session?.user?.id && !hasInitialSynced && !isAuthChecking) {
