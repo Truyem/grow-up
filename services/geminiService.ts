@@ -817,14 +817,18 @@ DISLIKED FOODS / EXCLUDED FOODS (ABSOLUTELY AVOID):
 ${dislikedFoodsStr}
 
 RULES:
-- MỖI MEAL PHẢI CÓ TỐI ĐA 2-3 MÓN/THÀNH PHẦN.
+- MỖI MEAL CHỈ TỐI ĐA 2 MÓN/THÀNH PHẦN, ƯU TIÊN CÀNG ÍT THÀNH PHẦN CÀNG TỐT.
 - **VERY IMPORTANT**: ƯU TIÊN SỬ DỤNG CÁC NGUYÊN LIỆU TRONG FRIDGE INVENTORY ĐỂ LÊN THỰC ĐƠN.
 - Nếu bạn sử dụng nguyên liệu từ FRIDGE INVENTORY, hãy trừ số lượng đi và liệt kê vào mảng "usedFridgeItems" (sử dụng đúng ID được cung cấp).
 - **VERY IMPORTANT**: KHÔNG được đề xuất món có chứa bất kỳ nguyên liệu nào trong "DISLIKED FOODS / EXCLUDED FOODS" (bao gồm tên đồng nghĩa như oats/yến mạch, cacao/ca cao).
+- CARB CHÍNH BẮT BUỘC LÀ CƠM (gạo/cơm trắng/cơm gạo lứt). KHÔNG dùng carb chính khác như bánh mì, bún, phở, mì, nui, yến mạch, khoai.
+- RAU ƯU TIÊN CHỈ DÙNG SÚP LƠ HOẶC CẢI XANH.
+- CHỈ bổ sung nguyên liệu ngoài tủ lạnh khi thật sự cần thiết, và tối đa 1 nguyên liệu ngoài tủ cho mỗi bữa.
 ${extraRules}
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS ALREADY GENERATED IN THIS PLAN" list.
 - Nếu một nguyên liệu trong tủ lạnh chỉ còn số lượng giới hạn (ví dụ còn 1 quả chuối), chỉ được dùng đúng phần còn lại và không dùng lặp ở các bữa tiếp theo.
+- TÊN MÓN và DESCRIPTION phải viết TIẾNG VIỆT 100% (không dùng tiếng Anh trong nội dung món).
 
 YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
 \`\`\`json
@@ -939,7 +943,7 @@ const generateNutritionPart = async (
     const breakfastData = await generateMealForTime(
       "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Breakfast (Sáng)**: NO rice/bread if cutting. Use eggs, yogurt, oats, fruit, nuts.",
+      "- **Bữa Sáng**: vẫn dùng cơm làm carb chính; ưu tiên đạm nạc + súp lơ hoặc cải xanh.",
       localFridgeItems
     );
     const breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
@@ -949,7 +953,7 @@ const generateNutritionPart = async (
     const lunchData = await generateMealForTime(
       "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Lunch (Trưa)**: Rice allowed. Balanced protein + carbs + veggies.",
+      "- **Bữa Trưa**: cơm + đạm + rau (ưu tiên súp lơ hoặc cải xanh), món đơn giản.",
       remainingFridgeItems
     );
     const lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
@@ -959,7 +963,7 @@ const generateNutritionPart = async (
     const dinnerData = await generateMealForTime(
       "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Dinner (Tối)**: Rice allowed but lighter than lunch. Lean protein preferred. NO snacks.",
+      "- **Bữa Tối**: cơm nhẹ hơn trưa, ưu tiên đạm nạc + súp lơ hoặc cải xanh, không thêm món vặt.",
       remainingFridgeItems
     );
     const dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
