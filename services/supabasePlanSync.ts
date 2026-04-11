@@ -55,26 +55,15 @@ export const savePlanToSupabase = async (
     workoutProgress?: Record<string, any>,
     planDateKey?: string
 ) : Promise<boolean> => {
+    const dateKey = planDateKey || getPlanDateKey(plan?.date);
+
+    // Extract workoutProgress from plan if embedded (from PlanDisplay toggle)
+    const progressToSave = workoutProgress || (plan as any).workoutProgress || {};
+
+    // Remove workoutProgress from plan_data to avoid duplication
+    const { workoutProgress: _wp, ...cleanPlan } = plan as any;
+
     try {
-        const dateKey = planDateKey || getPlanDateKey(plan?.date);
-
-        // Extract workoutProgress from plan if embedded (from PlanDisplay toggle)
-        const progressToSave = workoutProgress || (plan as any).workoutProgress || {};
-
-        // Remove workoutProgress from plan_data to avoid duplication
-        const { workoutProgress: _wp, ...cleanPlan } = plan as any;
-
-        // Xóa mô tả món ăn (description) khỏi meals để không lưu vào Supabase (cần copy sâu để không mất ở UI)
-        if (cleanPlan.nutrition && cleanPlan.nutrition.meals && Array.isArray(cleanPlan.nutrition.meals)) {
-            cleanPlan.nutrition = {
-                ...cleanPlan.nutrition,
-                meals: cleanPlan.nutrition.meals.map((meal: any) => {
-                    const { description, ...restMeal } = meal;
-                    return restMeal;
-                })
-            };
-        }
-
         // Xóa tất cả các bản ghi cũ của ngày này để ghi đè bản mới nhất
         const { error: deleteError } = await supabase
             .from('daily_plans')
@@ -102,7 +91,7 @@ export const savePlanToSupabase = async (
             return true;
         }
     } catch (err) {
-        console.error('[PlanSync] Unexpected error:', err);
+        console.error('[PlanSync] Save failed:', err);
         return false;
     }
 };
@@ -114,9 +103,9 @@ export const loadPlanFromSupabase = async (
     userId: string,
     planDateKey?: string
 ): Promise<{ plan: DailyPlan | null; workoutProgress: Record<string, any> | null }> => {
-    try {
-        const dateKey = planDateKey || getTodayDateKey();
+    const dateKey = planDateKey || getTodayDateKey();
 
+    try {
         const { data, error } = await supabase
             .from('daily_plans')
             .select('plan_data, workout_progress')
@@ -139,9 +128,71 @@ export const loadPlanFromSupabase = async (
 
         return { plan: null, workoutProgress: null };
     } catch (err) {
-        console.error('[PlanSync] Unexpected load error:', err);
+        console.error('[PlanSync] Load error:', err);
         return { plan: null, workoutProgress: null };
     }
+};
+
+// ========================================
+// LocalStorage for offline plans (unused - kept for potential future use)
+// ========================================
+type OfflinePlanData = {
+    plan: DailyPlan;
+    workoutProgress: Record<string, any> | null;
+};
+
+const getOfflinePlansFromStorage = (): Record<string, OfflinePlanData> => {
+    try {
+        const stored = localStorage.getItem(OFFLINE_PLANS_KEY);
+        return stored ? JSON.parse(stored) : {};
+    } catch {
+        return {};
+    }
+};
+
+const saveToOfflineStorage = (userId: string, plan: DailyPlan, workoutProgress: Record<string, any> | null, dateKey: string): void => {
+    try {
+        const plans = getOfflinePlansFromStorage();
+        const key = `${userId}_${dateKey || getPlanDateKey(plan?.date)}`;
+        plans[key] = { plan, workoutProgress };
+        localStorage.setItem(OFFLINE_PLANS_KEY, JSON.stringify(plans));
+        console.log('[PlanSync] Plan saved to offline storage:', key);
+    } catch (err) {
+        console.error('[PlanSync] Offline storage error:', err);
+    }
+};
+
+const loadFromOfflineStorage = (userId: string, dateKey?: string): { plan: DailyPlan | null; workoutProgress: Record<string, any> | null } => {
+    try {
+        const plans = getOfflinePlansFromStorage();
+        const key = `${userId}_${dateKey || getTodayDateKey()}`;
+        const data = plans[key];
+        return data ? { plan: data.plan, workoutProgress: data.workoutProgress || null } : { plan: null, workoutProgress: null };
+    } catch {
+        return { plan: null, workoutProgress: null };
+    }
+};
+
+export const syncOfflinePlansToSupabase = async (userId: string): Promise<number> => {
+    if (!isOnline()) return 0;
+    const plans = getOfflinePlansFromStorage();
+    let synced = 0;
+    for (const key in plans) {
+        if (key.startsWith(userId + '_')) {
+            const { plan, workoutProgress } = plans[key];
+            const dateKey = key.replace(userId + '_', '');
+            const success = await savePlanToSupabase(userId, plan, workoutProgress, dateKey);
+            if (success) {
+                delete plans[key];
+                synced++;
+            }
+        }
+    }
+    if (synced > 0) {
+        localStorage.setItem(OFFLINE_PLANS_KEY, JSON.stringify(plans));
+        console.log('[PlanSync] Synced', synced, 'offline plans to Supabase');
+    }
+    return synced;
 };
 
 // ========================================

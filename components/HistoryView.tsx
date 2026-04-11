@@ -1,11 +1,13 @@
-import React, { useMemo, useState, lazy, Suspense, useCallback } from 'react';
+import React, { useMemo, useState, lazy, Suspense, useCallback, useEffect } from 'react';
 import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview, SleepRecoveryEntry } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { ActivityRings } from './ui/ActivityRings';
+import { RankShowcase } from './ui/RankShowcase';
 import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
 import { generateAIOverview } from '../services/geminiService';
 import { DEFAULT_SLEEP_HOURS, MAX_SLEEP_HOURS, MIN_SLEEP_HOURS, getSleepQualityLabel } from '../services/sleepRecoveryService';
+import { useLevelSystem } from '../hooks';
 
 // Lazy load the heavy charts component (contains all recharts)
 const StatsCharts = lazy(() => import('./ui/StatsCharts'));
@@ -58,6 +60,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
   const [aiOverview, setAiOverview] = useState<AIOverview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAIOverview, setShowAIOverview] = useState(false);
+
+  // Load user level for RankShowcase
+  const { userLevel } = useLevelSystem();
 
   // Calendar state
   const now = new Date();
@@ -296,6 +301,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
 
   return (
     <div id="tour-history-calendar" className="space-y-6 animate-fade-in relative pb-8">
+
+      {/* --- RANK SHOWCASE --- */}
+      <Suspense fallback={null}>
+        <RankShowcase userLevel={userLevel} />
+      </Suspense>
 
       {/* --- HEADER & CONTROLS --- */}
       <div className="flex flex-col gap-4">

@@ -1,0 +1,113 @@
+.levelup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-out;
+  cursor: pointer;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.levelup-container-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 40px;
+}
+
+.rank-stack {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.rank-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.5));
+}
+
+.rank-new {
+  z-index: 1;
+}
+
+.rank-old {
+  z-index: 2;
+  transition: opacity 4s ease;
+}
+
+.rank-old.fading-out {
+  opacity: 0;
+}
+
+@keyframes rankReveal {
+  0% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.rank-new {
+  animation: rankReveal 4s ease-out forwards;
+}
+
+.levelup-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s ease-out 0.3s;
+}
+
+.levelup-text.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.levelup-level {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.levelup-rank {
+  font-size: 28px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+@media (max-width: 480px) {
+  .rank-overlay {
+    width: 100px;
+    height: 100px;
+  }
+
+  .rank-img {
+    width: 100px;
+    height: 100px;
+  }
+
+  .levelup-level {
+    font-size: 20px;
+  }
+
+  .levelup-rank {
+    font-size: 24px;
+  }
+}

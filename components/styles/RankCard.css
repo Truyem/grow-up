@@ -1,0 +1,357 @@
+.rank-card-container {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.rank-card-container:hover {
+  transform: translateY(-4px);
+}
+
+/* Background */
+.rank-card-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.1;
+  border-radius: 20px;
+}
+
+/* Main card */
+.rank-card {
+  position: relative;
+  background: white;
+  border-radius: 20px;
+  border: 3px solid;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.rank-card-container:hover .rank-card {
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
+}
+
+/* Top section with number and icon */
+.rank-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.05) 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.rank-number {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.rank-icon {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Image section */
+.rank-image-section {
+  position: relative;
+  padding: 24px;
+  text-align: center;
+  border-bottom: 2px solid;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.01) 0%, transparent 100%);
+}
+
+.rank-image {
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.rank-card-container:hover .rank-image {
+  transform: scale(1.05);
+}
+
+.level-badge {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Info section */
+.rank-info-section {
+  padding: 24px;
+}
+
+.rank-name {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rank-description {
+  margin: 0 0 20px 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* Progress sections */
+.progress-section,
+.level-progress-section {
+  margin-bottom: 16px;
+}
+
+.progress-label,
+.level-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progress-text,
+.xp-text {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.progress-bar,
+.level-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill,
+.level-progress-fill {
+  height: 100%;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+.progress-fill::after,
+.level-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+/* Stats */
+.rank-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat {
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.01) 0%, rgba(0, 0, 0, 0.02) 100%);
+  border-left: 3px solid;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.stat:hover {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.04) 100%);
+  transform: translateX(2px);
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Levels indicator */
+.levels-indicator {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.level-dot {
+  flex: 1;
+  height: 24px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.level-dot.active {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.level-dot.inactive {
+  opacity: 0.5;
+}
+
+.level-dot:hover {
+  transform: scaleY(1.2);
+}
+
+/* Bottom section */
+.rank-card-bottom {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.05) 100%);
+  border-top: 1px solid;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.rank-status {
+  display: inline-block;
+  animation: bounce 2s infinite;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .rank-card {
+    border-radius: 16px;
+    border-width: 2px;
+  }
+
+  .rank-name {
+    font-size: 20px;
+  }
+
+  .rank-image {
+    width: 120px;
+    height: 120px;
+  }
+
+  .rank-info-section {
+    padding: 16px;
+  }
+
+  .rank-stats {
+    gap: 8px;
+  }
+
+  .stat-value {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .rank-card {
+    border-radius: 12px;
+  }
+
+  .rank-card-top {
+    padding: 12px 16px;
+  }
+
+  .rank-number {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .rank-image-section {
+    padding: 16px;
+  }
+
+  .rank-image {
+    width: 100px;
+    height: 100px;
+  }
+
+  .rank-name {
+    font-size: 16px;
+  }
+
+  .rank-description {
+    font-size: 12px;
+  }
+
+  .levels-indicator {
+    gap: 2px;
+  }
+
+  .level-dot {
+    height: 18px;
+  }
+}

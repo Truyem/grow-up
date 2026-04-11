@@ -235,10 +235,51 @@ export interface AchievementBadge {
   progressText: string;
 }
 
+// ============================================================
+// Gamification - XP & Level System
+// ============================================================
+export interface UserLevel {
+  userId: string;
+  currentLevel: number;           // Cấp độ hiện tại (1+)
+  currentRankNumber: number;      // Rank hiện tại (1-7)
+  previousRankNumber: number;     // Rank trước đó
+  totalXP: number;                // Tổng XP tích lũy
+  currentLevelXP: number;         // XP trong cấp độ hiện tại
+  nextLevelXP: number;            // XP cần thiết để lên cấp tiếp theo
+  lifetimeXP: number;             // XP suốt đời
+  lastLevelUpDate?: string;       // Ngày lên cấp cuối cùng
+}
+
+export interface XPReward {
+  baseXP: number;                 // XP cơ bản
+  exerciseCount: number;          // Số bài tập hoàn thành
+  exerciseBonus: number;          // Bonus XP từ số bài tập
+  consistency: number;            // Bonus XP từ consistency streak
+  difficulty: number;             // Bonus XP từ độ khó (intensity)
+  totalXP: number;                // Tổng XP nhận được
+}
+
+export interface LevelUp {
+  newLevel: number;
+  xpGained: number;
+  totalXP: number;
+  rewards: string[];              // Những reward đặc biệt khi lên cấp
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  unlockedAt?: string;
+  icon?: string;
+  type: 'level' | 'streak' | 'volume' | 'consistency' | 'special';
+}
+
 export interface ProfileSettings {
   userData?: UserInput;
   userStats?: UserStats;
   userGoals?: UserGoals;
+  userLevel?: UserLevel;          // Thêm level info
   supplementLog?: {
     date: string;
     water_ml: number;
@@ -252,6 +293,13 @@ export interface ProfileSettings {
 }
 
 // AI Overview - Insights from Nemotron AI about workout progress
+export interface WeatherInfo {
+  season: 'spring' | 'summer' | 'fall' | 'winter';
+  condition: 'sunny' | 'cloudy' | 'rainy' | 'thunder' | 'snow';
+  temperature: number;
+  location: string;
+}
+
 export interface AIOverview {
   summary: string;           // Tóm tắt tiến trình tổng quan
   strengths: string[];       // Điểm mạnh của user

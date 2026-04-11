@@ -32,6 +32,79 @@ const INITIAL_STATS: UserStats = {
   lastLoginDate: '',
 };
 
+const DEFAULT_ACHIEVEMENTS: AchievementBadge[] = [
+  {
+    id: 'first_workout',
+    title: 'Khởi đầu',
+    description: 'Hoàn thành buổi tập đầu tiên',
+    unlocked: false,
+    progressText: '0/1 buổi tập',
+  },
+  {
+    id: 'streak_7',
+    title: 'Kiên trì',
+    description: 'Tập liên tục 7 ngày',
+    unlocked: false,
+    progressText: '0/7 ngày',
+  },
+  {
+    id: 'streak_30',
+    title: 'Thói quen',
+    description: 'Tập liên tục 30 ngày',
+    unlocked: false,
+    progressText: '0/30 ngày',
+  },
+  {
+    id: 'level_10',
+    title: 'Người tập',
+    description: 'Đạt Level 10',
+    unlocked: false,
+    progressText: 'Level 0/10',
+  },
+  {
+    id: 'level_50',
+    title: 'Võ sĩ',
+    description: 'Đạt Level 50',
+    unlocked: false,
+    progressText: 'Level 0/50',
+  },
+  {
+    id: 'complete_rank_bronze',
+    title: 'Đồng đủ',
+    description: 'Hoàn thành Rank Đồng (Level 10)',
+    unlocked: false,
+    progressText: 'Level 0/10',
+  },
+  {
+    id: 'complete_rank_silver',
+    title: 'Sắt hoàn thiện',
+    description: 'Hoàn thành Rank Sắt (Level 20)',
+    unlocked: false,
+    progressText: 'Level 0/20',
+  },
+  {
+    id: 'complete_rank_gold',
+    title: 'Vàng rực rỡ',
+    description: 'Hoàn thành Rank Vàng (Level 30)',
+    unlocked: false,
+    progressText: 'Level 0/30',
+  },
+  {
+    id: 'workout_100',
+    title: 'Trăm bài',
+    description: 'Hoàn thành 100 buổi tập',
+    unlocked: false,
+    progressText: '0/100 buổi tập',
+  },
+  {
+    id: 'max_level',
+    title: 'Huyền thoại',
+    description: 'Đạt Level tối đa (70)',
+    unlocked: false,
+    progressText: 'Level 0/70',
+  },
+];
+
 export interface UseUserDataReturn {
   userData: UserInput;
   setUserData: React.Dispatch<React.SetStateAction<UserInput>>;
@@ -47,7 +120,7 @@ export function useUserData(): UseUserDataReturn {
   const [userData, setUserData] = useState<UserInput>(INITIAL_USER_DATA);
   const [userStats, setUserStats] = useState<UserStats>(INITIAL_STATS);
   const [userGoals, setUserGoals] = useState<UserGoals | null>(null);
-  const [achievements, setAchievements] = useState<AchievementBadge[]>([]);
+  const [achievements, setAchievements] = useState<AchievementBadge[]>(DEFAULT_ACHIEVEMENTS);
 
   return { userData, setUserData, userStats, setUserStats, userGoals, setUserGoals, achievements, setAchievements };
 }

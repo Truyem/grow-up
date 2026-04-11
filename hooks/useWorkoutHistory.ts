@@ -3,6 +3,8 @@ import { WorkoutHistoryItem, UserInput, UserStats, DailyPlan, ExerciseLog } from
 import { deletePlanByDate, deleteWorkoutHistoryItemFromSupabase, loadWorkoutHistoryFromSupabase, savePlanToSupabase, syncUserStatsToSupabase, upsertWorkoutHistoryItemToSupabase, upsertSleepLogToWorkoutLogs } from '../services/supabasePlanSync';
 import { canPerformOnlineAction } from '../services/onlineGuard';
 import { useOnlineStatus } from './useOnlineStatus';
+import { initializeUserLevel, saveUserLevel, addXP } from '../services/levelService';
+import { XP_REWARDS, getRankFromLevel } from '../constants/rankConfig';
 
 // Helper: get today string in Vietnamese format (matches original App.tsx)
 const getTodayString = (): string => {
@@ -196,6 +198,79 @@ export function useWorkoutHistory(
     }
 
     showToast(`Đã lưu buổi tập: ${completedExercises.length} bài tập hoàn thành!`);
+    
+    // --- ADD XP REWARD ---
+    try {
+      // 1. Get or create user level data
+      let userLevel = await initializeUserLevel(userId);
+      if (!userLevel) {
+        console.warn('Failed to initialize user level');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // 2. Calculate XP reward based on workout info
+      const exerciseCount = completedExercises.length;
+      const hasNutrition = !!nutrition && nutrition.totalCalories && nutrition.totalCalories > 0;
+      const consistencyStreak = userStats.streak || 0;
+      
+      // Parse difficulty from levelSelected (e.g., "Beginner", "Intermediate", "Advanced", "Hard")
+      let intensity: 'low' | 'medium' | 'hard' = 'medium';
+      if (levelSelected.toLowerCase().includes('hard') || levelSelected.toLowerCase().includes('advanced')) {
+        intensity = 'hard';
+      } else if (levelSelected.toLowerCase().includes('beginner')) {
+        intensity = 'low';
+      }
+
+      // 3. Calculate XP: base + exercises + intensity + consistency + nutrition
+      let baseXP = XP_REWARDS.BASE_WORKOUT;
+      const exerciseBonus = exerciseCount * XP_REWARDS.PER_EXERCISE;
+      const difficultyBonus = XP_REWARDS.DIFFICULTY_BONUS[intensity] || 0;
+      const consistencyBonus = consistencyStreak > 0 ? XP_REWARDS.CONSISTENCY_BONUS : 0;
+      const nutritionBonus = hasNutrition ? XP_REWARDS.NUTRITION_BONUS : 0;
+      const totalXP = baseXP + exerciseBonus + difficultyBonus + consistencyBonus + nutritionBonus;
+
+      // 4. Add XP and check for level up
+      let updated = { ...userLevel };
+      let currentLevelXP = updated.currentLevelXP + totalXP;
+      let leveledUp = false;
+      let oldRank = updated.currentRankNumber;
+
+      // Simple level calculation: every 1100 XP = 1 level (you can adjust this formula)
+      const XP_PER_LEVEL = 1100;
+      while (currentLevelXP >= XP_PER_LEVEL) {
+        currentLevelXP -= XP_PER_LEVEL;
+        updated.currentLevel += 1;
+        leveledUp = true;
+
+        // Check if rank changed
+        const newRank = getRankFromLevel(updated.currentLevel);
+        updated.currentRankNumber = newRank.rankNumber;
+        if (newRank.rankNumber > oldRank) {
+          updated.previousRankNumber = oldRank;
+        }
+      }
+
+      updated.currentLevelXP = currentLevelXP;
+      updated.totalXP += totalXP;
+      updated.lifetimeXP += totalXP;
+      updated.lastLevelUpDate = leveledUp ? new Date().toISOString() : updated.lastLevelUpDate;
+
+      // 5. Save to Supabase
+      const saved = await saveUserLevel(userId, updated);
+      if (saved) {
+        // Show XP toast notification
+        if (leveledUp) {
+          showToast(`🎉 Lên Level ${updated.currentLevel}! +${totalXP} XP`, 'success');
+        } else {
+          showToast(`+${totalXP} XP (Level ${updated.currentLevel}: ${currentLevelXP}/${XP_PER_LEVEL})`, 'info');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding XP reward:', error);
+      // Don't show error toast to user, silently fail
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId]);
 

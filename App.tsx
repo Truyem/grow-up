@@ -16,11 +16,15 @@ const UserForm = lazy(() => import('./components/UserForm').then(m => ({ default
 const PlanDisplay = lazy(() => import('./components/PlanDisplay').then(m => ({ default: m.PlanDisplay })));
 const NutritionDisplay = lazy(() => import('./components/NutritionDisplay').then(m => ({ default: m.NutritionDisplay })));
 const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const OnboardingTour = lazy(() => import('./components/OnboardingTour').then(m => ({ default: m.OnboardingTour })));
 const AccountSettings = lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
 
 import { Toast } from './components/ui/Toast';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
 import { PlanTabs } from './components/ui/PlanTabs';
+import { XPStatusBar } from './components/ui/XPStatusBar';
+import { LevelUpAnimation } from './components/ui/LevelUpAnimation';
+import { WeatherDisplay } from './components/ui/WeatherDisplay';
 import { Sparkles, Settings } from 'lucide-react';
 
 import { scheduleAllDailyNotifications } from './services/scheduleNotifications';
@@ -33,7 +37,9 @@ import {
   useUserData,
   useWorkoutHistory,
   usePlanManager,
+  useTour,
   useSupabaseProfileSync,
+  useLevelSystem,
 } from './hooks';
 import { UserGoals, UserInput } from './types';
 
@@ -44,6 +50,26 @@ export default function App() {
     setToastMessage(msg);
     setToastType(type);
   };
+
+  // Preload rank images
+  useEffect(() => {
+    const preloadImages = async () => {
+      const promises = [];
+      for (let i = 0; i <= 70; i++) {
+        promises.push(
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = resolve;
+            img.onerror = resolve;
+            img.src = `/ranks/lv${i}.png`;
+          })
+        );
+      }
+      await Promise.all(promises);
+      console.log('[Preload] All rank images loaded');
+    };
+    preloadImages();
+  }, []);
 
   // 1. Auth Hook
   const { session, isAuthChecking, signOut } = useAuth();
@@ -78,7 +104,7 @@ export default function App() {
     handleStartTracking,
     handleUpdatePlan,
     handleRefreshPlan
-  } = usePlanManager(userData, userStats, session, showToast);
+  } = usePlanManager(userData, session, showToast);
 
   // 4. Workout History Hook
   const {
@@ -102,6 +128,11 @@ export default function App() {
     }
   }, [workoutHistory, calculateStreak, userStats, setUserStats]);
 
+  // 5. Tour Hook
+  const { isTourOpen, tourSteps, handleTourComplete } = useTour(
+    userData, setUserDataOnline, planLoading, setViewMode, setPlan, handleStartTracking, showToast
+  );
+
   const isLoading = planLoading || isAuthChecking;
   const [hasInitialSynced, setHasInitialSynced] = useState(false);
 
@@ -114,6 +145,287 @@ export default function App() {
     achievements, setAchievements,
     hasInitialSynced
   );
+
+  // 7. Level System Hook
+  const { userLevel, setUserLevelData, isLevelingUp, levelUpInfo } = useLevelSystem(session?.user?.id);
+
+  // 8. Update achievements based on progress
+  useEffect(() => {
+    if (!userLevel || !achievements) return;
+
+    const newAchievements = achievements.map(achievement => {
+      const updated = { ...achievement };
+      
+      switch (achievement.id) {
+        case 'first_workout':
+          if (workoutHistory.length >= 1 && !updated.unlocked) {
+            updated.unlocked = true;
+            updated.progressText = '1/1 buổi tập ✓';
+          }
+          break;
+        case 'streak_7':
+          if (userStats.streak >= 7) {
+            updated.unlocked = true;
+            updated.progressText = '7/7 ngày ✓';
+          } else {
+            updated.progressText = `${userStats.streak}/7 ngày`;
+          }
+          break;
+        case 'streak_30':
+          if (userStats.streak >= 30) {
+            updated.unlocked = true;
+            updated.progressText = '30/30 ngày ✓';
+          } else {
+            updated.progressText = `${userStats.streak}/30 ngày`;
+          }
+          break;
+        case 'level_10':
+          if (userLevel.currentLevel >= 10) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 10/10 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/10`;
+          }
+          break;
+        case 'level_50':
+          if (userLevel.currentLevel >= 50) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 50/50 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/50`;
+          }
+          break;
+        case 'complete_rank_bronze':
+          if (userLevel.currentLevel >= 10) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 10/10 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/10`;
+          }
+          break;
+        case 'complete_rank_silver':
+          if (userLevel.currentLevel >= 20) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 20/20 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/20`;
+          }
+          break;
+        case 'complete_rank_gold':
+          if (userLevel.currentLevel >= 30) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 30/30 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/30`;
+          }
+          break;
+        case 'workout_100':
+          if (workoutHistory.length >= 100) {
+            updated.unlocked = true;
+            updated.progressText = '100/100 buổi tập ✓';
+          } else {
+            updated.progressText = `${workoutHistory.length}/100 buổi tập`;
+          }
+          break;
+        case 'max_level':
+          if (userLevel.currentLevel >= 70) {
+            updated.unlocked = true;
+            updated.progressText = 'Level 70/70 ✓';
+          } else {
+            updated.progressText = `Level ${userLevel.currentLevel}/70`;
+          }
+          break;
+      }
+      return updated;
+    });
+
+    const hasChanges = newAchievements.some((newAch, i) => 
+      newAch.unlocked !== achievements[i].unlocked || 
+      newAch.progressText !== achievements[i].progressText
+    );
+
+    if (hasChanges) {
+      setAchievements(newAchievements);
+    }
+  }, [userLevel, userStats.streak, workoutHistory.length, achievements, setAchievements]);
+
+  // Track levels for animation
+  const [animationLevels, setAnimationLevels] = useState<{ old: number; new: number } | null>(null);
+
+  // Handle level up animation - capture levels immediately when triggered
+  useEffect(() => {
+    if (isLevelingUp && levelUpInfo) {
+      setAnimationLevels({
+        old: levelUpInfo.oldLevel,
+        new: levelUpInfo.newLevel
+      });
+    }
+  }, [isLevelingUp, levelUpInfo]);
+
+  const handleLevelUpComplete = () => {
+    setAnimationLevels(null);
+  };
+
+  // Cheat codes console
+  useEffect(() => {
+    const addXP = (amount: number) => {
+      if (!session?.user?.id || !userLevel) {
+        console.log('❌ Chưa đăng nhập hoặc chưa có userLevel');
+        return;
+      }
+      const newLevel = { ...userLevel };
+      newLevel.currentLevelXP += amount;
+      newLevel.totalXP += amount;
+      newLevel.lifetimeXP += amount;
+      setUserLevelData(newLevel);
+      console.log(`✅ +${amount} XP!`, newLevel);
+    };
+
+    const cheatCodes: Record<string, () => void> = {
+      'growup-xp100': () => addXP(100),
+      'growup-xp500': () => addXP(500),
+      'growup-xp1000': () => addXP(1000),
+      'growup-xp5000': () => addXP(5000),
+      'growup-xp10000': () => addXP(10000),
+      'growup-levelup': () => {
+        if (!session?.user?.id || !userLevel) {
+          console.log('❌ Chưa đăng nhập hoặc chưa có userLevel');
+          return;
+        }
+        const newLevel = { ...userLevel };
+        newLevel.currentLevel += 1;
+        newLevel.currentLevelXP = 0;
+        newLevel.totalXP += 1100;
+        newLevel.lifetimeXP += 1100;
+        setUserLevelData(newLevel);
+        console.log('✅ Level Up!', newLevel);
+      },
+      'growup-levelup10': () => {
+        if (!session?.user?.id || !userLevel) {
+          console.log('❌ Chưa đăng nhập hoặc chưa có userLevel');
+          return;
+        }
+        const newLevel = { ...userLevel };
+        for (let i = 0; i < 10; i++) {
+          newLevel.totalXP += (newLevel.currentLevel + i + 1) * 1100;
+        }
+        newLevel.currentLevel += 10;
+        newLevel.currentLevelXP = 0;
+        newLevel.lifetimeXP = newLevel.totalXP;
+        setUserLevelData(newLevel);
+        console.log('✅ +10 Levels!', newLevel);
+      },
+      'growup-reset': () => {
+        if (!session?.user?.id) {
+          console.log('❌ Chưa đăng nhập');
+          return;
+        }
+        const newLevel = {
+          userId: session.user.id,
+          currentLevel: 0,
+          currentRankNumber: 1,
+          previousRankNumber: 1,
+          totalXP: 0,
+          currentLevelXP: 0,
+          nextLevelXP: 1100,
+          lifetimeXP: 0,
+        };
+        setUserLevelData(newLevel);
+        console.log('✅ Reset!', newLevel);
+      },
+      'growup-max-rank': () => {
+        if (!session?.user?.id) {
+          console.log('❌ Chưa đăng nhập');
+          return;
+        }
+        const newLevel = {
+          userId: session.user.id,
+          currentLevel: 69,
+          currentRankNumber: 7,
+          previousRankNumber: 6,
+          totalXP: 100000,
+          currentLevelXP: 500,
+          nextLevelXP: 77000,
+          lifetimeXP: 100000,
+        };
+        setUserLevelData(newLevel);
+        console.log('👑 MAX RANK!', newLevel);
+      },
+      'growup-info': () => {
+        console.log('📊 User Level Info:', userLevel);
+        console.log('👤 User ID:', session?.user?.id);
+      },
+      'growup-fix': () => {
+        if (!session?.user?.id || !userLevel) {
+          console.log('❌ Chưa đăng nhập hoặc chưa có userLevel');
+          return;
+        }
+        // Fix data: recalculate from totalXP
+        const XP_PER_LEVEL = 1100;
+        let level = 0;
+        let tempXP = userLevel.lifetimeXP;
+        let currentLevelXP = 0;
+        while (tempXP >= (level + 1) * XP_PER_LEVEL && level < 70) {
+          tempXP -= (level + 1) * XP_PER_LEVEL;
+          level++;
+        }
+        currentLevelXP = tempXP;
+        const nextLevelXP = (level + 1) * XP_PER_LEVEL;
+        const newLevel = {
+          ...userLevel,
+          currentLevel: level,
+          currentLevelXP: currentLevelXP,
+          nextLevelXP: nextLevelXP,
+          totalXP: userLevel.lifetimeXP,
+        };
+        setUserLevelData(newLevel);
+        console.log('🔧 Data Fixed!', newLevel);
+      },
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'G') {
+        console.log('%c🕹️ GROW UP CHEAT CODES:', 'color: #22d3ee; font-weight: bold; font-size: 14px;');
+        console.log('%cXP:', 'color: #ffd700; font-weight: bold;');
+        console.log('%c  growup.xp100() - +100 XP', 'color: #4ade80;');
+        console.log('%c  growup.xp500() - +500 XP', 'color: #4ade80;');
+        console.log('%c  growup.xp1000() - +1000 XP', 'color: #4ade80;');
+        console.log('%c  growup.xp5000() - +5000 XP', 'color: #4ade80;');
+        console.log('%c  growup.xp10000() - +10000 XP', 'color: #4ade80;');
+        console.log('%cLevel:', 'color: #ffd700; font-weight: bold;');
+        console.log('%c  growup.levelup() - Lên 1 level', 'color: #67e8f9;');
+        console.log('%c  growup.levelup10() - Lên 10 level', 'color: #67e8f9;');
+        console.log('%cOther:', 'color: #ffd700; font-weight: bold;');
+        console.log('%c  growup.reset() - Reset về level 0', 'color: #f87171;');
+        console.log('%c  growup.maxRank() - Set Max Rank (Lv 69)', 'color: #fbbf24;');
+        console.log('%c  growup.info() - Xem thông tin', 'color: #a78bfa;');
+        console.log('%c  growup.fix() - Fix data', 'color: #f59e0b;');
+      }
+    };
+
+    // Expose cheat functions globally
+    (window as any).growup = {
+      info: () => console.log('📊 User Level Info:', userLevel),
+      xp100: () => addXP(100),
+      xp500: () => addXP(500),
+      xp1000: () => addXP(1000),
+      xp5000: () => addXP(5000),
+      xp10000: () => addXP(10000),
+      levelup: () => cheatCodes['growup-levelup'](),
+      levelup10: () => cheatCodes['growup-levelup10'](),
+      reset: () => cheatCodes['growup-reset'](),
+      maxRank: () => cheatCodes['growup-max-rank'](),
+      fix: () => cheatCodes['growup-fix'](),
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    console.log('%c🎮 GROW UP - Cheat codes ready! Nhấn Ctrl+Shift+G để xem danh sách', 'color: #22d3ee;');
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      delete (window as any).growup;
+    };
+  }, [session?.user?.id, userLevel, setUserLevelData]);
 
   const handleSyncAll = async () => {
     if (!session?.user?.id) return;
@@ -274,6 +586,7 @@ export default function App() {
                     <Settings className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
                   </button>
                 </div>
+                <WeatherDisplay />
               </div>
 
               <div className="transition-all duration-500 ease-in-out">
@@ -284,6 +597,15 @@ export default function App() {
                     className="shadow-2xl"
                   />
                 </div>
+
+                {session?.user && (
+                  <div className="max-w-2xl mx-auto mb-6">
+                    <XPStatusBar
+                      userLevel={userLevel}
+                      onClick={() => setViewMode('history')}
+                    />
+                  </div>
+                )}
 
                 {viewMode === 'settings' && session?.user ? (
                   <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
@@ -341,6 +663,17 @@ export default function App() {
                     </Suspense>
                   </div>
                 )}
+
+                {isTourOpen && (
+                  <Suspense fallback={null}>
+                    <OnboardingTour
+                      steps={tourSteps}
+                      isOpen={isTourOpen}
+                      onComplete={handleTourComplete}
+                      onSkip={handleTourComplete}
+                    />
+                  </Suspense>
+                )}
               </div>
             </div>
           </>
@@ -356,6 +689,13 @@ export default function App() {
           onClose={() => setToastMessage(null)}
           type={toastType}
           duration={6000}
+        />
+
+        <LevelUpAnimation
+          isVisible={!!animationLevels}
+          oldLevel={animationLevels?.old || 0}
+          newLevel={animationLevels?.new || 0}
+          onComplete={handleLevelUpComplete}
         />
       </div>
     </AppProvider>

@@ -1,4 +1,21 @@
+import { useState, useEffect } from 'react';
+
 export function useOnlineStatus(): boolean {
-  // Offline mode has been removed. Always return true to ensure sync never gets blocked.
-  return true;
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+
+    setOnline(navigator.onLine);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  return online;
 }

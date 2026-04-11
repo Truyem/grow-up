@@ -344,7 +344,7 @@ const calculateWaterIntake = (weight: number): number => {
 
 
 // Fallback plans tailored by intensity and goal
-const getFallbackPlan = (userData: UserInput): DailyPlan => {
+export const getFallbackPlan = (userData: UserInput): DailyPlan => {
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
 
   const isBulking = userData.nutritionGoal === 'bulking';
@@ -821,20 +821,19 @@ RULES:
 - **VERY IMPORTANT**: ƯU TIÊN SỬ DỤNG CÁC NGUYÊN LIỆU TRONG FRIDGE INVENTORY ĐỂ LÊN THỰC ĐƠN.
 - Nếu bạn sử dụng nguyên liệu từ FRIDGE INVENTORY, hãy trừ số lượng đi và liệt kê vào mảng "usedFridgeItems" (sử dụng đúng ID được cung cấp).
 - **VERY IMPORTANT**: KHÔNG được đề xuất món có chứa bất kỳ nguyên liệu nào trong "DISLIKED FOODS / EXCLUDED FOODS" (bao gồm tên đồng nghĩa như oats/yến mạch, cacao/ca cao).
-- CARB CHÍNH BẮT BUỘC LÀ CƠM (gạo/cơm trắng/cơm gạo lứt). KHÔNG dùng carb chính khác như bánh mì, bún, phở, mì, nui, yến mạch, khoai (Ngoại trừ Bữa Sáng).
+- CARB CHÍNH BẮT BUỘC LÀ CƠM (gạo/cơm trắng/cơm gạo lứt). KHÔNG dùng carb chính khác như bánh mì, bún, phở, mì, nui, yến mạch, khoai.
 - RAU ƯU TIÊN CHỈ DÙNG SÚP LƠ HOẶC CẢI XANH.
 - CHỈ bổ sung nguyên liệu ngoài tủ lạnh khi thật sự cần thiết, và tối đa 1 nguyên liệu ngoài tủ cho mỗi bữa.
 ${extraRules}
-- **EXTREMELY IMPORTANT**: PHÂN TÍCH kỹ danh sách "MEALS CONSUMED RECENTLY" (các món đã ăn 2 ngày qua). BẮT BUỘC KHÔNG DÙNG TRÙNG LẶP loại THỊT/CÁ (như gà, bò, lợn, tôm...) và KHÔNG DÙNG TRÙNG LẶP phương pháp nấu (như nướng, luộc, chiên, xào, hấp, nồi chiên không dầu...) so với các món đã có trong danh sách này.
+- **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS ALREADY GENERATED IN THIS PLAN" list.
 - Nếu một nguyên liệu trong tủ lạnh chỉ còn số lượng giới hạn (ví dụ còn 1 quả chuối), chỉ được dùng đúng phần còn lại và không dùng lặp ở các bữa tiếp theo.
 - TÊN MÓN phải viết TIẾNG VIỆT 100% (không dùng tiếng Anh).
-- DESCRIPTION phải chứa HƯỚNG DẪN NẤU ĂN CỰC KỲ CHI TIẾT CÓ KÈM ĐỊNH LƯỢNG GIA VỊ bằng tiếng Việt, bao gồm:
-  * Các bước làm món từ sơ chế đến nấu chín
-  * ĐỊNH LƯỢNG GIA VỊ RÕ RÀNG cho từng bước (ví dụ: nửa thìa cà phê muối, 1 thìa nước mắm, hành, tỏi...)
+- DESCRIPTION phải chứa HƯỚNG DẪN LÀM MÓN CHI TIẾT bằng tiếng Việt, bao gồm:
+  * Các bước làm món từ A-Z
   * Thời gian chuẩn bị và nấu ăn cho mỗi bước
   * Phương pháp chế biến (luộc, xào, hấp, nướng, v.v.)
-  * Lượng sử dụng của từng nguyên liệu
+  * Lượng sử dụng của từng nguyên liệu (nếu không được chỉ định cụ thể trong meal)
   * Mẹo nhỏ để món ngon hơn (tùy chọn)
 
 YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
@@ -905,9 +904,9 @@ const generateNutritionPart = async (
     return newItems;
   };
 
-  const recentMeals = extractMealsFromHistory(fullHistory, 2);
+  const recentMeals = extractMealsFromHistory(fullHistory, 7);
   const uniqueRecentMeals = Array.from(new Set(recentMeals));
-  const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join('; ') : 'none';
+  const recentMealsStr = uniqueRecentMeals.length > 0 ? uniqueRecentMeals.join(', ') : 'none';
   const dislikedFoods = Array.isArray(userData.dislikedFoods) ? userData.dislikedFoods : [];
   const dislikedFoodsStr = dislikedFoods.length > 0 ? dislikedFoods.join(', ') : 'none';
 
@@ -950,7 +949,7 @@ const generateNutritionPart = async (
     const breakfastData = await generateMealForTime(
       "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Sáng**: Bắt buộc phải là các món nhanh gọn dễ làm như: Yến mạch, ngũ cốc, sữa, hoặc trứng. TUYỆT ĐỐI KHÔNG dùng cơm KHÔNG dùng rau xanh.",
+      "- **Bữa Sáng**: vẫn dùng cơm làm carb chính; ưu tiên đạm nạc + súp lơ hoặc cải xanh.",
       localFridgeItems
     );
     const breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
@@ -960,7 +959,7 @@ const generateNutritionPart = async (
     const lunchData = await generateMealForTime(
       "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Trưa**: cơm + đạm + rau, món đơn giản.",
+      "- **Bữa Trưa**: cơm + đạm + rau (ưu tiên súp lơ hoặc cải xanh), món đơn giản.",
       remainingFridgeItems
     );
     const lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
@@ -1028,24 +1027,38 @@ export const generateDailyPlan = async (
   // Optimization: Only use the last 14 days of history
   const history = fullHistory.slice(-14);
 
+  let sleepRecovery7Days: SleepRecoveryEntry[] = [];
+  
+  try {
+    const sleepRecoveryAll = userId ? await loadSleepRecoveryFromSupabase(userId) : [];
+    sleepRecovery7Days = [...sleepRecoveryAll]
+      .filter((s) => typeof s.timestamp === 'number')
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 7);
+  } catch (e) {
+    console.warn('[Plan] Could not load sleep recovery:', e);
+  }
+
   try {
     console.log(`🚀 Generating Plan (${generationType}) using Nemotron API...`);
 
     let workoutPart: any = {};
     let nutritionPart: any = {};
 
-    const sleepRecoveryAll = userId ? await loadSleepRecoveryFromSupabase(userId) : [];
-    const sleepRecovery7Days = [...sleepRecoveryAll]
-      .filter((s) => typeof s.timestamp === 'number')
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 7);
-
     if (generationType === 'workout' || generationType === 'both') {
-      workoutPart = await generateWorkoutPart(userData, history, sleepRecovery7Days, onProgress);
+      try {
+        workoutPart = await generateWorkoutPart(userData, history, sleepRecovery7Days, onProgress);
+      } catch (e) {
+        console.warn('[Plan] Workout generation failed:', e);
+      }
     }
 
     if (generationType === 'nutrition' || generationType === 'both') {
-      nutritionPart = await generateNutritionPart(userData, fullHistory, sleepRecovery7Days, onProgress);
+      try {
+        nutritionPart = await generateNutritionPart(userData, fullHistory, sleepRecovery7Days, onProgress);
+      } catch (e) {
+        console.warn('[Plan] Nutrition generation failed:', e);
+      }
     }
 
     const fallback = getFallbackPlan(userData);

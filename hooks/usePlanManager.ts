@@ -3,8 +3,6 @@ import { DailyPlan, ExerciseLog, UserInput, WorkoutHistoryItem } from '../types'
 import { generateDailyPlan, getBasicNutritionPlan } from '../services/geminiService';
 import { debouncedSavePlan, deletePlanByDate, loadPlanFromSupabase, savePlanToSupabase } from '../services/supabasePlanSync';
 import { enrichWorkoutWithWarmupCooldown } from '../services/warmupCooldownService';
-import { canPerformOnlineAction } from '../services/onlineGuard';
-import { useOnlineStatus } from './useOnlineStatus';
 
 type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
 
@@ -39,17 +37,15 @@ export function usePlanManager(
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>('workout');
   const userId = session?.user?.id as string | undefined;
-  const online = useOnlineStatus();
 
   useEffect(() => {
     if (!userId) {
       setPlan(null);
       return;
     }
-    if (!online) return;
 
     // Lần đầu do App.tsx quản lý tải initial (tránh gọi duplicate)
-  }, [userId, online]);
+  }, [userId]);
 
   const handleGenerate = useCallback(async (type: ViewMode, currentHistory: WorkoutHistoryItem[]) => {
     if (type === 'history') {
@@ -82,22 +78,22 @@ export function usePlanManager(
       showToast('Bạn cần đăng nhập để tạo kế hoạch.', 'error');
       return;
     }
-    if (!canPerformOnlineAction('plan-generate', showToast)) return;
 
     setLoading(true);
     setIsStreaming(true);
     setStreamingText("");
 
-    const generationType = type as 'workout' | 'nutrition';
+    const generationType = type === 'workout' ? 'workout' : 'nutrition';
     let generatedPartial: DailyPlan;
     try {
       generatedPartial = await generateDailyPlan(userData, currentHistory, session?.user?.id, generationType, (chunkText) => {
         setStreamingText(chunkText);
-      }, userStats?.streak);
+      });
     } catch (error) {
       console.error('[PlanManager] generateDailyPlan failed:', error);
       setLoading(false);
       setIsStreaming(false);
+      showToast('Không thể tạo kế hoạch. Vui lòng thử lại.', 'error');
       return;
     }
 
@@ -113,7 +109,7 @@ export function usePlanManager(
     setPlan(finalPlan);
     const saved = await savePlanToSupabase(userId, finalPlan, undefined);
     if (saved === false) {
-      showToast('Không thể lưu kế hoạch lên máy chủ.', 'error');
+      showToast('Không thể lưu kế hoạch.', 'error');
       setLoading(false);
       setIsStreaming(false);
       return;
@@ -130,7 +126,6 @@ export function usePlanManager(
       showToast('Bạn cần đăng nhập để reset kế hoạch.', 'error');
       return;
     }
-    if (!canPerformOnlineAction('plan-reset', showToast)) return;
 
     if (!plan) {
       const dateKey = new Date().toISOString().split('T')[0];
@@ -172,7 +167,7 @@ export function usePlanManager(
       showToast('Bạn cần đăng nhập để lưu kế hoạch.', 'error');
       return;
     }
-    if (!canPerformOnlineAction('plan-start-tracking', showToast)) return;
+    
 
     const basicPlan = getBasicNutritionPlan(userData);
 
@@ -192,7 +187,6 @@ export function usePlanManager(
       showToast('Bạn cần đăng nhập để cập nhật kế hoạch.', 'error');
       return;
     }
-    if (!canPerformOnlineAction('plan-update', showToast)) return;
 
     setPlan(updatedPlan);
 
@@ -201,7 +195,6 @@ export function usePlanManager(
 
   const handleRefreshPlan = useCallback(async () => {
     if (!userId) return;
-    if (!canPerformOnlineAction('plan-refresh', showToast)) return;
     
     setLoading(true);
     try {
@@ -223,7 +216,7 @@ export function usePlanManager(
     } finally {
       setLoading(false);
     }
-  }, [userId, online]);
+  }, [userId]);
 
   return {
     plan,
