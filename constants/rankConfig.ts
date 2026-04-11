@@ -132,11 +132,12 @@ export function getXPForNextLevel(currentLevel: number): number {
   return (currentLevel + 1) * XP_PER_LEVEL;
 }
 
-/**
- * Hàm lấy ảnh rank từ level
- */
 export function getRankImage(level: number): string {
   return `/ranks/lv${level}.png`;
+}
+
+export function getNextRankImage(level: number): string {
+  return `/ranks/lv${level + 1}.png`;
 }
 
 /**

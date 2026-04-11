@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Ruler, Weight, Flame, Dumbbell, Utensils, Loader2, ChevronRight, Camera } from 'lucide-react';
+import { Calendar, Ruler, Weight, Dumbbell, Utensils, Loader2, ChevronRight, Camera } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
 import { NutritionInput } from './forms/NutritionInput';
 import { HistoryView } from './HistoryView';
@@ -78,26 +78,44 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
 
 
       {/* --- STREAK CARD --- */}
-      <div id="tour-streak" className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)] p-4">
-        <div className="flex items-center justify-between relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/40">
-              <Flame className="w-7 h-7 text-white fill-white animate-pulse" />
-            </div>
-            <div>
-              <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
-              <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
+      <div 
+        id="tour-streak" 
+        className={`relative overflow-hidden rounded-2xl p-4 ${
+          userStats.streak === 0 
+            ? 'bg-gray-700/60 border border-gray-500/30 shadow-[0_0_20px_rgba(128,128,128,0.2)]'
+            : userStats.streak >= 100 
+              ? 'bg-gradient-to-r from-purple-900/60 to-violet-900/60 border border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+              : 'bg-gradient-to-r from-orange-900/60 to-red-900/60 border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)]'
+        }`}
+      >
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0">
+            <video
+              key={userStats.streak >= 100 ? 'streak-100' : userStats.streak > 0 ? 'streak-active' : 'no-streak'}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              src={
+                userStats.streak === 0 
+                  ? '/streak/No_streak.webm'
+                  : userStats.streak >= 100 
+                    ? '/streak/Day_100_streak.webm'
+                    : '/streak/Streak.webm'
+              }
+            />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-white font-bold text-lg leading-tight">Chuỗi Ngày Tập Luyện</h3>
+            <p className="text-orange-200 text-xs font-medium">Đừng để ngọn lửa vụt tắt!</p>
+            <div className="mt-1">
+              <span className="text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {userStats.streak}
+              </span>
+              <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold ml-1">Ngày</span>
             </div>
           </div>
-          <div className="text-right">
-            <span className="block text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-              {userStats.streak}
-            </span>
-            <span className="text-[10px] text-orange-200 uppercase tracking-widest font-bold">Ngày liên tiếp</span>
-          </div>
-        </div>
-        <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
-          <Flame className="w-32 h-32" />
         </div>
       </div>
 

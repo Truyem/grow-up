@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserInput, UserStats, UserGoals, FatigueLevel, Intensity, HealthCondition, MuscleGroup, AchievementBadge } from '../types';
-import { syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase, loadProfileSettingsFromSupabase, syncAchievementsToSupabase } from '../services/supabasePlanSync';
+import { syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase, loadProfileSettingsFromSupabase, syncAchievementsToSupabase, loadAchievementsFromSupabase } from '../services/supabasePlanSync';
 import { useOnlineStatus } from './useOnlineStatus';
 
 const DEFAULT_EQUIPMENT = [
@@ -159,7 +159,16 @@ export function useSupabaseProfileSync(
           if (cloudSettings.userData && setUserData) setUserData((prev) => ({ ...prev, ...cloudSettings.userData }));
           if (cloudSettings.userStats && setUserStats) setUserStats(cloudSettings.userStats);
           if (cloudSettings.userGoals && setUserGoals) setUserGoals(cloudSettings.userGoals);
-          if (Array.isArray(cloudSettings.achievements) && setAchievements) setAchievements(cloudSettings.achievements);
+          if (setAchievements) {
+            const unlockedIds = await loadAchievementsFromSupabase(userId);
+            if (unlockedIds) {
+              const mergedAchievements = DEFAULT_ACHIEVEMENTS.map(a => ({
+                ...a,
+                unlocked: unlockedIds.has(a.id),
+              }));
+              setAchievements(mergedAchievements);
+            }
+          }
         }
       } catch (err) {
         console.error('[ProfileSync] Error loading settings:', err);

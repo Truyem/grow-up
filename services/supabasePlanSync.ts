@@ -499,37 +499,45 @@ export const syncWorkoutHistoryToSupabase = async (userId: string, history: Work
 
 export const syncAchievementsToSupabase = async (userId: string, achievements: AchievementBadge[]) => {
     try {
-        const { data: existing } = await supabase
-            .from('profiles')
-            .select('settings')
-            .eq('id', userId)
-            .maybeSingle();
+        // Xóa tất cả achievements cũ
+        await supabase.from('user_achievements').delete().eq('user_id', userId);
 
-        const existingSettings = (existing?.settings && typeof existing.settings === 'object')
-            ? existing.settings
-            : {};
+        // Lọc ra các achievement đã unlock và insert mới
+        const unlockedAchievements = achievements
+            .filter(a => a.unlocked)
+            .map(a => ({
+                user_id: userId,
+                achievement_id: a.id,
+                unlocked_at: new Date().toISOString(),
+            }));
 
-        const mergedSettings = {
-            ...existingSettings,
-            achievements,
-        };
-
-        const { error } = await supabase
-            .from('profiles')
-            .upsert(
-                {
-                    id: userId,
-                    settings: mergedSettings,
-                    updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'id' }
-            );
-
-        if (error) {
-            console.error('[ProfileSync] achievements sync error:', error);
+        if (unlockedAchievements.length > 0) {
+            const { error } = await supabase.from('user_achievements').insert(unlockedAchievements);
+            if (error) {
+                console.error('[AchievementsSync] insert error:', error);
+            }
         }
     } catch (err) {
-        console.error('[ProfileSync] achievements unexpected error:', err);
+        console.error('[AchievementsSync] unexpected error:', err);
+    }
+};
+
+export const loadAchievementsFromSupabase = async (userId: string): Promise<Set<string> | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('user_achievements')
+            .select('achievement_id')
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('[AchievementsSync] load error:', error);
+            return null;
+        }
+
+        return new Set((data || []).map(r => r.achievement_id));
+    } catch (err) {
+        console.error('[AchievementsSync] load unexpected error:', err);
+        return null;
     }
 };
 

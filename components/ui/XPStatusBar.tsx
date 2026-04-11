@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserLevel } from '../../types';
-import { getRankFromLevel, getRankImage } from '../../constants/rankConfig';
+import { getRankFromLevel, getRankImage, getNextRankImage } from '../../constants/rankConfig';
 import { Zap } from 'lucide-react';
 import '../../styles/XPStatusBar.css';
 
@@ -15,7 +15,8 @@ export const XPStatusBar: React.FC<XPStatusBarProps> = ({ userLevel, onClick }) 
   if (!userLevel) return null;
 
   const rank = getRankFromLevel(userLevel.currentLevel);
-  const rankImage = getRankImage(userLevel.currentLevel);
+  const currentRankImage = getRankImage(userLevel.currentLevel);
+  const nextRankImage = getNextRankImage(userLevel.currentLevel);
   const progressPercent = Math.min(
     100,
     (userLevel.currentLevelXP / userLevel.nextLevelXP) * 100
@@ -26,12 +27,21 @@ export const XPStatusBar: React.FC<XPStatusBarProps> = ({ userLevel, onClick }) 
       {/* Level Badge */}
       <div className="status-level-badge">
         <img 
-          src={rankImage} 
-          alt={`Lv ${userLevel.currentLevel}`} 
+          src="/ranks/LV.png" 
+          alt="LV" 
           className={`badge-image ${imgLoaded ? 'loaded' : ''}`}
           onLoad={() => setImgLoaded(true)}
         />
-        <span className="badge-level">Lv {userLevel.currentLevel}</span>
+      </div>
+
+      {/* Current Rank Image */}
+      <div className="status-current-rank">
+        <img 
+          src={currentRankImage} 
+          alt={rank.rankName} 
+          className={`badge-image ${imgLoaded ? 'loaded' : ''}`}
+          onLoad={() => setImgLoaded(true)}
+        />
       </div>
 
       {/* XP Info */}
@@ -46,13 +56,18 @@ export const XPStatusBar: React.FC<XPStatusBarProps> = ({ userLevel, onClick }) 
           <span className="xp-current">{userLevel.currentLevelXP}</span>
           <span className="xp-separator">/</span>
           <span className="xp-max">{userLevel.nextLevelXP}</span>
-          <Zap size={12} className="xp-icon" />
+          <img src="/ranks/XP.png" alt="XP" className="xp-icon" />
         </div>
       </div>
 
       {/* Rank Name */}
       <div className="status-rank-info">
-        <span className="rank-badge">{rank.rankName}</span>
+        <img 
+          src={nextRankImage} 
+          alt="Next Rank" 
+          className={`badge-image ${imgLoaded ? 'loaded' : ''}`}
+          onLoad={() => setImgLoaded(true)}
+        />
       </div>
     </div>
   );
