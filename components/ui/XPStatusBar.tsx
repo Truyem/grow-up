@@ -27,7 +27,7 @@ export const XPStatusBar: React.FC<XPStatusBarProps> = ({ userLevel, onClick }) 
       {/* Level Badge */}
       <div className="status-level-badge">
         <img 
-          src="/ranks/LV.png" 
+          src="/ranks/LV.webp" 
           alt="LV" 
           className={`badge-image ${imgLoaded ? 'loaded' : ''}`}
           onLoad={() => setImgLoaded(true)}
@@ -56,7 +56,7 @@ export const XPStatusBar: React.FC<XPStatusBarProps> = ({ userLevel, onClick }) 
           <span className="xp-current">{userLevel.currentLevelXP}</span>
           <span className="xp-separator">/</span>
           <span className="xp-max">{userLevel.nextLevelXP}</span>
-          <img src="/ranks/XP.png" alt="XP" className="xp-icon" />
+          <img src="/ranks/XP.webp" alt="XP" className="xp-icon" />
         </div>
       </div>
 

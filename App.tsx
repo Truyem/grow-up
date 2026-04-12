@@ -61,7 +61,7 @@ export default function App() {
             const img = new Image();
             img.onload = resolve;
             img.onerror = resolve;
-            img.src = `/ranks/lv${i}.png`;
+            img.src = `/ranks/lv${i}.webp`;
           })
         );
       }

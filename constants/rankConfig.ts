@@ -133,11 +133,11 @@ export function getXPForNextLevel(currentLevel: number): number {
 }
 
 export function getRankImage(level: number): string {
-  return `/ranks/lv${level}.png`;
+  return `/ranks/lv${level}.webp`;
 }
 
 export function getNextRankImage(level: number): string {
-  return `/ranks/lv${level + 1}.png`;
+  return `/ranks/lv${level + 1}.webp`;
 }
 
 /**

@@ -2,23 +2,23 @@ import { useEffect, useState } from 'react';
 import { getWeatherInfo, WeatherInfo as WeatherData } from '../../services/weatherService';
 
 const seasonIcons: Record<string, string> = {
-  spring: '/seasons/spring.png',
-  summer: '/seasons/summer.png',
-  fall: '/seasons/fall.png',
-  winter: '/seasons/winter.png',
+  spring: '/seasons/spring.webp',
+  summer: '/seasons/summer.webp',
+  fall: '/seasons/fall.webp',
+  winter: '/seasons/winter.webp',
 };
 
 const weatherIcons: Record<string, string> = {
-  sunny: '/weather/cloud.png',
-  cloudy: '/weather/cloud.png',
-  rainy: '/weather/rain.png',
-  thunder: '/weather/thunder.png',
-  snow: '/weather/snow.png',
+  sunny: '/weather/cloud.webp',
+  cloudy: '/weather/cloud.webp',
+  rainy: '/weather/rain.webp',
+  thunder: '/weather/thunder.webp',
+  snow: '/weather/snow.webp',
 };
 
 const tempIcons: Record<string, string> = {
-  hot: '/temperature/hot.png',
-  cold: '/temperature/cold.png',
+  hot: '/temperature/hot.webp',
+  cold: '/temperature/cold.webp',
 };
 
 export const WeatherDisplay = () => {
