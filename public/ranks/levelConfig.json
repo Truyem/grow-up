@@ -1,0 +1,19 @@
+{
+  "startLevel": 1,
+  "baseExp": 100,
+  "decPerLevel": 4,
+  "minExp": 25,
+  "expFormula": "max(minExp, baseExp - (level-1) * decPerLevel)",
+  "cycle": 8,
+  "colors": [
+    {"name": "Red", "hex": "#FF3B30", "rank": "Crimson"},
+    {"name": "Orange", "hex": "#FF9500", "rank": "Sunrise"},
+    {"name": "Yellow", "hex": "#FFCC00", "rank": "Golden"},
+    {"name": "Green", "hex": "#34C759", "rank": "Emerald"},
+    {"name": "Blue", "hex": "#007AFF", "rank": "Azure"},
+    {"name": "Indigo", "hex": "#5856D6", "rank": "Indigo"},
+    {"name": "Violet", "hex": "#8E67EC", "rank": "Amethyst"},
+    {"name": "Pink", "hex": "#FF2D55", "rank": "Rosé"}
+  ],
+  "levelNameTemplate": "<colorRank>"
+}

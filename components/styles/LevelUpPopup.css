@@ -1,0 +1,403 @@
+.level-up-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.level-up-container.active {
+  pointer-events: auto;
+}
+
+/* Fireworks Background */
+.fireworks {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.firework {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  animation: firework-burst 1s ease-out forwards;
+}
+
+.firework:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.firework:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.firework:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.firework:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+/* Popup */
+.level-up-popup {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 24px;
+  padding: 32px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+  animation: popup-appear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  z-index: 10;
+}
+
+/* Header with Stars */
+.popup-header {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.stars {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.star {
+  color: #ffd700;
+  animation: star-twinkle 0.6s ease-in-out infinite;
+}
+
+.star-1 {
+  animation-delay: 0s;
+}
+
+.star-2 {
+  animation-delay: 0.2s;
+}
+
+.star-3 {
+  animation-delay: 0.4s;
+}
+
+.star-4 {
+  animation-delay: 0.1s;
+}
+
+.star-5 {
+  animation-delay: 0.3s;
+}
+
+.star-6 {
+  animation-delay: 0.5s;
+}
+
+.level-up-title {
+  font-size: 48px;
+  font-weight: 900;
+  margin: 0;
+  color: #ffd700;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+  animation: title-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Level Info */
+.level-info {
+  margin-bottom: 24px;
+}
+
+.level-circle {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(245, 87, 108, 0.4);
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  animation: level-circle-scale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.level-number {
+  font-size: 48px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.level-message {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* XP Gained */
+.xp-gained {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  font-size: 20px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 12px 24px;
+  border-radius: 12px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.xp-icon {
+  color: #ffd700;
+  animation: xp-pulse 0.6s ease-in-out infinite;
+}
+
+.xp-text {
+  color: #ffd700;
+}
+
+/* Rewards Section */
+.rewards-section {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.rewards-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rewards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reward-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  animation: reward-slide-in 0.5s ease-out forwards;
+}
+
+.reward-item:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.reward-item:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.reward-icon {
+  font-size: 16px;
+}
+
+.reward-text {
+  flex: 1;
+  text-align: left;
+}
+
+/* Button */
+.popup-button {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.popup-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(245, 87, 108, 0.6);
+}
+
+.popup-button:active {
+  transform: translateY(0);
+}
+
+/* Confetti */
+.confetti {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ffd700;
+  animation: confetti-fall 3s ease-out forwards;
+}
+
+.confetti-piece:nth-child(odd) {
+  background: #ff69b4;
+}
+
+.confetti-piece:nth-child(3n) {
+  background: #00f2fe;
+}
+
+.confetti-piece:nth-child(5n) {
+  background: #667eea;
+}
+
+/* Animations */
+@keyframes popup-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotateX(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateX(0);
+  }
+}
+
+@keyframes title-bounce {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(5px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes level-circle-scale {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes xp-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes reward-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(-100vh) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(720deg);
+  }
+}
+
+@keyframes firework-burst {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .level-up-popup {
+    padding: 24px;
+    max-width: 90vw;
+  }
+
+  .level-up-title {
+    font-size: 36px;
+  }
+
+  .level-circle {
+    width: 80px;
+    height: 80px;
+  }
+
+  .level-number {
+    font-size: 36px;
+  }
+
+  .level-message {
+    font-size: 14px;
+  }
+
+  .popup-button {
+    padding: 12px 32px;
+    font-size: 14px;
+  }
+}
