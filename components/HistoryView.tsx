@@ -675,7 +675,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                   <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalFat || 0}g</div>
                 </div>
                 <div className="text-center bg-black/30 rounded-lg p-2 col-span-2">
-                  <div className="text-[10px] text-[#60a5fa] font-bold">Gic ng</div>
+                  <div className="text-[10px] text-[#60a5fa] font-bold">Giấc ngủ</div>
                   <div className="text-sm font-bold text-white">
                     {(() => {
                       const sleep = sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${selectedDay}`);

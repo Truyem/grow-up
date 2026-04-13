@@ -17,29 +17,45 @@ const getTodayString = (): string => {
 const calculateWeeklyStreak = (history: WorkoutHistoryItem[]): number => {
   if (!history || history.length === 0) return 0;
 
+  // Filter only workout and nutrition records
+  const validRecords = history.filter(item => item.recordType !== 'sleep');
+
+  if (validRecords.length === 0) return 0;
+
   // Group by week (Monday start)
   const weeks: Record<string, number> = {};
-  history.forEach(item => {
+  const today = new Date();
+  
+  validRecords.forEach(item => {
     const d = new Date(item.timestamp);
-    const day = d.getDay() || 7; // 1=Mon, 7=Sun
-    d.setHours(0, 0, 0, 0);
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - day + 1);
-    const weekKey = monday.toISOString().split('T')[0];
+    
+    // Adjust to local timezone by getting the date parts directly
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const date = d.getDate();
+    
+    // Create date in local timezone
+    const localDate = new Date(year, month, date);
+    const day = localDate.getDay() || 7; // 1=Mon, 7=Sun
+    
+    const monday = new Date(localDate);
+    monday.setDate(localDate.getDate() - day + 1);
+    
+    const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
     weeks[weekKey] = (weeks[weekKey] || 0) + 1;
   });
 
-  const today = new Date();
-  const currentDay = today.getDay() || 7;
-  const currentMonday = new Date(today);
-  currentMonday.setDate(today.getDate() - currentDay + 1);
+  const now = new Date();
+  const currentDay = now.getDay() || 7;
+  const currentMonday = new Date(now);
+  currentMonday.setDate(now.getDate() - currentDay + 1);
   currentMonday.setHours(0, 0, 0, 0);
 
   let streak = 0;
   let checkDate = new Date(currentMonday);
 
   for (let i = 0; i < 100; i++) {
-    const weekKey = checkDate.toISOString().split('T')[0];
+    const weekKey = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
     const count = weeks[weekKey] || 0;
 
     if (count >= 4) {

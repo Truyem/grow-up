@@ -695,7 +695,9 @@ export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepStart: st
             const start = startHour * 60 + startMinute;
             let end = endHour * 60 + endMinute;
             if (end <= start) end += 24 * 60;
-            return Math.min(12, Math.max(3, (end - start) / 60));
+            const calculatedHours = (end - start) / 60;
+            if (calculatedHours <= 0 || calculatedHours > 24) return 8;
+            return Math.min(12, Math.max(3, calculatedHours));
         })();
         const item: WorkoutHistoryItem = {
             recordType: 'sleep',
