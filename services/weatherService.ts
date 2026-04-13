@@ -1,4 +1,4 @@
-const IP_API_URL = 'https://ip-api.com/json/';
+const IP_API_URL = 'https://api.ipbase.com/v1/json/';
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 
 export interface LocationData {
@@ -35,12 +35,12 @@ export const getUserLocation = async (): Promise<LocationData | null> => {
     const response = await fetch(IP_API_URL, { method: 'GET' });
     if (!response.ok) return null;
     const data = await response.json();
-    if (data.status === 'success') {
+    if (data.latitude && data.longitude) {
       return {
-        lat: data.lat,
-        lon: data.lon,
+        lat: data.latitude,
+        lon: data.longitude,
         city: data.city,
-        country: data.country,
+        country: data.country_name,
       };
     }
     return null;
