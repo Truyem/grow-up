@@ -114,6 +114,8 @@ const callNemotronAPI = async (
     let response: Response;
     try {
       response = await fetch(NEMOTRON_ENDPOINT, {
+      response = await Promise.race([
+        fetch(NEMOTRON_ENDPOINT, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
