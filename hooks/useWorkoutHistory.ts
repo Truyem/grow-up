@@ -162,7 +162,8 @@ export function useWorkoutHistory(
       exercisesSummary,
       exerciseLogs: exerciseLogs || undefined,
       nutrition: mergedNutrition,
-      weight: userData.weight
+      weight: userData.weight,
+      recordType: 'workout'
     };
 
     let itemToSave = newItem;
@@ -311,6 +312,7 @@ export function useWorkoutHistory(
         nutrition,
         weight: userData.weight,
         timestamp: Math.max(existingToday.timestamp, now.getTime()),
+        recordType: 'nutrition'
       };
     } else {
       itemToSave = {
@@ -321,7 +323,8 @@ export function useWorkoutHistory(
         completedExercises: [],
         exercisesSummary: 'Không có bài tập',
         nutrition,
-        weight: userData.weight
+        weight: userData.weight,
+        recordType: 'nutrition'
       };
     }
 
