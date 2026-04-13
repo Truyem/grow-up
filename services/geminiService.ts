@@ -113,24 +113,22 @@ const callNemotronAPI = async (
 
     let response: Response;
     try {
-      response = await Promise.race([
-        fetch(NEMOTRON_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "x-model": GPT_OSS_MODEL,
-          },
-          body: JSON.stringify({
-            model: GPT_OSS_MODEL,
-            messages: history,
-            max_tokens: options?.maxTokens ?? 131000,
-            temperature: options?.temperature ?? 0.2,
-            stream: false,
-          }),
-          signal: options?.signal,
-        });
-      ]);
+      response = await fetch(NEMOTRON_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "x-model": GPT_OSS_MODEL,
+        },
+        body: JSON.stringify({
+          model: GPT_OSS_MODEL,
+          messages: history,
+          max_tokens: options?.maxTokens ?? 131000,
+          temperature: options?.temperature ?? 0.2,
+          stream: false,
+        }),
+        signal: options?.signal,
+      });
     } catch (err) {
       console.error("Nemotron fetch failed:", err);
       throw err;
