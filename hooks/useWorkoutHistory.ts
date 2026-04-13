@@ -74,6 +74,7 @@ export interface UseWorkoutHistoryReturn {
   handleSaveSleep: (sleepStart: string, sleepEnd: string) => Promise<void>;
   isRefreshing: boolean;
   calculateStreak: () => number;
+  onXPAdded?: (newLevel: import('../types').UserLevel) => void;
 }
 
 /**
@@ -86,7 +87,8 @@ export function useWorkoutHistory(
   plan: DailyPlan | null,
   setPlan: React.Dispatch<React.SetStateAction<DailyPlan | null>>,
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void,
-  userId?: string
+  userId?: string,
+  onXPAdded?: (newLevel: import('../types').UserLevel) => void
 ): UseWorkoutHistoryReturn {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -201,65 +203,69 @@ export function useWorkoutHistory(
     
     // --- ADD XP REWARD ---
     try {
-      // 1. Get or create user level data
-      let userLevel = await initializeUserLevel(userId);
-      if (!userLevel) {
-        console.warn('Failed to initialize user level');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-
-      // 2. Calculate XP reward based on workout info
-      const exerciseCount = completedExercises.length;
-      const hasNutrition = !!nutrition && nutrition.totalCalories && nutrition.totalCalories > 0;
-      const consistencyStreak = userStats.streak || 0;
-      
-      // Parse difficulty from levelSelected (e.g., "Beginner", "Intermediate", "Advanced", "Hard")
-      let intensity: 'low' | 'medium' | 'hard' = 'medium';
-      if (levelSelected.toLowerCase().includes('hard') || levelSelected.toLowerCase().includes('advanced')) {
-        intensity = 'hard';
-      } else if (levelSelected.toLowerCase().includes('beginner')) {
-        intensity = 'low';
-      }
-
-      // 3. Calculate XP: base + exercises + intensity + consistency + nutrition
-      let baseXP = XP_REWARDS.BASE_WORKOUT;
-      const exerciseBonus = exerciseCount * XP_REWARDS.PER_EXERCISE;
-      const difficultyBonus = XP_REWARDS.DIFFICULTY_BONUS[intensity] || 0;
-      const consistencyBonus = consistencyStreak > 0 ? XP_REWARDS.CONSISTENCY_BONUS : 0;
-      const nutritionBonus = hasNutrition ? XP_REWARDS.NUTRITION_BONUS : 0;
-      const totalXP = baseXP + exerciseBonus + difficultyBonus + consistencyBonus + nutritionBonus;
-
-      // 4. Add XP and check for level up
-      let updated = { ...userLevel };
-      let currentLevelXP = updated.currentLevelXP + totalXP;
-      let leveledUp = false;
-      let oldRank = updated.currentRankNumber;
-
-      while (currentLevelXP >= getXPForNextLevel(updated.currentLevel) && updated.currentLevel < MAX_LEVEL) {
-        currentLevelXP -= getXPForNextLevel(updated.currentLevel);
-        updated.currentLevel += 1;
-        updated.currentRankNumber = Math.floor((updated.currentLevel - 1) / 10) + 1;
-        if (updated.currentRankNumber > oldRank) {
-          updated.previousRankNumber = oldRank;
-        }
-        leveledUp = true;
-      }
-
-      updated.currentLevelXP = currentLevelXP;
-      updated.nextLevelXP = getXPForNextLevel(updated.currentLevel);
-      updated.totalXP += totalXP;
-      updated.lifetimeXP += totalXP;
-      updated.lastLevelUpDate = leveledUp ? new Date().toISOString() : updated.lastLevelUpDate;
-
-      // 5. Save to Supabase
-      const saved = await saveUserLevel(userId, updated);
-      if (saved) {
-        const xpNeeded = getXPForNextLevel(updated.currentLevel);
-        if (leveledUp) {
-          showToast(`🎉 Lên Level ${updated.currentLevel}! +${totalXP} XP`, 'success');
+      const todayKey = now.toISOString().split('T')[0];
+      const todayXPHistory = workoutHistory.filter(h => {
+        const hDate = h.date?.split('T')[0] || h.date;
+        return hDate === todayKey && h.xpAdded === true;
+      });
+      if (todayXPHistory.length > 0) {
+        console.log('XP already added today for workout, skipping');
+      } else {
+        let userLevel = await initializeUserLevel(userId);
+        if (!userLevel) {
+          console.warn('Failed to initialize user level');
         } else {
-          showToast(`+${totalXP} XP (${currentLevelXP}/${xpNeeded})`, 'info');
+          const exerciseCount = completedExercises.length;
+          const hasNutrition = !!nutrition && nutrition.totalCalories && nutrition.totalCalories > 0;
+          const consistencyStreak = userStats.streak || 0;
+          
+          let intensity: 'low' | 'medium' | 'hard' = 'medium';
+          if (levelSelected.toLowerCase().includes('hard') || levelSelected.toLowerCase().includes('advanced')) {
+            intensity = 'hard';
+          } else if (levelSelected.toLowerCase().includes('beginner')) {
+            intensity = 'low';
+          }
+
+          let baseXP = XP_REWARDS.BASE_WORKOUT;
+          const exerciseBonus = exerciseCount * XP_REWARDS.PER_EXERCISE;
+          const difficultyBonus = XP_REWARDS.DIFFICULTY_BONUS[intensity] || 0;
+          const consistencyBonus = consistencyStreak > 0 ? XP_REWARDS.CONSISTENCY_BONUS : 0;
+          const nutritionBonus = hasNutrition ? XP_REWARDS.NUTRITION_BONUS : 0;
+          const totalXP = baseXP + exerciseBonus + difficultyBonus + consistencyBonus + nutritionBonus;
+
+          let updated = { ...userLevel };
+          let currentLevelXP = updated.currentLevelXP + totalXP;
+          let leveledUp = false;
+          let oldRank = updated.currentRankNumber;
+
+          while (currentLevelXP >= getXPForNextLevel(updated.currentLevel) && updated.currentLevel < MAX_LEVEL) {
+            currentLevelXP -= getXPForNextLevel(updated.currentLevel);
+            updated.currentLevel += 1;
+            updated.currentRankNumber = Math.floor((updated.currentLevel - 1) / 10) + 1;
+            if (updated.currentRankNumber > oldRank) {
+              updated.previousRankNumber = oldRank;
+            }
+            leveledUp = true;
+          }
+
+          updated.currentLevelXP = currentLevelXP;
+          updated.nextLevelXP = getXPForNextLevel(updated.currentLevel);
+          updated.totalXP += totalXP;
+          updated.lifetimeXP += totalXP;
+          updated.lastLevelUpDate = leveledUp ? new Date().toISOString() : updated.lastLevelUpDate;
+
+          const saved = await saveUserLevel(userId, updated);
+          if (saved) {
+            if (onXPAdded) {
+              onXPAdded(updated);
+            }
+            const xpNeeded = getXPForNextLevel(updated.currentLevel);
+            if (leveledUp) {
+              showToast(`🎉 Lên Level ${updated.currentLevel}! +${totalXP} XP`, 'success');
+            } else {
+              showToast(`+${totalXP} XP (${currentLevelXP}/${xpNeeded})`, 'info');
+            }
+          }
         }
       }
     } catch (error) {
@@ -329,8 +335,54 @@ export function useWorkoutHistory(
     }
 
     showToast(`Đã lưu thực đơn dinh dưỡng: ${nutrition.totalCalories} kcal, ${nutrition.totalProtein}g protein!`);
+
+    try {
+      const todayKey = now.toISOString().split('T')[0];
+      const todayXPHistory = workoutHistory.filter(h => {
+        const hDate = h.date?.split('T')[0] || h.date;
+        return hDate === todayKey && h.xpAdded === true;
+      });
+      if (todayXPHistory.length > 0) {
+        console.log('XP already added today, skipping nutrition XP');
+      } else {
+        let userLevel = await initializeUserLevel(userId);
+        if (userLevel) {
+          const totalXP = XP_REWARDS.NUTRITION_BONUS;
+          let updated = { ...userLevel };
+          let currentLevelXP = updated.currentLevelXP + totalXP;
+          let leveledUp = false;
+
+          while (currentLevelXP >= getXPForNextLevel(updated.currentLevel) && updated.currentLevel < MAX_LEVEL) {
+            currentLevelXP -= getXPForNextLevel(updated.currentLevel);
+            updated.currentLevel += 1;
+            leveledUp = true;
+          }
+
+          updated.currentLevelXP = currentLevelXP;
+          updated.nextLevelXP = getXPForNextLevel(updated.currentLevel);
+          updated.totalXP += totalXP;
+          updated.lifetimeXP += totalXP;
+          updated.lastLevelUpDate = leveledUp ? new Date().toISOString() : updated.lastLevelUpDate;
+
+          const saved = await saveUserLevel(userId, updated);
+          if (saved) {
+            if (onXPAdded) {
+              onXPAdded(updated);
+            }
+            if (leveledUp) {
+              showToast(`🎉 Lên Level ${updated.currentLevel}! +${totalXP} XP`, 'success');
+            } else {
+              showToast(`+${totalXP} XP (${currentLevelXP}/${updated.nextLevelXP})`, 'info');
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error adding nutrition XP:', error);
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId]);
+  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId, onXPAdded]);
 
   const handleDeleteHistoryItem = useCallback(async (timestamp: number) => {
     if (!userId) {

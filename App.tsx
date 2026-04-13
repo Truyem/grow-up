@@ -104,7 +104,7 @@ export default function App() {
     handleStartTracking,
     handleUpdatePlan,
     handleRefreshPlan
-  } = usePlanManager(userData, session, showToast);
+  } = usePlanManager(userData, userStats, session, showToast);
 
   // 4. Workout History Hook
   const {
@@ -117,7 +117,11 @@ export default function App() {
     handleSaveSleep,
     isRefreshing,
     calculateStreak
-  } = useWorkoutHistory(userData, userStats, setUserStats, plan, setPlan, showToast, session?.user?.id);
+  } = useWorkoutHistory(userData, userStats, setUserStats, plan, setPlan, showToast, session?.user?.id, (newLevel) => {
+    if (newLevel) {
+      setUserLevelData(newLevel);
+    }
+  });
 
   // Auto-update streak
   useEffect(() => {

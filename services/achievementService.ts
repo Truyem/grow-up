@@ -1,4 +1,5 @@
 import type { AchievementBadge, WorkoutHistoryItem } from '../types';
+import { MAX_LEVEL, RANK_CONFIG } from '../constants/rankConfig';
 
 const getCurrentStreak = (history: WorkoutHistoryItem[]): number => {
   if (history.length === 0) return 0;
@@ -28,6 +29,9 @@ export const calculateAchievements = (history: WorkoutHistoryItem[]): Achievemen
   const totalWorkouts = history.filter((h) => h.levelSelected !== 'Ốm/Bệnh').length;
   const streak = getCurrentStreak(history);
   const exercisesDone = history.reduce((sum, item) => sum + (item.completedExercises?.length || 0), 0);
+  
+  const maxLevel = history.reduce((max, item) => Math.max(max, item.levelAfter || item.levelBefore || 0), 0);
+  const currentRank = Math.min(Math.floor((maxLevel - 1) / 10) + 1, 20);
 
   return [
     {
@@ -58,5 +62,12 @@ export const calculateAchievements = (history: WorkoutHistoryItem[]): Achievemen
       unlocked: exercisesDone >= 100,
       progressText: `${Math.min(exercisesDone, 100)}/100`,
     },
+    ...RANK_CONFIG.map((rank, index) => ({
+      id: `rank_${index + 1}`,
+      title: rank.rankName,
+      description: `Hoàn thành Rank ${rank.rankName} (Level ${rank.endLevel})`,
+      unlocked: currentRank >= rank.rankNumber,
+      progressText: `${rank.endLevel}/${MAX_LEVEL}`,
+    })),
   ];
 };
