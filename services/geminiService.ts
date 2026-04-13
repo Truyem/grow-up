@@ -130,6 +130,7 @@ const callNemotronAPI = async (
           }),
           signal: options?.signal,
         });
+      ]);
     } catch (err) {
       console.error("Nemotron fetch failed:", err);
       throw err;
