@@ -4,7 +4,7 @@ import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 import { fridgeService } from './fridgeService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
-const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
+const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/chat/completions";
 const GPT_OSS_MODEL = "@cf/moonshotai/kimi-k2.5";
 
 // Gemini API keys from environment (for food image analysis)
@@ -101,25 +101,38 @@ const markGeminiKeyRateLimitedAndRotate = (): string | null => {
 // Helper function to call Nemotron API
 const callNemotronAPI = async (
   messages: Array<{ role: string; content: string }>,
-  options?: { maxTokens?: number; temperature?: number }
+  options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }
 ): Promise<string> => {
-  try {
-    const response = await fetch(NEMOTRON_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "x-model": GPT_OSS_MODEL
-      },
-      body: JSON.stringify({
-        model: GPT_OSS_MODEL,
-        messages: messages,
-        max_tokens: options?.maxTokens ?? 50000,
-        temperature: options?.temperature ?? 0.2,
-        plain_text: true,
-        stream: false
-      })
-    });
+  let history = [...messages];
+  let fullContent = "";
+  let attempts = 0;
+  const MAX_ATTEMPTS = 10;
+
+  while (attempts < MAX_ATTEMPTS) {
+    attempts++;
+
+    let response: Response;
+    try {
+      response = await fetch(NEMOTRON_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "x-model": GPT_OSS_MODEL,
+          },
+          body: JSON.stringify({
+            model: GPT_OSS_MODEL,
+            messages: history,
+            max_tokens: options?.maxTokens ?? 131000,
+            temperature: options?.temperature ?? 0.2,
+            stream: false,
+          }),
+          signal: options?.signal,
+        });
+    } catch (err) {
+      console.error("Nemotron fetch failed:", err);
+      throw err;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -127,40 +140,45 @@ const callNemotronAPI = async (
       throw new Error(`Nemotron API error: ${response.status}`);
     }
 
-    const responseTextRaw = await response.text();
-    console.log('[Nemotron API Raw Status & Body]:', response.status, responseTextRaw.substring(0, 500));
-
-    // Try to parse as JSON
-    let data;
-    if (!responseTextRaw || responseTextRaw.trim() === '') {
-      console.error('Nemotron API returned empty response');
-      throw new Error('Nemotron API returned empty response');
-    }
+    let data: any;
     try {
-      data = JSON.parse(responseTextRaw);
-    } catch (e) {
-      console.error('Failed to parse response as JSON:', e);
-      // If it's not JSON, maybe it's an error message from the proxy
-      throw new Error(`Nemotron API returned non-JSON response: ${responseTextRaw.substring(0, 100)}`);
+      data = await response.json();
+    } catch {
+      throw new Error("Nemotron returned non-JSON response");
     }
 
-    // Extract text from response - handle both direct response and chat.completion format
-    let responseText = "";
-    if (data.choices && data.choices[0]?.message?.content) {
-      responseText = data.choices[0].message.content;
-    } else if (data.response) {
-      responseText = data.response;
-    } else if (typeof data === "string") {
-      responseText = data;
-    } else {
-      responseText = JSON.stringify(data);
+    const chunk: string =
+      data?.choices?.[0]?.message?.content ??
+      data?.response ??
+      "";
+
+    if (!chunk && attempts === 1) {
+      throw new Error("Nemotron returned empty content");
     }
 
-    return responseText;
-  } catch (error) {
-    console.error("Nemotron API call failed:", error);
-    throw error;
+    fullContent += chunk;
+
+    console.log(
+      `[Nemotron] attempt=${attempts} chunk=${chunk.length}chars`,
+      `finish_reason=${data?.choices?.[0]?.finish_reason}`
+    );
+
+    const hasMore =
+      response.headers.get("x-has-more") === "true" ||
+      data?.choices?.[0]?.finish_reason === "length";
+
+    if (!hasMore) break;
+
+    history = [
+      ...history,
+      { role: "assistant", content: chunk },
+      { role: "user", content: "Tiếp tục từ chỗ vừa dừng, không lặp lại." },
+    ];
   }
+
+  if (!fullContent) throw new Error("Nemotron returned empty response");
+
+  return fullContent;
 };
 
 // Check if error is rate limit related (not needed for Nemotron, but kept for compatibility)
