@@ -135,6 +135,14 @@ const callNemotronAPI = async (
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Nemotron API error (${response.status}):`, errorText);
+      
+      // Retry on server errors (500, 502, 503, 504) and rate limits (429)
+      const shouldRetry = response.status === 429 || response.status >= 500;
+      if (shouldRetry && attempts < MAX_ATTEMPTS) {
+        console.warn(`Nemotron API error ${response.status} (attempt ${attempts}/${MAX_ATTEMPTS}), retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        continue;
+      }
       throw new Error(`Nemotron API error: ${response.status}`);
     }
 
