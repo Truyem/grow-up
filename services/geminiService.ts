@@ -101,7 +101,7 @@ const markGeminiKeyRateLimitedAndRotate = (): string | null => {
 // Helper function to call Nemotron API
 const callNemotronAPI = async (
   messages: Array<{ role: string; content: string }>,
-  options?: { maxTokens?: number; temperature?: number }
+  options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }
 ): Promise<string> => {
   let history = [...messages];
   let fullContent = "";
@@ -113,6 +113,7 @@ const callNemotronAPI = async (
 
     let response: Response;
     try {
+      response = await fetch(NEMOTRON_ENDPOINT, {
       response = await Promise.race([
         fetch(NEMOTRON_ENDPOINT, {
           method: "POST",
@@ -128,11 +129,8 @@ const callNemotronAPI = async (
             temperature: options?.temperature ?? 0.2,
             stream: false,
           }),
-        }),
-        new Promise<never>((_, rej) =>
-          setTimeout(() => rej(new Error("Nemotron timeout after 28s")), 28_000)
-        ),
-      ]);
+          signal: options?.signal,
+        });
     } catch (err) {
       console.error("Nemotron fetch failed:", err);
       throw err;
