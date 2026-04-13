@@ -4,8 +4,8 @@ import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 import { fridgeService } from './fridgeService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
-const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/chat/completions";
-const GPT_OSS_MODEL = "@cf/moonshotai/kimi-k2.5";
+const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
+const NEMOTRON_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 // Gemini API keys from environment (for food image analysis)
 // Multiple keys are injected via vite.config.ts
@@ -98,7 +98,7 @@ const markGeminiKeyRateLimitedAndRotate = (): string | null => {
   return null;
 };
 
-// Helper function to call Nemotron API
+// Helper function to call Nemotron API (plain-text response)
 const callNemotronAPI = async (
   messages: Array<{ role: string; content: string }>,
   options?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }
@@ -117,15 +117,13 @@ const callNemotronAPI = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
-          "x-model": GPT_OSS_MODEL,
+          "x-model": NEMOTRON_MODEL,
         },
         body: JSON.stringify({
-          model: GPT_OSS_MODEL,
           messages: history,
           max_tokens: options?.maxTokens ?? 131000,
           temperature: options?.temperature ?? 0.2,
-          stream: false,
+          id: crypto.randomUUID(),
         }),
         signal: options?.signal,
       });
@@ -140,17 +138,8 @@ const callNemotronAPI = async (
       throw new Error(`Nemotron API error: ${response.status}`);
     }
 
-    let data: any;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error("Nemotron returned non-JSON response");
-    }
-
-    const chunk: string =
-      data?.choices?.[0]?.message?.content ??
-      data?.response ??
-      "";
+    // Nemotron returns plain text, NOT JSON
+    const chunk = (await response.text()).trim();
 
     if (!chunk && attempts === 1) {
       throw new Error("Nemotron returned empty content");
@@ -158,14 +147,8 @@ const callNemotronAPI = async (
 
     fullContent += chunk;
 
-    console.log(
-      `[Nemotron] attempt=${attempts} chunk=${chunk.length}chars`,
-      `finish_reason=${data?.choices?.[0]?.finish_reason}`
-    );
-
-    const hasMore =
-      response.headers.get("x-has-more") === "true" ||
-      data?.choices?.[0]?.finish_reason === "length";
+    // Check for continuation via x-has-more header
+    const hasMore = response.headers.get("x-has-more") === "true";
 
     if (!hasMore) break;
 
@@ -919,10 +902,9 @@ YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
 
   const responseText = await callNemotronAPI([
     { role: "user", content: prompt }
-    ], { maxTokens: 50000, temperature: 0.2 });
+    ], { maxTokens: 20000, temperature: 0.2 });
 
   if (!responseText) throw new Error(`Empty response for ${mealName}`);
-  return cleanAndParseJSON(responseText, `NutritionPart_${mealName}`);
   return cleanAndParseJSON(responseText, `NutritionPart_${mealName}`);
 };
 
@@ -1011,7 +993,7 @@ const generateNutritionPart = async (
     const breakfastData = await generateMealForTime(
       "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Sáng**: vẫn dùng cơm làm carb chính; ưu tiên đạm nạc + súp lơ hoặc cải xanh.",
+      "- **Bữa Sáng**: ưu tiên đạm nạc + rau xanh.",
       localFridgeItems
     );
     const breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
@@ -1021,7 +1003,7 @@ const generateNutritionPart = async (
     const lunchData = await generateMealForTime(
       "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Trưa**: cơm + đạm + rau (ưu tiên súp lơ hoặc cải xanh), món đơn giản.",
+      "- **Bữa Trưa**: đạm + rau, món đơn giản.",
       remainingFridgeItems
     );
     const lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
@@ -1031,7 +1013,7 @@ const generateNutritionPart = async (
     const dinnerData = await generateMealForTime(
       "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
       recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Tối**: cơm nhẹ hơn trưa, ưu tiên đạm nạc + súp lơ hoặc cải xanh, không thêm món vặt.",
+      "- **Bữa Tối**: đạm nạc + rau xanh, không thêm món vặt.",
       remainingFridgeItems
     );
     const dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
@@ -1102,7 +1084,6 @@ export const generateDailyPlan = async (
   }
 
   try {
-    console.log(`🚀 Generating Plan (${generationType}) using Nemotron API...`);
 
     let workoutPart: any = {};
     let nutritionPart: any = {};
