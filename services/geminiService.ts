@@ -1002,35 +1002,83 @@ const generateNutritionPart = async (
       return arr;
     };
 
-    const breakfastData = await generateMealForTime(
-      "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
-      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Sáng**: ưu tiên đạm nạc + rau xanh.",
-      localFridgeItems
-    );
-    const breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
-    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...breakfastMeals.map((m: any) => m?.name).filter(Boolean)];
-    let remainingFridgeItems = applyDeductions(localFridgeItems, breakfastData.usedFridgeItems);
+    // Generate each meal with individual try-catch to ensure all 3 meals are returned
+    let breakfastMeals: any[] = [];
+    let lunchMeals: any[] = [];
+    let dinnerMeals: any[] = [];
+    let remainingFridgeItems = [...localFridgeItems];
 
-    const lunchData = await generateMealForTime(
-      "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
-      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Trưa**: đạm + rau, món đơn giản.",
-      remainingFridgeItems
-    );
-    const lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
-    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...lunchMeals.map((m: any) => m?.name).filter(Boolean)];
-    remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
+    // Bữa Sáng
+    try {
+      const breakfastData = await generateMealForTime(
+        "Bữa Sáng", breakfastTargets.cal, breakfastTargets.pro, breakfastTargets.carb, breakfastTargets.fat,
+        recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+        "- **Bữa Sáng**: ưu tiên đạm nạc + rau xanh.",
+        remainingFridgeItems
+      );
+      breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
+      usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...breakfastMeals.map((m: any) => m?.name).filter(Boolean)];
+      remainingFridgeItems = applyDeductions(remainingFridgeItems, breakfastData.usedFridgeItems);
+    } catch (err) {
+      console.error("Breakfast generation failed:", err);
+      // Fallback breakfast
+      breakfastMeals = [{
+        name: "Bữa Sáng",
+        calories: breakfastTargets.cal,
+        protein: breakfastTargets.pro,
+        carbs: breakfastTargets.carb,
+        fat: breakfastTargets.fat,
+        description: "2 lát bánh mì đen + 3 lòng trắng trứng"
+      }];
+    }
 
-    const dinnerData = await generateMealForTime(
-      "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
-      recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
-      "- **Bữa Tối**: đạm nạc + rau xanh, không thêm món vặt.",
-      remainingFridgeItems
-    );
-    const dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
-    usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...dinnerMeals.map((m: any) => m?.name).filter(Boolean)];
-    remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
+    // Bữa Trưa
+    try {
+      const lunchData = await generateMealForTime(
+        "Bữa Trưa", lunchTargets.cal, lunchTargets.pro, lunchTargets.carb, lunchTargets.fat,
+        recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+        "- **Bữa Trưa**: đạm + rau, món đơn giản.",
+        remainingFridgeItems
+      );
+      lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
+      usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...lunchMeals.map((m: any) => m?.name).filter(Boolean)];
+      remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
+    } catch (err) {
+      console.error("Lunch generation failed:", err);
+      // Fallback lunch
+      lunchMeals = [{
+        name: "Bữa Trưa",
+        calories: lunchTargets.cal,
+        protein: lunchTargets.pro,
+        carbs: lunchTargets.carb,
+        fat: lunchTargets.fat,
+        description: "200g ức gà + 300g cơm trắng + 200g rau xanh"
+      }];
+    }
+
+    // Bữa Tối
+    try {
+      const dinnerData = await generateMealForTime(
+        "Bữa Tối", dinnerTargets.cal, dinnerTargets.pro, dinnerTargets.carb, dinnerTargets.fat,
+        recentMealsStr, getAvoidCurrentPlanMealsStr(), dislikedFoodsStr, dayPeriod, weightTrend.direction, foodAssessment,
+        "- **Bữa Tối**: đạm nạc + rau xanh, không thêm món vặt.",
+        remainingFridgeItems
+      );
+      dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
+      usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...dinnerMeals.map((m: any) => m?.name).filter(Boolean)];
+      remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
+    } catch (err) {
+      console.error("Dinner generation failed:", err);
+      // Fallback dinner
+      dinnerMeals = [{
+        name: "Bữa Tối",
+        calories: dinnerTargets.cal,
+        protein: dinnerTargets.pro,
+        carbs: dinnerTargets.carb,
+        fat: dinnerTargets.fat,
+        description: "200g cá thu + 300g cơm trắng + 200g rau xanh"
+      }];
+    }
 
     let allMeals = [
       ...breakfastMeals,

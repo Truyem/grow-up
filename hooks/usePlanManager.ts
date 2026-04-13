@@ -103,6 +103,20 @@ export function usePlanManager(
     console.log('[PlanManager] Workout detail:', generatedPartial.workout?.detail);
 
     let finalPlan: DailyPlan = generatedPartial;
+
+    // Merge consumed meals from old plan when generating nutrition
+    if ((generationType === 'nutrition' || generationType === 'both') && plan?.nutrition?.meals) {
+      const consumedMeals = plan.nutrition.meals.filter(m => m.consumed);
+      if (consumedMeals.length > 0) {
+        const existingMealNames = new Set(finalPlan.nutrition.meals?.map(m => m.name) || []);
+        const newConsumedMeals = consumedMeals.map(m => ({ ...m, consumed: true }));
+        finalPlan.nutrition.meals = [
+          ...(finalPlan.nutrition.meals || []),
+          ...newConsumedMeals.filter(m => !existingMealNames.has(m.name))
+        ];
+        console.log('[PlanManager] Merged consumed meals from old plan:', consumedMeals.length);
+      }
+    }
     
     // Nếu có dữ liệu đã lưu (ví dụ userData.consumedFood), có thể xóa ở đây nếu cần.
     // Xoá hoàn toàn dữ liệu kế hoạch cũ bằng cách ghi đè trực tiếp bằng kế hoạch mới được sinh ra.
