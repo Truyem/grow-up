@@ -6,6 +6,12 @@ export enum FatigueLevel {
   Tired = 'Mệt',
 }
 
+export enum MuscleRecoveryStatus {
+  Fresh = 'Fresh',
+  Tired = 'Tired',
+  Injured = 'Injured',
+}
+
 export enum MuscleGroup {
   // Chest (Ngực)
   Chest = 'Ngực',
@@ -104,6 +110,10 @@ export interface ExerciseSetLog {
 }
 
 export interface ExerciseLog {
+  lastVolume?: number; // Σ(weight × reps) of the last workout for this exercise
+  recoveryStatus?: string; // Recovery status of the muscle group (e.g., 'Fresh', 'Tired', 'Injured')
+  isBFR?: boolean; // Blood Flow Restriction flag
+  
   exerciseName: string;
   sets: ExerciseSetLog[];
   totalVolume: number; // Σ(weight × reps)
@@ -204,6 +214,8 @@ export interface WorkoutHistoryItem {
   sleepQuality?: SleepQuality;
   sleepStart?: string;
   sleepEnd?: string;
+  xpAdded?: boolean;
+  xpAmount?: number;
 }
 
 export interface PersonalRecord {

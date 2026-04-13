@@ -248,8 +248,9 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
                 saveSleep(sleepStart, sleepEnd).catch((e) => {
                   console.error('Lỗi khi lưu giấc ngủ:', e);
                 });
-                generatePlan('workout').catch(() => {
-                  showToast('Không thể tạo kế hoạch khi đang offline.', 'error');
+                generatePlan('workout').catch((e) => {
+                  console.error('Lỗi tạo kế hoạch workout:', e);
+                  showToast('Không thể tạo kế hoạch. Vui lòng thử lại.', 'error');
                 });
               }}
               disabled={isLoading}
@@ -287,8 +288,9 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
               <button
                 id="tour-nutrition-ai-btn"
                 onClick={() => {
-                  generatePlan('nutrition').catch(() => {
-                    showToast('Không thể tạo thực đơn khi đang offline.', 'error');
+                  generatePlan('nutrition').catch((e) => {
+                    console.error('Lỗi tạo kế hoạch nutrition:', e);
+                    showToast('Không thể tạo thực đơn. Vui lòng thử lại.', 'error');
                   });
                 }}
                 disabled={isLoading}

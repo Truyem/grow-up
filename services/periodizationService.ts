@@ -1,4 +1,4 @@
-import { UserInput, FatigueLevel, MuscleGroup } from '../types';
+import { UserInput, FatigueLevel, MuscleGroup, WorkoutHistoryItem } from '../types';
 
 export type PlanDuration = 4 | 8 | 12;
 export type TrainingPhase = 'base' | 'build' | 'peak' | 'deload';
@@ -67,13 +67,40 @@ export const generatePeriodizationSchedule = (duration: PlanDuration): Periodiza
 export const shouldAutoDeload = (
   recentFatigue: FatigueLevel, 
   sleepQuality: 'good' | 'bad' | 'average', 
-  isTrainingLoadSpiking: boolean
+  isTrainingLoadSpiking: boolean,
+  workoutHistory: WorkoutHistoryItem[] = []
 ): boolean => {
   // If extremely tired and bad sleep -> Auto deload
   if (recentFatigue === FatigueLevel.Tired && sleepQuality === 'bad') return true;
   
   // If training load spiked and they aren't fresh -> Auto deload
   if (isTrainingLoadSpiking && recentFatigue !== FatigueLevel.Fresh) return true;
+
+  // AUTOMATIC DELOAD: If in the last 3 workouts, totalVolume decreased > 15%
+  if (workoutHistory.length >= 3) {
+    // Get last 3 workout sessions
+    const recentWorkouts = workoutHistory
+      .filter(h => h.recordType === 'workout') // Only workout records
+      .slice(0, 3); // Last 3 workouts
+    
+    if (recentWorkouts.length === 3) {
+      // Calculate total volume for each workout
+      const volumes = recentWorkouts.map(workout => {
+        return workout.exerciseLogs?.reduce((sum, log) => sum + log.totalVolume, 0) || 0;
+      });
+      
+      // Check if volume decreased by more than 15% from first to third workout
+      const firstVolume = volumes[0];
+      const thirdVolume = volumes[2];
+      
+      if (firstVolume > 0) {
+        const volumeDecreasePercent = ((firstVolume - thirdVolume) / firstVolume) * 100;
+        if (volumeDecreasePercent > 15) {
+          return true; // Auto deload triggered
+        }
+      }
+    }
+  }
 
   // Additional rule for poor health
   // if (recentHealth === HealthCondition.Tired or Injured) could be added here

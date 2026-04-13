@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { UserInput, UserStats, UserGoals, FatigueLevel, Intensity, HealthCondition, MuscleGroup, AchievementBadge } from '../types';
 import { syncUserGoalsToSupabase, syncUserSettingsToSupabase, syncUserStatsToSupabase, loadProfileSettingsFromSupabase, syncAchievementsToSupabase, loadAchievementsFromSupabase } from '../services/supabasePlanSync';
 import { useOnlineStatus } from './useOnlineStatus';
+import { RANK_CONFIG, MAX_LEVEL } from '../constants/rankConfig';
 
 const DEFAULT_EQUIPMENT = [
   'Board chống đẩy',
@@ -69,40 +70,19 @@ const DEFAULT_ACHIEVEMENTS: AchievementBadge[] = [
     progressText: 'Level 0/50',
   },
   {
-    id: 'complete_rank_bronze',
-    title: 'Đồng đủ',
-    description: 'Hoàn thành Rank Đồng (Level 10)',
-    unlocked: false,
-    progressText: 'Level 0/10',
-  },
-  {
-    id: 'complete_rank_silver',
-    title: 'Sắt hoàn thiện',
-    description: 'Hoàn thành Rank Sắt (Level 20)',
-    unlocked: false,
-    progressText: 'Level 0/20',
-  },
-  {
-    id: 'complete_rank_gold',
-    title: 'Vàng rực rỡ',
-    description: 'Hoàn thành Rank Vàng (Level 30)',
-    unlocked: false,
-    progressText: 'Level 0/30',
-  },
-  {
     id: 'workout_100',
     title: 'Trăm bài',
     description: 'Hoàn thành 100 buổi tập',
     unlocked: false,
     progressText: '0/100 buổi tập',
   },
-  {
-    id: 'max_level',
-    title: 'Huyền thoại',
-    description: 'Đạt Level tối đa (70)',
+  ...RANK_CONFIG.map((rank) => ({
+    id: `rank_${rank.rankNumber}`,
+    title: rank.rankName,
+    description: `Hoàn thành Rank ${rank.rankName} (Level ${rank.endLevel})`,
     unlocked: false,
-    progressText: 'Level 0/70',
-  },
+    progressText: `${rank.endLevel}/${MAX_LEVEL}`,
+  })),
 ];
 
 export interface UseUserDataReturn {

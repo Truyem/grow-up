@@ -43,8 +43,6 @@ export function usePlanManager(
       setPlan(null);
       return;
     }
-
-    // Lần đầu do App.tsx quản lý tải initial (tránh gọi duplicate)
   }, [userId]);
 
   const handleGenerate = useCallback(async (type: ViewMode, currentHistory: WorkoutHistoryItem[]) => {
@@ -57,9 +55,15 @@ export function usePlanManager(
       return;
     }
 
+    if (!userId) {
+      console.log('[PlanManager] No userId, user not logged in');
+      showToast?.('Bạn cần đăng nhập để tạo kế hoạch.', 'error');
+      return;
+    }
+
     if (type === 'workout') {
       if (!plan?.nutrition) {
-        showToast('Vui lòng tạo Dinh dưỡng trước khi tạo Bài tập!', 'error');
+        showToast?.('Vui lòng tạo Dinh dưỡng trước khi tạo Bài tập!', 'error');
         return;
       }
       
@@ -69,15 +73,13 @@ export function usePlanManager(
       );
       
       if (!mainMealsEaten) {
-        showToast('Bạn phải hoàn thành (ăn) ít nhất 1 bữa chính (Sáng/Trưa/Tối) mới được tạo bài tập!', 'error');
+        showToast?.('Bạn phải hoàn thành (ăn) ít nhất 1 bữa chính (Sáng/Trưa/Tối) mới được tạo bài tập!', 'error');
         return;
       }
     }
 
-    if (!userId) {
-      showToast('Bạn cần đăng nhập để tạo kế hoạch.', 'error');
-      return;
-    }
+    console.log('[PlanManager] Starting generation for type:', type, 'userId:', userId);
+    console.log('[PlanManager] userData:', userData);
 
     setLoading(true);
     setIsStreaming(true);
@@ -93,9 +95,12 @@ export function usePlanManager(
       console.error('[PlanManager] generateDailyPlan failed:', error);
       setLoading(false);
       setIsStreaming(false);
-      showToast('Không thể tạo kế hoạch. Vui lòng thử lại.', 'error');
+      showToast?.('Không thể tạo kế hoạch. Vui lòng thử lại.', 'error');
       return;
     }
+
+    console.log('[PlanManager] Generated plan:', generatedPartial);
+    console.log('[PlanManager] Workout detail:', generatedPartial.workout?.detail);
 
     let finalPlan: DailyPlan = generatedPartial;
     
@@ -109,7 +114,7 @@ export function usePlanManager(
     setPlan(finalPlan);
     const saved = await savePlanToSupabase(userId, finalPlan, undefined);
     if (saved === false) {
-      showToast('Không thể lưu kế hoạch.', 'error');
+      showToast?.('Không thể lưu kế hoạch.', 'error');
       setLoading(false);
       setIsStreaming(false);
       return;
@@ -123,7 +128,7 @@ export function usePlanManager(
 
   const handleReset = useCallback((type: 'workout' | 'nutrition') => {
     if (!userId) {
-      showToast('Bạn cần đăng nhập để reset kế hoạch.', 'error');
+      showToast?.('Bạn cần đăng nhập để reset kế hoạch.', 'error');
       return;
     }
 
@@ -164,7 +169,7 @@ export function usePlanManager(
 
   const handleStartTracking = useCallback(() => {
     if (!userId) {
-      showToast('Bạn cần đăng nhập để lưu kế hoạch.', 'error');
+      showToast?.('Bạn cần đăng nhập để lưu kế hoạch.', 'error');
       return;
     }
     
@@ -184,7 +189,7 @@ export function usePlanManager(
 
   const handleUpdatePlan = useCallback((updatedPlan: DailyPlan) => {
     if (!userId) {
-      showToast('Bạn cần đăng nhập để cập nhật kế hoạch.', 'error');
+      showToast?.('Bạn cần đăng nhập để cập nhật kế hoạch.', 'error');
       return;
     }
 
@@ -209,7 +214,7 @@ export function usePlanManager(
             ? workoutProgress as { checkedState: Record<string, boolean>; userNote?: string; exerciseLogs?: Record<string, ExerciseLog> }
             : cloudPlan?.workoutProgress,
         });
-        showToast('Đã tải kế hoạch từ máy chủ', 'success');
+        showToast?.('Đã tải kế hoạch từ máy chủ', 'success');
       }
     } catch (e) {
       console.error('[PlanManager] Refresh plan error:', e);

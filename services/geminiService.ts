@@ -5,7 +5,7 @@ import { fridgeService } from './fridgeService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/nemotron";
-const GPT_OSS_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const GPT_OSS_MODEL = "@cf/moonshotai/kimi-k2.5";
 
 // Gemini API keys from environment (for food image analysis)
 // Multiple keys are injected via vite.config.ts
@@ -127,8 +127,23 @@ const callNemotronAPI = async (
       throw new Error(`Nemotron API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    
+    const responseTextRaw = await response.text();
+    console.log('[Nemotron API Raw Status & Body]:', response.status, responseTextRaw.substring(0, 500));
+
+    // Try to parse as JSON
+    let data;
+    if (!responseTextRaw || responseTextRaw.trim() === '') {
+      console.error('Nemotron API returned empty response');
+      throw new Error('Nemotron API returned empty response');
+    }
+    try {
+      data = JSON.parse(responseTextRaw);
+    } catch (e) {
+      console.error('Failed to parse response as JSON:', e);
+      // If it's not JSON, maybe it's an error message from the proxy
+      throw new Error(`Nemotron API returned non-JSON response: ${responseTextRaw.substring(0, 100)}`);
+    }
+
     // Extract text from response - handle both direct response and chat.completion format
     let responseText = "";
     if (data.choices && data.choices[0]?.message?.content) {
@@ -352,14 +367,37 @@ export const getFallbackPlan = (userData: UserInput): DailyPlan => {
 
   // Macro Calculation
   // Fat: 0.9g/kg (Moderate)
-  const fatTarget = Math.round(userData.weight * 0.9);
+  let fatTarget = Math.round(userData.weight * 0.9);
 
   // Carbs: Remaining Calories / 4
   // 1g Protein = 4kcal, 1g Fat = 9kcal, 1g Carb = 4kcal
   const caloriesFromProtein = proteinTarget * 4;
-  const caloriesFromFat = fatTarget * 9;
-  const remainingCalories = target - caloriesFromProtein - caloriesFromFat;
-  const carbTarget = Math.max(0, Math.round(remainingCalories / 4));
+  let caloriesFromFat = fatTarget * 9;
+  let remainingCalories = target - caloriesFromProtein - caloriesFromFat;
+  let carbTarget = Math.max(0, Math.round(remainingCalories / 4));
+
+  // MACRO-CYCLING (Xoay vòng dinh dưỡng)
+  // Điều chỉnh lượng Carb dựa trên cường độ tập luyện của ngày đó.
+  // Ngày tập nặng (Leg Day/Back Day) -> Tăng 20% Carb
+  // Ngày nghỉ (Rest Day) -> Giảm 30% Carb, tăng Fat tốt để phục hồi hormone.
+  if (userData.selectedIntensity === Intensity.Hard) {
+    // Heavy training day - increase carbs by 20%
+    carbTarget = Math.round(carbTarget * 1.2);
+    // Adjust fat and protein to maintain target calories
+    const carbCalories = carbTarget * 4;
+    const proteinCalories = proteinTarget * 4;
+    const fatCalories = target - carbCalories - proteinCalories;
+    fatTarget = Math.max(0, Math.round(fatCalories / 9));
+  } else if (userData.selectedIntensity === Intensity.Low) {
+    // Rest/Light day - decrease carbs by 30%, increase fat
+    carbTarget = Math.round(carbTarget * 0.7);
+    // Adjust fat and protein to maintain target calories
+    const carbCalories = carbTarget * 4;
+    const proteinCalories = proteinTarget * 4;
+    const fatCalories = target - carbCalories - proteinCalories;
+    fatTarget = Math.max(0, Math.round(fatCalories / 9));
+  }
+  // For medium intensity, keep standard macro calculation
 
   const intensity = userData.selectedIntensity;
 
@@ -677,6 +715,9 @@ const generateWorkoutPart = async (
         exerciseName: log.exerciseName,
         inferredEquipment: inferEquipmentFromExerciseName(log.exerciseName),
         totalVolume: log.totalVolume,
+        lastVolume: log.lastVolume, // Σ(weight × reps) of the last workout for this exercise
+        recoveryStatus: log.recoveryStatus, // Recovery status of the muscle group (e.g., 'Fresh', 'Tired', 'Injured')
+        isBFR: log.isBFR, // Blood Flow Restriction flag
         sets: (log.sets || []).map((s, idx) => ({
           set: idx + 1,
           kg: s.weight,
@@ -719,25 +760,27 @@ const generateWorkoutPart = async (
     - Dữ liệu giấc ngủ 7 ngày: ${JSON.stringify(sleepRecovery7Days)}
     - Số giờ ngủ trung bình 7 ngày: ${avgSleepHours ?? 'Chưa có dữ liệu'}
 
-    LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, cân nặng, calories, protein, dụng cụ):
-    ${JSON.stringify(history7Days, null, 2)}
-
-    QUY TẮC CHỌN BÀI:
-    - Không lặp nhóm cơ primary vừa tập nặng trong 48h gần nhất.
-    - Đa dạng hóa bài tập: Luân phiên các góc độ, kỹ thuật và biến thể khác nhau để không gây nhàm chán và kích thích cơ toàn diện. Tận dụng triệt để Thanh xà đơn, Thanh dips, Tạ đơn và ưu tiên sử dụng BFR (đặt isBFR: true) cho các bài tập cô lập/isolation cuối buổi.
-    - Mỗi bài phải có primaryMuscleGroups và secondaryMuscleGroups rõ ràng.
-    - Dùng tiếng Anh cho tên bài tập.
-    - Summary/description/reasoning viết tiếng Việt.
-    - ĐỐI VỚI BÀI TẬP BODYWEIGHT (không dùng tạ ngoài, ví dụ: hít đất, kéo xà, plank, burpee, crunch...), 'equipment' BẮT BUỘC ghi là 'None'.
-    - **NẾU XU HƯỚNG CÂN NẶNG GIẢM (${weightTrend.direction === 'giảm' ? 'ĐÚNG' : 'SAI'})**:
-      - Nếu đang giảm cân, ưu tiên bài tập volume vừa phải, tránh overtraining.
-      - Tập trọng lượng nhẹ hơn, tập nhiều reps hơn để tránh mất cơ.
-    - **NẾU ĂN ÍT (${foodAssessment.status === 'Ăn ít' ? 'ĐÚNG' : 'SAI'})**:
-      - Giảm volume workout, tối ưu recovery.
-      - Tập ngắn hơn, focus vào compound movements chính.
-      - Có thể giảm ${foodAssessment.adjustment} cường độ.
-    - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories (${target} kcal) và protein (${proteinTarget}g) chưa?"
-    - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp, và cảnh báo nếu cần tăng intake.
+     LỊCH SỬ 7 NGÀY (bao gồm bài tập đã tập, set, reps, kg, volume, cân nặng, calories, protein, dụng cụ, lastVolume, recoveryStatus, isBFR):
+     ${JSON.stringify(history7Days, null, 2)}
+     
+     QUY TẮC CHỌN BÀI:
+     - Không lặp nhóm cơ primary vừa tập nặng trong 48h gần nhất.
+     - Đa dạng hóa bài tập: Luân phiên các góc độ, kỹ thuật và biến thể khác nhau để không gây nhàm chán và kích thích cơ toàn diện. Tận dụng triệt để Thanh xà đơn, Thanh dips, Tạ đơn và ưu tiên sử dụng BFR (đặt isBFR: true) cho các bài tập cô lập/isolation cuối buổi.
+     - Mỗi bài phải có primaryMuscleGroups và secondaryMuscleGroups rõ ràng.
+     - Dùng tiếng Anh cho tên bài tập.
+     - Summary/description/reasoning viết tiếng Việt.
+     - ĐỐI VỚI BÀI TẬP BODYWEIGHT (không dùng tạ ngoài, ví dụ: hít đất, kéo xà, plank, burpee, crunch...), 'equipment' BẮT BUỘC ghi là 'None'.
+     - **PROGRESSIVE OVERLOAD**: So sánh totalVolume với lastVolume từ lịch sử tập. Nếu totalVolume >= lastVolume × 1.05 (tăng 5%), tăng trọng lượng 2.5kg hoặc tăng 2 reps cho lần tập tiếp theo.
+     - **MUSCLE RECOVERY HEATMAP**: Sử dụng recoveryStatus để xác định nhóm cơ cần hồi phục. Nếu recoveryStatus là 'Tired' hoặc 'Injured', tránh tập nhóm cơ đó và tập trung vào các nhóm cơ có recoveryStatus là 'Fresh'.
+     - **NẾU XU HƯỚNG CÂN NẶNG GIẢM (${weightTrend.direction === 'giảm' ? 'ĐÚNG' : 'SAI'})**:
+       - Nếu đang giảm cân, ưu tiên bài tập volume vừa phải, tránh overtraining.
+       - Tập trọng lượng nhẹ hơn, tập nhiều reps hơn để tránh mất cơ.
+     - **NẾU ĂN ÍT (${foodAssessment.status === 'Ăn ít' ? 'ĐÚNG' : 'SAI'})**:
+       - Giảm volume workout, tối ưu recovery.
+       - Tập ngắn hơn, focus vào compound movements chính.
+       - Có thể giảm ${foodAssessment.adjustment} cường độ.
+     - Trong workout.summary HOẶC schedule.reasoning phải có 1 câu hỏi kiểm tra năng lượng theo thời điểm hiện tại, ví dụ: "Hiện tại là ${dayPeriod}, bạn đã nạp đủ calories (${target} kcal) và protein (${proteinTarget}g) chưa?"
+     - Trong notes nên ghi rõ target tăng tiến bằng set/reps/kg khi phù hợp, và cảnh báo nếu cần tăng intake.
 
     YÊU CẦU ĐẦU RA (RẤT QUAN TRỌNG):
     CHỈ XUẤT RA ĐÚNG 1 MẢNG JSON CÓ 1 OBJECT (KHÔNG giải thích, KHÔNG chào hỏi, KHÔNG có văn bản nào khác ngoài JSON):
@@ -750,10 +793,10 @@ const generateWorkoutPart = async (
     { role: "user", content: prompt }
     ], { maxTokens: 50000, temperature: 0.2 });
 
-  if (!responseText) throw new Error("Empty workout response");
-    const parsed = cleanAndParseJSON(responseText, "WorkoutPart");
-    return Array.isArray(parsed) ? parsed[0] : parsed;
-};
+   if (!responseText) throw new Error("Empty workout response");
+   const parsed = cleanAndParseJSON(responseText, "WorkoutPart");
+   return Array.isArray(parsed) ? parsed[0] : parsed;
+ };
 
 const extractMealsFromHistory = (history: WorkoutHistoryItem[], days: number = 7): string[] => {
   const weekAgo = Date.now() - days * 24 * 60 * 60 * 1000;
@@ -818,12 +861,12 @@ ${dislikedFoodsStr}
 
 RULES:
 - MỖI MEAL CHỈ TỐI ĐA 2 MÓN/THÀNH PHẦN, ƯU TIÊN CÀNG ÍT THÀNH PHẦN CÀNG TỐT.
-- **VERY IMPORTANT**: ƯU TIÊN SỬ DỤNG CÁC NGUYÊN LIỆU TRONG FRIDGE INVENTORY ĐỂ LÊN THỰC ĐƠN.
+- **VERY IMPORTANT**: CHỈ SỬ DỤNG 100% NGUYÊN LIỆU TỪ FRIDGE INVENTORY. Nếu tủ lạnh có đủ nguyên liệu thì dùng tất cả từ tủ, KHÔNG cần thêm nguyên liệu bên ngoài.
 - Nếu bạn sử dụng nguyên liệu từ FRIDGE INVENTORY, hãy trừ số lượng đi và liệt kê vào mảng "usedFridgeItems" (sử dụng đúng ID được cung cấp).
 - **VERY IMPORTANT**: KHÔNG được đề xuất món có chứa bất kỳ nguyên liệu nào trong "DISLIKED FOODS / EXCLUDED FOODS" (bao gồm tên đồng nghĩa như oats/yến mạch, cacao/ca cao).
-- CARB CHÍNH BẮT BUỘC LÀ CƠM (gạo/cơm trắng/cơm gạo lứt). KHÔNG dùng carb chính khác như bánh mì, bún, phở, mì, nui, yến mạch, khoai.
-- RAU ƯU TIÊN CHỈ DÙNG SÚP LƠ HOẶC CẢI XANH.
-- CHỈ bổ sung nguyên liệu ngoài tủ lạnh khi thật sự cần thiết, và tối đa 1 nguyên liệu ngoài tủ cho mỗi bữa.
+
+- RAU XANH (súp lơ, cải xanh, rau muống, rau cải, xà lách,...): DÙNG NẾU CÓ TRONG TỦ LẠNH, KO CÓ THÌ THÔI (không bắt buộc).
+- Chỉ dùng nguyên liệu chính (thịt, cá, trứng, rau, carb,...) từ tủ lạnh. GIA VỊ (hành, tỏi, nước mắm, dầu, muối, tiêu,...) ĐƯỢC thêm ngoài tủ lạnh.
 ${extraRules}
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS CONSUMED RECENTLY" list.
 - **VERY IMPORTANT**: AVOID suggesting meals from the "MEALS ALREADY GENERATED IN THIS PLAN" list.
@@ -861,6 +904,7 @@ YÊU CẦU ĐẦU RA (Đúng chuẩn JSON Object này):
     ], { maxTokens: 50000, temperature: 0.2 });
 
   if (!responseText) throw new Error(`Empty response for ${mealName}`);
+  return cleanAndParseJSON(responseText, `NutritionPart_${mealName}`);
   return cleanAndParseJSON(responseText, `NutritionPart_${mealName}`);
 };
 

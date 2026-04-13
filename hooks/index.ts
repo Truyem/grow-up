@@ -6,3 +6,4 @@ export { useOnlineStatus } from './useOnlineStatus';
 export { useSupabaseProfileSync } from './useUserData';
 export { useLevelSystem } from './useLevelSystem';
 export { useTour } from './useTour';
+export { useRankPreload } from './useRankPreload';
