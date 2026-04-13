@@ -13,61 +13,46 @@ const getTodayString = (): string => {
   return `${days[now.getDay()]}, ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
 };
 
-// Calculate Streak based on Workout History (Weekly >= 4 sessions)
+// Calculate Streak based on consecutive days
 const calculateWeeklyStreak = (history: WorkoutHistoryItem[]): number => {
   if (!history || history.length === 0) return 0;
 
-  // Filter only workout and nutrition records
   const validRecords = history.filter(item => item.recordType !== 'sleep');
-
   if (validRecords.length === 0) return 0;
 
-  // Group by week (Monday start)
-  const weeks: Record<string, number> = {};
   const today = new Date();
-  
+  today.setHours(0, 0, 0, 0);
+
+  const workoutDates = new Set<string>();
   validRecords.forEach(item => {
     const d = new Date(item.timestamp);
-    
-    // Adjust to local timezone by getting the date parts directly
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const date = d.getDate();
-    
-    // Create date in local timezone
-    const localDate = new Date(year, month, date);
-    const day = localDate.getDay() || 7; // 1=Mon, 7=Sun
-    
-    const monday = new Date(localDate);
-    monday.setDate(localDate.getDate() - day + 1);
-    
-    const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-    weeks[weekKey] = (weeks[weekKey] || 0) + 1;
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    workoutDates.add(dateStr);
   });
 
-  const now = new Date();
-  const currentDay = now.getDay() || 7;
-  const currentMonday = new Date(now);
-  currentMonday.setDate(now.getDate() - currentDay + 1);
-  currentMonday.setHours(0, 0, 0, 0);
-
   let streak = 0;
-  let checkDate = new Date(currentMonday);
+  let checkDate = new Date(today);
 
-  for (let i = 0; i < 100; i++) {
-    const weekKey = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
-    const count = weeks[weekKey] || 0;
-
-    if (count >= 4) {
+  for (let i = 0; i < 365; i++) {
+    const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+    
+    if (workoutDates.has(dateStr)) {
       streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
     } else {
-      if (checkDate.getTime() === currentMonday.getTime()) {
-        // Current week incomplete - continue checking previous
+      if (i === 0) {
+        checkDate.setDate(checkDate.getDate() - 1);
+        const yesterdayStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+        if (workoutDates.has(yesterdayStr)) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
       } else {
         break;
       }
     }
-    checkDate.setDate(checkDate.getDate() - 7);
   }
   return streak;
 };
