@@ -1,4 +1,4 @@
-const IP_API_URL = 'http://ip-api.com/json/';
+const IP_API_URL = 'https://ip-api.com/json/';
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 
 export interface LocationData {
