@@ -12,6 +12,7 @@ interface NutritionDisplayProps {
     plan: DailyPlan;
     onReset: (type: 'workout' | 'nutrition') => void;
     onUpdatePlan: (plan: DailyPlan) => void;
+    onUpdatePlanImmediate?: (plan: DailyPlan) => void;
 
     onCompleteNutrition?: (nutrition: DailyPlan['nutrition']) => void;
 }
@@ -509,7 +510,7 @@ const LocketCameraModal: React.FC<{
     );
 };
 
-export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onCompleteNutrition }) => {
+export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onReset, onUpdatePlan, onUpdatePlanImmediate, onCompleteNutrition }) => {
     // Consumed state is now persisted in meal.consumed via onUpdatePlan
 
     // State for modal
@@ -564,7 +565,12 @@ export const NutritionDisplay: React.FC<NutritionDisplayProps> = ({ plan, onRese
                 } : m
             )
         };
-        onUpdatePlan(updatedPlan);
+        // Save immediately to Supabase to prevent data loss on tab switch
+        if (onUpdatePlanImmediate) {
+            onUpdatePlanImmediate(updatedPlan);
+        } else {
+            onUpdatePlan(updatedPlan);
+        }
     };
 
     // Delete meal function - only for meals added via camera (with timestamp)

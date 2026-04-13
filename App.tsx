@@ -103,6 +103,7 @@ export default function App() {
     handleReset,
     handleStartTracking,
     handleUpdatePlan,
+    handleUpdatePlanImmediate,
     handleRefreshPlan
   } = usePlanManager(userData, userStats, session, showToast);
 
@@ -484,6 +485,7 @@ export default function App() {
                         onReset={handleReset}
                         onComplete={handleCompleteWorkoutWithSleep}
                         onUpdatePlan={handleUpdatePlan}
+                        onUpdatePlanImmediate={handleUpdatePlanImmediate}
                       />
                     </Suspense>
                   ) : (
@@ -502,6 +504,7 @@ export default function App() {
                         plan={plan}
                         onReset={handleReset}
                         onUpdatePlan={handleUpdatePlan}
+                        onUpdatePlanImmediate={handleUpdatePlanImmediate}
                         onCompleteNutrition={handleCompleteNutrition}
                       />
                     </Suspense>

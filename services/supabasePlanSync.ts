@@ -38,7 +38,7 @@ export const debouncedSavePlan = (
     userId: string,
     plan: DailyPlan,
     workoutProgress?: Record<string, any>,
-    delay = 500
+    delay = 100
 ) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -510,7 +510,7 @@ export const syncAchievementsToSupabase = async (userId: string, achievements: A
         if (unlockedAchievements.length > 0) {
             const { error } = await supabase
                 .from('user_achievements')
-                .upsert(unlockedAchievements, { onConflict: 'user_id_achievement_id' });
+                .upsert(unlockedAchievements, { onConflict: 'user_id,achievement_id' });
             if (error) {
                 console.error('[AchievementsSync] upsert error:', error);
             }

@@ -19,6 +19,7 @@ interface PlanDisplayProps {
   onReset: (type: 'workout' | 'nutrition') => void;
   onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => Promise<void>;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
+  onUpdatePlanImmediate?: (updatedPlan: DailyPlan) => void;
 }
 
 const formatCurrencyInput = (value: string) => {
@@ -323,7 +324,7 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isChecked, onTogg
 
 
 
-export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete, onUpdatePlan }) => {
+export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onComplete, onUpdatePlan, onUpdatePlanImmediate }) => {
   const { userData, workoutHistory, showToast } = useAppContext();
   const [isCompleted, setIsCompleted] = useState(false);
   const [userNote, setUserNote] = useState('');
@@ -378,18 +379,19 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       setUserNote('');
       setExerciseLogs({});
     }
-  }, [plan.date]);
+  }, [plan?.workoutProgress]);
 
   // Save progress to Supabase whenever it changes
   useEffect(() => {
-    if (!isCompleted) {
-      // Sync to Supabase via onUpdatePlan (debounced in hook)
-      if (Object.keys(checkedState).length > 0) {
-        const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote, exerciseLogs } };
-        onUpdatePlan(updatedPlan);
-      }
+    if (isCompleted) return;
+    // Save immediately to Supabase to prevent data loss on tab switch
+    const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote, exerciseLogs } };
+    if (onUpdatePlanImmediate) {
+      onUpdatePlanImmediate(updatedPlan);
+    } else {
+      onUpdatePlan(updatedPlan);
     }
-  }, [checkedState, userNote, exerciseLogs, plan.date, isCompleted]);
+  }, [checkedState, userNote, exerciseLogs, isCompleted]);
 
   const handleToggle = (key: string) => {
     setCheckedState(prev => ({ ...prev, [key]: !prev[key] }));

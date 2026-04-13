@@ -198,6 +198,14 @@ export function usePlanManager(
     debouncedSavePlan(userId, updatedPlan);
   }, [showToast, userId]);
 
+  const handleUpdatePlanImmediate = useCallback(async (updatedPlan: DailyPlan) => {
+    if (!userId) return;
+
+    setPlan(updatedPlan);
+
+    await savePlanToSupabase(userId, updatedPlan, undefined);
+  }, [userId]);
+
   const handleRefreshPlan = useCallback(async () => {
     if (!userId) return;
     
@@ -235,6 +243,7 @@ export function usePlanManager(
     handleReset,
     handleStartTracking,
     handleUpdatePlan,
+    handleUpdatePlanImmediate,
     handleRefreshPlan,
   };
 }
