@@ -198,6 +198,13 @@ export function useWorkoutHistory(
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
 
+    // Update streak and sync to Supabase immediately after saving
+    const newStreak = calculateWeeklyStreak(updatedHistory);
+    const todayDate = new Date().toDateString();
+    const updatedStats = { ...userStats, streak: newStreak, lastLoginDate: todayDate };
+    setUserStats(updatedStats);
+    await syncUserStatsToSupabase(userId, updatedStats);
+
     // Mark workout as completed in plan
     if (plan) {
       const updatedPlan = { ...plan };
@@ -290,7 +297,7 @@ export function useWorkoutHistory(
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId]);
+  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId, userStats, calculateStreak, setUserStats]);
 
   const handleCompleteNutrition = useCallback(async (nutrition: DailyPlan['nutrition']) => {
     if (!userId) {
@@ -341,6 +348,13 @@ export function useWorkoutHistory(
 
     const updatedHistory = [itemToSave, ...otherItems];
     setWorkoutHistory(updatedHistory);
+
+    // Update streak and sync to Supabase immediately after saving
+    const newStreak = calculateWeeklyStreak(updatedHistory);
+    const todayDate = new Date().toDateString();
+    const updatedStats = { ...userStats, streak: newStreak, lastLoginDate: todayDate };
+    setUserStats(updatedStats);
+    await syncUserStatsToSupabase(userId, updatedStats);
 
     if (plan) {
       const updatedPlan = { ...plan };
