@@ -141,8 +141,12 @@ const callNemotronAPI = async (
     // Nemotron returns plain text, NOT JSON
     const chunk = (await response.text()).trim();
 
-    if (!chunk && attempts === 1) {
-      throw new Error("Nemotron returned empty content");
+    if (!chunk) {
+      console.warn(`Nemotron returned empty content (attempt ${attempts}/${MAX_ATTEMPTS}), retrying...`);
+      if (attempts >= MAX_ATTEMPTS) {
+        throw new Error("Nemotron returned empty content after max retries");
+      }
+      continue;
     }
 
     fullContent += chunk;
@@ -159,7 +163,7 @@ const callNemotronAPI = async (
     ];
   }
 
-  if (!fullContent) throw new Error("Nemotron returned empty response");
+  if (!fullContent) throw new Error("Nemotron returned empty response after max retries");
 
   return fullContent;
 };
