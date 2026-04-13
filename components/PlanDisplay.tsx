@@ -367,14 +367,15 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalExercises > 0 ? Math.round((checkedCount / totalExercises) * 100) : 0;
 
-  // Restore progress from Supabase-backed plan payload
+  // Restore progress from Supabase-backed plan payload (only when plan changes externally)
+  const [isRestoring, setIsRestoring] = useState(false);
   useEffect(() => {
-    if (plan.workoutProgress?.checkedState) {
+    if (plan.workoutProgress?.checkedState && !isRestoring) {
       setCheckedState(plan.workoutProgress.checkedState);
       setUserNote(plan.workoutProgress.userNote || '');
       setExerciseLogs(plan.workoutProgress.exerciseLogs || {});
       console.log('[PlanDisplay] Restored progress from Supabase');
-    } else {
+    } else if (!isRestoring) {
       setCheckedState({});
       setUserNote('');
       setExerciseLogs({});
@@ -384,13 +385,14 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
   // Save progress to Supabase whenever it changes
   useEffect(() => {
     if (isCompleted) return;
-    // Save immediately to Supabase to prevent data loss on tab switch
+    setIsRestoring(true);
     const updatedPlan = { ...plan, workoutProgress: { checkedState, userNote, exerciseLogs } };
     if (onUpdatePlanImmediate) {
       onUpdatePlanImmediate(updatedPlan);
     } else {
       onUpdatePlan(updatedPlan);
     }
+    setTimeout(() => setIsRestoring(false), 100);
   }, [checkedState, userNote, exerciseLogs, isCompleted]);
 
   const handleToggle = (key: string) => {
