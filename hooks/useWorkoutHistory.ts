@@ -285,123 +285,6 @@ export function useWorkoutHistory(
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId, userStats, calculateStreak, setUserStats]);
 
-  const handleCompleteNutrition = useCallback(async (nutrition: DailyPlan['nutrition']) => {
-    if (!userId) {
-      showToast('Bạn cần đăng nhập để lưu dữ liệu.', 'error');
-      return;
-    }
-    if (!canPerformOnlineAction('history-complete-nutrition', showToast)) return;
-
-    const now = new Date();
-    const todayDateStr = getTodayString();
-    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const isSameDay = (ts: number) => {
-      const d = new Date(ts);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` === todayKey;
-    };
-
-    const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
-    const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
-    const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
-
-    let itemToSave: WorkoutHistoryItem;
-    if (existingToday) {
-      itemToSave = {
-        ...existingToday,
-        nutrition,
-        weight: userData.weight,
-        timestamp: Math.max(existingToday.timestamp, now.getTime()),
-        recordType: 'nutrition'
-      };
-    } else {
-      itemToSave = {
-        date: todayDateStr,
-        timestamp: now.getTime(),
-        levelSelected: 'Chỉ dinh dưỡng',
-        summary: 'Chỉ lưu thực đơn dinh dưỡng',
-        completedExercises: [],
-        exercisesSummary: 'Không có bài tập',
-        nutrition,
-        weight: userData.weight,
-        recordType: 'nutrition'
-      };
-    }
-
-    const savedHistory = await upsertWorkoutHistoryItemToSupabase(userId, itemToSave);
-    if (!savedHistory) {
-      showToast('Đã có dữ liệu tập luyện trong ngày, vui lòng tạo lịch tập mới để lưu!', 'error');
-      return;
-    }
-
-    const updatedHistory = [itemToSave, ...otherItems];
-    setWorkoutHistory(updatedHistory);
-
-    // Update streak and sync to Supabase immediately after saving
-    const newStreak = calculateWeeklyStreak(updatedHistory);
-    const todayDate = new Date().toDateString();
-    const updatedStats = { ...userStats, streak: newStreak, lastLoginDate: todayDate };
-    setUserStats(updatedStats);
-    await syncUserStatsToSupabase(userId, updatedStats);
-
-    if (plan) {
-      const updatedPlan = { ...plan };
-      updatedPlan.nutrition = { ...updatedPlan.nutrition, isGenerated: false };
-      setPlan(updatedPlan);
-      const dateKey = now.toISOString().split('T')[0];
-      await savePlanToSupabase(userId, updatedPlan, undefined, dateKey);
-    }
-
-    showToast(`Đã lưu thực đơn dinh dưỡng: ${nutrition.totalCalories} kcal, ${nutrition.totalProtein}g protein!`);
-
-    try {
-      const todayKey = now.toISOString().split('T')[0];
-      const todayXPHistory = workoutHistory.filter(h => {
-        const hDate = h.date?.split('T')[0] || h.date;
-        return hDate === todayKey && h.xpAdded === true;
-      });
-      if (todayXPHistory.length > 0) {
-        console.log('XP already added today, skipping nutrition XP');
-      } else {
-        let userLevel = await initializeUserLevel(userId);
-        if (userLevel) {
-          const totalXP = XP_REWARDS.NUTRITION_BONUS;
-          let updated = { ...userLevel };
-          let currentLevelXP = updated.currentLevelXP + totalXP;
-          let leveledUp = false;
-
-          while (currentLevelXP >= getXPForNextLevel(updated.currentLevel) && updated.currentLevel < MAX_LEVEL) {
-            currentLevelXP -= getXPForNextLevel(updated.currentLevel);
-            updated.currentLevel += 1;
-            leveledUp = true;
-          }
-
-          updated.currentLevelXP = currentLevelXP;
-          updated.nextLevelXP = getXPForNextLevel(updated.currentLevel);
-          updated.totalXP += totalXP;
-          updated.lifetimeXP += totalXP;
-          updated.lastLevelUpDate = leveledUp ? new Date().toISOString() : updated.lastLevelUpDate;
-
-          const saved = await saveUserLevel(userId, updated);
-          if (saved) {
-            if (onXPAdded) {
-              onXPAdded(updated);
-            }
-            if (leveledUp) {
-              showToast(`🎉 Lên Level ${updated.currentLevel}! +${totalXP} XP`, 'success');
-            } else {
-              showToast(`+${totalXP} XP (${currentLevelXP}/${updated.nextLevelXP})`, 'info');
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error adding nutrition XP:', error);
-    }
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [workoutHistory, userData.weight, plan, setPlan, showToast, userId, onXPAdded]);
-
   const handleDeleteHistoryItem = useCallback(async (timestamp: number) => {
     if (!userId) {
       showToast('Bạn cần đăng nhập để xoá dữ liệu.', 'error');
@@ -493,7 +376,6 @@ export function useWorkoutHistory(
     workoutHistory,
     setWorkoutHistory,
     handleCompleteWorkout,
-    handleCompleteNutrition,
     handleDeleteHistoryItem,
     handleRefreshHistory,
     handleSickDay,

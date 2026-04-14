@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Dumbbell, Utensils, History } from 'lucide-react';
+import { Dumbbell, History, Trophy } from 'lucide-react';
 
-export type TabType = 'workout' | 'nutrition' | 'history' | 'settings';
+export type TabType = 'workout' | 'rank' | 'history' | 'settings';
 
 interface PlanTabsProps {
     activeTab: TabType;
@@ -30,18 +30,18 @@ export const PlanTabs: React.FC<PlanTabsProps> = ({ activeTab, onTabChange, clas
             </button>
 
             <button
-                onClick={() => onTabChange('nutrition')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all duration-300 relative overflow-hidden cursor-pointer ${activeTab === 'nutrition'
+                onClick={() => onTabChange('rank')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all duration-300 relative overflow-hidden cursor-pointer ${activeTab === 'rank'
                     ? 'text-white shadow-lg'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                     }`}
             >
-                {activeTab === 'nutrition' && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-600 animate-fade-in rounded-xl" />
+                {activeTab === 'rank' && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-orange-600 animate-fade-in rounded-xl" />
                 )}
                 <span className="relative z-10 flex items-center gap-2 text-sm md:text-base">
-                    <Utensils className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'nutrition' ? 'fill-white' : ''}`} />
-                    <span className="hidden min-[380px]:inline">Dinh dưỡng</span>
+                    <Trophy className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'rank' ? 'fill-yellow-400 text-yellow-300' : ''}`} />
+                    <span className="hidden min-[380px]:inline">Rank</span>
                 </span>
             </button>
 

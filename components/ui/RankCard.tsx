@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserLevel } from '../../types';
-import { getRankFromLevel, getRankImage, COLOR_PALETTE } from '../../constants/rankConfig';
+import { getRankFromLevel, getRankImage, getTierImage, COLOR_PALETTE } from '../../constants/rankConfig';
 import { Zap, Crown, Flame, Gem, Star } from 'lucide-react';
 import '../styles/RankCard.css';
 
@@ -64,16 +64,10 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
     }
   };
 
-  return (
+return (
     <div className="rank-card-container" onClick={onClick}>
-      {/* Background decoration */}
-      <div className="rank-card-bg" style={{ background: colors.gradient }}></div>
-      
       {/* Rank card */}
-      <div className="rank-card" style={{
-        borderColor: colors.primary,
-        boxShadow: `0 8px 32px ${colors.primary}40`
-      }}>
+      <div className="rank-card">
         {/* Top decoration */}
         <div className="rank-card-top">
           <div className="rank-number" style={{ 
@@ -88,7 +82,7 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
         </div>
 
         {/* Rank image section */}
-        <div className="rank-image-section" style={{ borderColor: colors.primary }}>
+        <div className="rank-image-section">
           <img src={rankImage} alt={`Level ${userLevel.currentLevel + 1}`} className="rank-image" />
           <div className="level-badge" style={{
             background: colors.gradient,
@@ -100,9 +94,11 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
 
         {/* Rank info section */}
         <div className="rank-info-section">
-          <h3 className="rank-name" style={{ color: colors.primary }}>
-            {rank.rankName}
-          </h3>
+          <img 
+            src={getTierImage(userLevel.currentLevel)} 
+            alt={rank.rankName} 
+            className="rank-name-image"
+          />
           <p className="rank-description">{rank.description}</p>
 
           {/* Progress in rank */}
@@ -125,7 +121,7 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
         {/* Level progress */}
           <div className="level-progress-section">
             <div className="level-progress-label">
-              <span>Level Progress</span>
+              <span>Tiến trình cấp</span>
               <span className="xp-text">{userLevel.currentLevelXP} / {userLevel.nextLevelXP}</span>
             </div>
             <div className="level-progress-bar" style={{ background: `${colors.primary}20` }}>
@@ -142,15 +138,9 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
           {/* Stats */}
           <div className="rank-stats">
             <div className="stat" style={{ borderLeftColor: colors.primary }}>
-              <span className="stat-label">Total XP</span>
+              <span className="stat-label">Tổng kinh nghiệm</span>
               <span className="stat-value" style={{ color: colors.primary }}>
                 {userLevel.totalXP}
-              </span>
-            </div>
-            <div className="stat" style={{ borderLeftColor: colors.primary }}>
-              <span className="stat-label">Lifetime</span>
-              <span className="stat-value" style={{ color: colors.primary }}>
-                {userLevel.lifetimeXP}
               </span>
             </div>
           </div>
@@ -172,9 +162,6 @@ export const RankCard: React.FC<RankCardProps> = ({ userLevel, onClick }) => {
 
         {/* Bottom decoration */}
         <div className="rank-card-bottom" style={{ borderTopColor: colors.primary }}>
-          <span className="rank-status">
-            {levelInRank === 10 ? '🎉 Sắp hoàn thành rank' : '📈 Tiếp tục tăng XP'}
-          </span>
         </div>
       </div>
     </div>

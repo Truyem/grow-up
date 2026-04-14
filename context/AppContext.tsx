@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import type { ExerciseLog, UserGoals, UserInput, UserStats, WorkoutHistoryItem, DailyPlan, AchievementBadge } from '../types';
 
-type GenerateType = 'workout' | 'nutrition' | 'history' | 'settings';
+type GenerateType = 'workout' | 'history' | 'settings';
 
 export interface AppContextValue {
   userId?: string;
@@ -16,7 +16,7 @@ export interface AppContextValue {
   workoutHistory: WorkoutHistoryItem[];
   isRefreshing: boolean;
   generatePlan: (type: GenerateType) => Promise<void>;
-  resetPlan: (type: 'workout' | 'nutrition') => void;
+  resetPlan: (type: 'workout') => void;
   startTracking: () => void;
   updatePlan: (updatedPlan: DailyPlan) => void;
   saveSleep: (sleepStart: string, sleepEnd: string) => Promise<void>;
@@ -28,7 +28,6 @@ export interface AppContextValue {
     nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
   ) => Promise<void>;
-  completeNutrition: (nutrition: DailyPlan['nutrition']) => Promise<void>;
   deleteHistoryItem: (timestamp: number) => Promise<void>;
   refreshHistory: () => Promise<void>;
   sickDay: () => Promise<void>;

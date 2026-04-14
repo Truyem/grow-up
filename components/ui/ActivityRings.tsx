@@ -3,12 +3,10 @@ import React from 'react';
 interface ActivityRingsProps {
     /** 0-1 progress for outer ring (exercises) */
     move: number;
-    /** 0-1 progress for middle ring (calories) */
+    /** 0-1 progress for middle ring (sleep) */
     exercise: number;
-    /** 0-1 progress for inner ring (protein) */
+    /** 0-1 progress for inner ring (streak) */
     stand: number;
-    /** 0-1 progress for sleep ring */
-    sleep?: number;
     /** Size in px */
     size?: number;
     /** Whether this is today */
@@ -19,7 +17,6 @@ export const ActivityRings: React.FC<ActivityRingsProps> = ({
     move,
     exercise,
     stand,
-    sleep = 0,
     size = 44,
     isToday = false,
 }) => {
@@ -27,19 +24,17 @@ export const ActivityRings: React.FC<ActivityRingsProps> = ({
     const strokeWidth = size * 0.09;
     const gap = strokeWidth * 0.45;
 
-    // Radii for 4 rings (outer → inner)
+    // Radii for 3 rings (outer → inner)
     const r1 = center - strokeWidth / 2 - 1;
     const r2 = r1 - strokeWidth - gap;
     const r3 = r2 - strokeWidth - gap;
-    const r4 = r3 - strokeWidth - gap;
 
     const clamp = (v: number) => Math.min(Math.max(v, 0), 1);
 
     const ringData = [
-        { r: r1, progress: clamp(move), color: '#fa114f', bgColor: '#3a0a1a' },      // Red
-        { r: r2, progress: clamp(exercise), color: '#92e82a', bgColor: '#1a2a0a' },   // Green  
-        { r: r3, progress: clamp(stand), color: '#00d4aa', bgColor: '#0a1a1a' },      // Teal/Cyan
-        { r: r4, progress: clamp(sleep), color: '#60a5fa', bgColor: '#0a1426' },      // Blue (Sleep)
+        { r: r1, progress: clamp(move), color: '#fa114f', bgColor: '#3a0a1a' },      // Red (Exercises)
+        { r: r2, progress: clamp(exercise), color: '#60a5fa', bgColor: '#0a1426' },  // Blue (Sleep)
+        { r: r3, progress: clamp(stand), color: '#92e82a', bgColor: '#1a2a0a' },     // Green (Streak)
     ];
 
     return (

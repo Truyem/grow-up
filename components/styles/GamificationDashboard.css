@@ -286,6 +286,10 @@
 .locked-badge {
   background: rgba(0, 0, 0, 0.1);
   color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
 }
 
 .rank-item-name {

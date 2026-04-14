@@ -14,7 +14,6 @@ import wallpaperMb from './wallpaper-mb.webp';
 
 const UserForm = lazy(() => import('./components/UserForm').then(m => ({ default: m.UserForm })));
 const PlanDisplay = lazy(() => import('./components/PlanDisplay').then(m => ({ default: m.PlanDisplay })));
-const NutritionDisplay = lazy(() => import('./components/NutritionDisplay').then(m => ({ default: m.NutritionDisplay })));
 const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
 const OnboardingTour = lazy(() => import('./components/OnboardingTour').then(m => ({ default: m.OnboardingTour })));
 const AccountSettings = lazy(() => import('./components/AccountSettings').then(m => ({ default: m.AccountSettings })));
@@ -25,6 +24,7 @@ import { PlanTabs } from './components/ui/PlanTabs';
 import { XPStatusBar } from './components/ui/XPStatusBar';
 import { LevelUpAnimation } from './components/ui/LevelUpAnimation';
 import { WeatherDisplay } from './components/ui/WeatherDisplay';
+import { RankShowcase } from './components/ui/RankShowcase';
 import { Sparkles, Settings } from 'lucide-react';
 
 import { scheduleAllDailyNotifications } from './services/scheduleNotifications';
@@ -42,6 +42,7 @@ import {
   useLevelSystem,
 } from './hooks';
 import { UserGoals, UserInput } from './types';
+import { RANK_CONFIG } from './constants/rankConfig';
 
 export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -111,7 +112,6 @@ export default function App() {
   const {
     workoutHistory,
     handleCompleteWorkout,
-    handleCompleteNutrition,
     handleDeleteHistoryItem,
     handleRefreshHistory,
     handleSickDay,
@@ -160,6 +160,17 @@ export default function App() {
 
     const newAchievements = achievements.map(achievement => {
       const updated = { ...achievement };
+      
+      if (achievement.id.startsWith('rank_')) {
+        const rankNum = parseInt(achievement.id.replace('rank_', ''));
+        const rankConfig = RANK_CONFIG.find(r => r.rankNumber === rankNum);
+        if (rankConfig) {
+          const currentRank = Math.floor((userLevel.currentLevel - 1) / 10) + 1;
+          updated.unlocked = currentRank >= rankNum;
+          updated.progressText = `Lv ${rankConfig.startLevel}-${rankConfig.endLevel}`;
+        }
+        return updated;
+      }
       
       switch (achievement.id) {
         case 'first_workout':
@@ -391,7 +402,6 @@ export default function App() {
     updatePlan: handleUpdatePlan,
     saveSleep: handleSaveSleep,
     completeWorkout: handleCompleteWorkoutWithSleep,
-    completeNutrition: handleCompleteNutrition,
     deleteHistoryItem: handleDeleteHistoryItem,
     refreshHistory: handleRefreshHistory,
     sickDay: handleSickDay,
@@ -497,30 +507,18 @@ export default function App() {
                   )
                 )}
 
-                {viewMode === 'nutrition' && (
-                  plan?.nutrition?.isGenerated ? (
-                    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
-                      <NutritionDisplay
-                        plan={plan}
-                        onReset={handleReset}
-                        onUpdatePlan={handleUpdatePlan}
-                        onUpdatePlanImmediate={handleUpdatePlanImmediate}
-                        onCompleteNutrition={handleCompleteNutrition}
-                      />
-                    </Suspense>
-                  ) : (
-                    <div className="max-w-2xl mx-auto space-y-4">
-                      <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
-                        <UserForm activeTab="nutrition" />
-                      </Suspense>
-                    </div>
-                  )
-                )}
-
                 {viewMode === 'history' && (
                   <div className="max-w-2xl mx-auto space-y-4">
                     <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div></div>}>
                       <UserForm activeTab="history" />
+                    </Suspense>
+                  </div>
+                )}
+
+                {viewMode === 'rank' && session?.user && (
+                  <div className="max-w-2xl mx-auto space-y-4 overflow-visible">
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div></div>}>
+                      <RankShowcase userLevel={userLevel} />
                     </Suspense>
                   </div>
                 )}

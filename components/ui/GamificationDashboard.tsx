@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserLevel } from '../types';
 import { getRankFromLevel, RANK_CONFIG, getRankImage, LEVEL_UP_REWARDS } from '../constants/rankConfig';
-import { Award, TrendingUp, Target, Zap } from 'lucide-react';
+import { Award, TrendingUp, Target, Zap, Lock } from 'lucide-react';
 import '../styles/GamificationDashboard.css';
 
 interface GamificationDashboardProps {
@@ -131,7 +131,7 @@ export const GamificationDashboard: React.FC<GamificationDashboardProps> = ({ us
                   <div className="rank-item-header">
                     <span className="rank-number">Rank {r.rankNumber}</span>
                     {isCurrentRank && <span className="current-badge">HIỆN TẠI</span>}
-                    {!isUnlocked && <span className="locked-badge">KHÓA</span>}
+                    {!isUnlocked && <span className="locked-badge"><Lock className="w-3 h-3" /></span>}
                   </div>
                   <p className="rank-item-name">{r.rankName}</p>
                   <p className="rank-item-levels">Lv {r.startLevel} - {r.endLevel}</p>

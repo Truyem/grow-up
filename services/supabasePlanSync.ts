@@ -687,7 +687,21 @@ export const loadWorkoutHistoryFromSupabase = async (userId: string): Promise<Wo
 export const upsertSleepLogToWorkoutLogs = async (userId: string, sleepStart: string, sleepEnd: string, dateText?: string): Promise<boolean> => {
     try {
         const timestamp = Date.now();
-        const date = dateText || new Date(timestamp).toLocaleDateString('vi-VN');
+        let date: string;
+        if (dateText) {
+            date = dateText;
+        } else {
+            const [startHour] = sleepStart.split(':').map(Number);
+            const now = new Date();
+            
+            if (startHour >= 18 || startHour < 6) {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                date = yesterday.toLocaleDateString('vi-VN');
+            } else {
+                date = now.toLocaleDateString('vi-VN');
+            }
+        }
         const hours = (() => {
             const [startHour, startMinute] = sleepStart.split(':').map(Number);
             const [endHour, endMinute] = sleepEnd.split(':').map(Number);

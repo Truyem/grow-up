@@ -1,5 +1,5 @@
 import React, { useMemo, useState, lazy, Suspense, useCallback, useEffect } from 'react';
-import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview, SleepRecoveryEntry } from '../types';
+import { WorkoutHistoryItem, ExerciseLog, MuscleGroup, UserInput, AIOverview, SleepRecoveryEntry, UserStats } from '../types';
 import { GlassCard } from './ui/GlassCard';
 import { ActivityRings } from './ui/ActivityRings';
 import { RankShowcase } from './ui/RankShowcase';
@@ -15,10 +15,11 @@ const StatsCharts = lazy(() => import('./ui/StatsCharts'));
 interface HistoryViewProps {
   history: WorkoutHistoryItem[];
   onDelete: (timestamp: number) => void;
-  userData?: UserInput; // Needed for context
+  userData?: UserInput;
   onRefresh?: () => void;
   isRefreshing?: boolean;
   sleepRecovery?: SleepRecoveryEntry[];
+  userStats?: UserStats;
 }
 
 const formatCurrency = (amount?: number) => {
@@ -44,14 +45,13 @@ const MONTH_NAMES = [
 
 // --- RING GOALS ---
 const RING_GOALS = {
-  exercises: 6,    // ~6 exercises per day
-  calories: 2000,  // ~2000 kcal
-  protein: 100,    // ~100g protein
+  exercises: 6,
+  streak: 7,
 };
 
 const SLEEP_GOAL_HOURS = DEFAULT_SLEEP_HOURS;
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing, sleepRecovery = [] }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, userData, onRefresh, isRefreshing, sleepRecovery = [], userStats }) => {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
@@ -201,12 +201,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
 
       const workoutsOnDay = history.filter(h => h.timestamp >= dayStart && h.timestamp <= dayEnd);
       const exercises = workoutsOnDay.reduce((acc, w) => acc + (w.completedExercises?.length || 0), 0);
-      const calories = workoutsOnDay.reduce((acc, w) => acc + (w.nutrition?.totalCalories || 0), 0);
-      const protein = workoutsOnDay.reduce((acc, w) => acc + (w.nutrition?.totalProtein || 0), 0);
-      const carbs = workoutsOnDay.reduce((acc, w) => acc + (w.nutrition?.totalCarbs || 0), 0);
-      const fat = workoutsOnDay.reduce((acc, w) => acc + (w.nutrition?.totalFat || 0), 0);
 
-      days.push({ name: i === 0 ? 'Hôm nay' : dateStr, exercises, calories, protein, carbs, fat });
+      days.push({ name: i === 0 ? 'Hôm nay' : dateStr, exercises });
     }
     return days;
   }, [history]);
@@ -542,16 +538,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
             <span className="text-[10px] text-gray-400">Bài tập</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#92e82a]" />
-            <span className="text-[10px] text-gray-400">Calories</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#00d4aa]" />
-            <span className="text-[10px] text-gray-400">Protein</span>
-          </div>
-          <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-[#60a5fa]" />
             <span className="text-[10px] text-gray-400">Giấc ngủ</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#92e82a]" />
+            <span className="text-[10px] text-gray-400">Streak</span>
           </div>
         </div>
 
@@ -577,14 +569,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
 
             // Calculate ring progress
             const exercisesCount = item?.completedExercises?.length || 0;
-            const calories = item?.nutrition?.totalCalories || 0;
-            const protein = item?.nutrition?.totalProtein || 0;
+            const sleepEntry = sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${day}`);
 
             const moveProgress = exercisesCount / RING_GOALS.exercises;
-            const exerciseProgress = calories / RING_GOALS.calories;
-            const standProgress = protein / RING_GOALS.protein;
-            const sleepEntry = sleepByDate.get(`${calendarDate.year}-${calendarDate.month}-${day}`);
             const sleepProgress = (sleepEntry?.sleepHours || 0) / SLEEP_GOAL_HOURS;
+            const streakProgress = (userStats?.streak || 0) / RING_GOALS.streak;
 
             // Check if day is in the future
             const dayDate = new Date(calendarDate.year, calendarDate.month, day);
@@ -609,9 +598,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                 ) : (
                   <ActivityRings
                     move={moveProgress}
-                    exercise={exerciseProgress}
-                    stand={standProgress}
-                    sleep={sleepProgress}
+                    exercise={sleepProgress}
+                    stand={streakProgress}
                     size={36}
                     isToday={today}
                   />
@@ -653,28 +641,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
               </div>
 
               {/* Ring Stats */}
-              <div className="grid grid-cols-6 gap-2 mt-2">
+              <div className="grid grid-cols-4 gap-2 mt-2">
                 <div className="text-center bg-black/30 rounded-lg p-2">
                   <div className="text-[10px] text-[#fa114f] font-bold">Bài tập</div>
                   <div className="text-sm font-bold text-white">{selectedDayItem.completedExercises?.length || 0}</div>
                 </div>
-                <div className="text-center bg-black/30 rounded-lg p-2">
-                  <div className="text-[10px] text-[#92e82a] font-bold">Calories</div>
-                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalCalories || 0}</div>
-                </div>
-                <div className="text-center bg-black/30 rounded-lg p-2">
-                  <div className="text-[10px] text-[#00d4aa] font-bold">Protein</div>
-                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalProtein || 0}g</div>
-                </div>
-                <div className="text-center bg-black/30 rounded-lg p-2">
-                  <div className="text-[10px] text-orange-400 font-bold">Carbs</div>
-                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalCarbs || 0}g</div>
-                </div>
-                <div className="text-center bg-black/30 rounded-lg p-2">
-                  <div className="text-[10px] text-yellow-400 font-bold">Fat</div>
-                  <div className="text-sm font-bold text-white">{selectedDayItem.nutrition?.totalFat || 0}g</div>
-                </div>
-                <div className="text-center bg-black/30 rounded-lg p-2 col-span-2">
+                <div className="text-center bg-black/30 rounded-lg p-2 col-span-3">
                   <div className="text-[10px] text-[#60a5fa] font-bold">Giấc ngủ</div>
                   <div className="text-sm font-bold text-white">
                     {(() => {
@@ -688,37 +660,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete, use
                 </div>
               </div>
 
-              {/* Two-column: Meals (left) + Exercises (right) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                {/* LEFT: Meals */}
-                <div className="bg-black/20 rounded-xl p-2.5 border border-emerald-500/10">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Utensils className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase">Thực đơn</span>
-                  </div>
-                  {selectedDayItem.nutrition?.meals && selectedDayItem.nutrition.meals.length > 0 ? (
-                    <ul className="space-y-1.5">
-                      {selectedDayItem.nutrition.meals.map((meal, i) => (
-                        <li key={i} className="bg-black/20 rounded-lg px-2 py-1.5">
-                          <div className="flex items-start justify-between gap-1">
-                            <span className="text-[11px] font-semibold text-white leading-tight">{meal.name}</span>
-                            <span className="text-[9px] text-emerald-300 whitespace-nowrap">{meal.calories} kcal</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">{meal.description}</p>
-                          <div className="flex gap-2 mt-0.5">
-                            <span className="text-[9px] text-[#00d4aa]">P: {meal.protein}g</span>
-                            {meal.carbs != null && <span className="text-[9px] text-orange-400">C: {meal.carbs}g</span>}
-                            {meal.fat != null && <span className="text-[9px] text-yellow-400">F: {meal.fat}g</span>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-[10px] text-gray-500 italic">Chưa có thực đơn</p>
-                  )}
-                </div>
-
-                {/* RIGHT: Exercises */}
+              {/* Exercises */}
+              <div className="mt-2">
                 <div className="bg-black/20 rounded-xl p-2.5 border border-blue-500/10">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Dumbbell className="w-3.5 h-3.5 text-blue-400" />

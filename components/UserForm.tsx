@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
-import { Calendar, Ruler, Weight, Dumbbell, Utensils, Loader2, ChevronRight, Camera } from 'lucide-react';
+import { Calendar, Ruler, Weight, Dumbbell } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
-import { NutritionInput } from './forms/NutritionInput';
 import { HistoryView } from './HistoryView';
 import { BodyMetricsCard } from './ui/BodyMetricsCard';
 import { GoalSettingCard } from './ui/GoalSettingCard';
-import { SupplementTracker } from './ui/SupplementTracker';
 import { PersonalRecordCard } from './ui/PersonalRecordCard';
 import { SleepRecoveryCard } from './ui/SleepRecoveryCard';
 import { ActiveRecoveryCard } from './ui/ActiveRecoveryCard';
@@ -16,7 +14,7 @@ import { calculatePersonalRecords } from '../services/personalRecordService';
 import { SleepRecoveryEntry } from '../types';
 
 interface UserFormProps {
-  activeTab: 'workout' | 'nutrition' | 'history';
+  activeTab: 'workout' | 'history';
 }
 
 export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
@@ -120,25 +118,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
       </div>
 
       {/* --- GOAL SETTING CARD --- */}
-      {activeTab === 'nutrition' && (
-        <GoalSettingCard
-          goals={userGoals}
-          onSave={(newGoals) => {
-            setUserGoals(newGoals);
-            if (newGoals.weekly.targetWeightKg) {
-              const diff = userData.weight - newGoals.weekly.targetWeightKg;
-              if (diff > 0) {
-                setUserData(prev => ({ ...prev, nutritionGoal: 'cutting' }));
-              } else if (diff < 0) {
-                setUserData(prev => ({ ...prev, nutritionGoal: 'bulking' }));
-              }
-            }
-          }}
-          history={workoutHistory}
-          userData={userData}
-        />
-      )}
-
       {activeTab === 'history' && (
         <PersonalRecordCard records={calculatePersonalRecords(workoutHistory)} />
       )}
@@ -163,12 +142,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
         <AchievementBadgesCard badges={achievements} />
       )}
 
-      {/* --- SUPPLEMENT & WATER TRACKER --- */}
-      {activeTab === 'nutrition' && (
-        <SupplementTracker />
-      )}
-
-
       {/* --- COMMON INFO (Visible only on Workout Tabs) --- */}
       {activeTab === 'workout' && (
         <div id="tour-body-stats">
@@ -189,11 +162,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
                       if (!isNaN(parsed)) {
                         setUserData(prev => {
                           const newState = { ...prev, weight: parsed };
-                          if (userGoals?.weekly?.targetWeightKg) {
-                            const diff = parsed - userGoals.weekly.targetWeightKg;
-                            if (diff > 0) newState.nutritionGoal = 'cutting';
-                            else if (diff < 0) newState.nutritionGoal = 'bulking';
-                          }
                           return newState;
                         });
                       }
@@ -274,74 +242,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
           </div>
         )}
 
-        {/* Custom Nutrition Options Redesign */}
-        {activeTab === 'nutrition' && (
-          <div className="space-y-6">
-            <NutritionInput
-              userData={userData}
-              setUserData={setUserData}
-              showToast={showToast}
-            />
-
-            <div className="grid grid-cols-1 gap-4 mt-2">
-              {/* Option 1: AI Plan (Primary) */}
-              <button
-                id="tour-nutrition-ai-btn"
-                onClick={() => {
-                  generatePlan('nutrition').catch((e) => {
-                    console.error('Lỗi tạo kế hoạch nutrition:', e);
-                    showToast('Không thể tạo thực đơn. Vui lòng thử lại.', 'error');
-                  });
-                }}
-                disabled={isLoading}
-                className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-5 text-left transition-all hover:border-emerald-500/50 hover:from-emerald-500/20 hover:to-teal-500/20 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] active:scale-[0.98]"
-              >
-                <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all group-hover:bg-emerald-500/20" />
-
-                <div className="relative z-10 flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform duration-300">
-                    {isLoading ? <Loader2 className="animate-spin h-6 w-6 text-white" /> : <Utensils className="h-6 w-6 text-white" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-white group-hover:text-emerald-50 transition-colors">
-                      Tạo Kế Hoạch AI
-                    </h3>
-                    <p className="text-sm font-medium text-emerald-200/60 group-hover:text-emerald-200/80 leading-snug">
-                      AI tự động thiết kế thực đơn phù hợp với bạn
-                    </p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-emerald-500/50 transition-all group-hover:translate-x-1 group-hover:text-emerald-400" />
-                </div>
-              </button>
-
-              {/* Option 2: Quick Check (Secondary) */}
-              <button
-                id="tour-check-calo"
-                onClick={() => {
-                  startTracking();
-                }}
-                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition-all hover:border-white/20 hover:bg-white/10 active:scale-[0.98]"
-              >
-                <div className="relative z-10 flex items-center gap-4">
-                  <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-800/50 border border-white/5 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-all duration-300">
-                    <Camera className="h-6 w-6 text-gray-400 group-hover:text-emerald-400 transition-colors" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-200 group-hover:text-white transition-colors">
-                      Tự Check Calo
-                    </h3>
-                    <p className="text-sm font-medium text-gray-500 group-hover:text-gray-400 leading-snug">
-                      Chụp ảnh kiểm tra nhanh, không tạo thực đơn
-                    </p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-gray-600 transition-all group-hover:translate-x-1 group-hover:text-gray-400" />
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'history' && (
           <HistoryView
             history={workoutHistory}
@@ -350,6 +250,7 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
             onRefresh={refreshHistory}
             isRefreshing={isRefreshing}
             sleepRecovery={sleepRecovery}
+            userStats={userStats}
           />
         )}
       </div>

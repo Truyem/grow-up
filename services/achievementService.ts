@@ -25,13 +25,12 @@ const getCurrentStreak = (history: WorkoutHistoryItem[]): number => {
   return streak;
 };
 
-export const calculateAchievements = (history: WorkoutHistoryItem[]): AchievementBadge[] => {
+export const calculateAchievements = (history: WorkoutHistoryItem[], currentLevel: number = 0): AchievementBadge[] => {
   const totalWorkouts = history.filter((h) => h.levelSelected !== 'Ốm/Bệnh').length;
   const streak = getCurrentStreak(history);
   const exercisesDone = history.reduce((sum, item) => sum + (item.completedExercises?.length || 0), 0);
   
-  const maxLevel = history.reduce((max, item) => Math.max(max, item.levelAfter || item.levelBefore || 0), 0);
-  const currentRank = Math.min(Math.floor((maxLevel - 1) / 10) + 1, 20);
+  const currentRank = Math.min(Math.floor((currentLevel - 1) / 10) + 1, 20);
 
   return [
     {
@@ -62,12 +61,12 @@ export const calculateAchievements = (history: WorkoutHistoryItem[]): Achievemen
       unlocked: exercisesDone >= 100,
       progressText: `${Math.min(exercisesDone, 100)}/100`,
     },
-    ...RANK_CONFIG.map((rank, index) => ({
-      id: `rank_${index + 1}`,
+    ...RANK_CONFIG.map((rank) => ({
+      id: `rank_${rank.rankNumber}`,
       title: rank.rankName,
       description: `Hoàn thành Rank ${rank.rankName} (Level ${rank.endLevel})`,
       unlocked: currentRank >= rank.rankNumber,
-      progressText: `${rank.endLevel}/${MAX_LEVEL}`,
+      progressText: `Lv ${rank.startLevel}-${rank.endLevel}`,
     })),
   ];
 };
