@@ -20,7 +20,7 @@ async function loadExerciseData(): Promise<Exercise[]> {
   if (exerciseData) return exerciseData.exercises;
   
   try {
-    const module = await import('../data/exercises.json');
+    const module = await import('../src/data/exercises.json');
     exerciseData = module.default || module;
     return exerciseData.exercises || [];
   } catch (e) {
