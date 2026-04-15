@@ -16,8 +16,8 @@ import { calculateWorkoutCalories, formatDuration } from '../services/metCalorie
 
 interface PlanDisplayProps {
   plan: DailyPlan;
-  onReset: (type: 'workout' | 'nutrition') => void;
-  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, nutrition: DailyPlan['nutrition'], exerciseLogs?: ExerciseLog[]) => Promise<void>;
+  onReset: (type: 'workout') => void;
+  onComplete: (levelSelected: string, summary: string, completedExercises: string[], userNotes: string, exerciseLogs?: ExerciseLog[]) => Promise<void>;
   onUpdatePlan: (updatedPlan: DailyPlan) => void;
   onUpdatePlanImmediate?: (updatedPlan: DailyPlan) => void;
 }
@@ -529,12 +529,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
 
     const completedExercisesList = [...completedWarmup, ...completedMorning, ...completedEvening, ...completedCooldown];
 
-    const finalNutrition = {
-      ...plan.nutrition,
-      // cost handled in NutritionDisplay if editable there, but here we just pass current
-    };
-
-
     // Collect exercise logs for completed exercises only
     const completedLogs: ExerciseLog[] = (Object.entries(exerciseLogs) as [string, ExerciseLog][])
       .filter(([key]) => checkedState[key])
@@ -546,7 +540,6 @@ export const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, onReset, onCompl
       plan.workout.summary,
       completedExercisesList,
       userNote,
-      finalNutrition,
       completedLogs.length > 0 ? completedLogs : undefined
     ).catch(() => {
       setIsCompleted(false);

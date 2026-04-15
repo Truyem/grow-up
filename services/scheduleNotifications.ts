@@ -62,17 +62,16 @@ export async function scheduleAllDailyNotifications(plan?: any): Promise<void> {
     }
 
     const hasWorkout = plan?.workout?.isGenerated === true || plan?.workout?.detail?.morning?.length > 0 || plan?.workout?.detail?.evening?.length > 0;
-    const hasNutrition = plan?.nutrition?.isGenerated === true || plan?.nutrition?.meals?.length > 0;
-    const hasPlan = hasWorkout || hasNutrition;
+    const hasPlan = hasWorkout;
 
     let allItems: ScheduleItem[] = [];
 
     if (!hasPlan) {
         allItems = [
-            { time: '08:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Đã tạo lịch tập và dinh dưỡng chưa? Nhớ làm sớm!' },
-            { time: '12:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Nghỉ trưa rảnh rỗi, lên lịch tập và thực đơn cho hôm nay/ngày mai đi!' },
-            { time: '15:15', label: 'Nhắc nhở Kế Hoạch', detail: 'Nhắc lần 3 trong ngày! Lên lịch tập và dinh dưỡng đi nhé!' },
-            { time: '20:45', label: 'NHẮC LẠI', detail: 'Chưa lên lịch tập và thực đơn thì làm ngay đi!' },
+            { time: '08:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Đã tạo lịch tập chưa? Nhớ làm sớm!' },
+            { time: '12:30', label: 'Nhắc nhở Kế Hoạch', detail: 'Nghỉ trưa rảnh rỗi, lên lịch tập cho hôm nay/ngày mai đi!' },
+            { time: '15:15', label: 'Nhắc nhở Kế Hoạch', detail: 'Nhắc lần 3 trong ngày! Lên lịch tập đi nhé!' },
+            { time: '20:45', label: 'NHẮC LẠI', detail: 'Chưa lên lịch tập thì làm ngay đi!' },
             { time: '20:55', label: 'CẢNH BÁO', detail: 'Sắp 21h rồi! Chuẩn bị ngay cho ngày mai!!' },
         ];
     }

@@ -331,13 +331,12 @@ export default function App() {
     summary: string,
     completedExercises: string[],
     userNotes: string,
-    nutrition: any,
     exerciseLogs?: any[]
   ) => {
     if (!canPerformOnlineAction('complete-workout', showToast)) return;
 
     try {
-      await handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, nutrition, exerciseLogs);
+      await handleCompleteWorkout(levelSelected, summary, completedExercises, userNotes, exerciseLogs);
     } catch {
       return;
     }

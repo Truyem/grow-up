@@ -197,6 +197,14 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
             </div>
             {/* BMI/BMR/TDEE Card - realtime */}
             <BodyMetricsCard userData={userData} />
+            
+            {/* Mục tiêu dinh dưỡng */}
+            <GoalSettingCard
+              goals={userGoals}
+              onSave={setUserGoals}
+              history={workoutHistory}
+              userData={userData}
+            />
           </GlassCard>
         </div>
       )}

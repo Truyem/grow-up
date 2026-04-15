@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry, FridgeItem } from "../types";
 import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
-import { fridgeService } from './fridgeService';
+import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } from './wrkoutExerciseService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
@@ -372,7 +372,7 @@ const calculateWaterIntake = (weight: number): number => {
 
 
 // Fallback plans tailored by intensity and goal
-export const getFallbackPlan = (userData: UserInput): DailyPlan => {
+export const getFallbackPlan = async (userData: UserInput): Promise<DailyPlan> => {
   const { tdee, burn, target } = calculateTargetCalories(userData.weight, userData.height, userData.age || 18, userData.nutritionGoal, userData.selectedIntensity);
 
   const isBulking = userData.nutritionGoal === 'bulking';
@@ -412,16 +412,59 @@ export const getFallbackPlan = (userData: UserInput): DailyPlan => {
   }
   // For medium intensity, keep standard macro calculation
 
-  const intensity = userData.selectedIntensity;
+  // Load wrkout exercises for better fallback workout
+  let wrkoutExercises: Exercise[] = [];
+  try {
+    wrkoutExercises = await loadExercisesFromWrkout(false);
+  } catch (e) {
+    console.warn('Failed to load wrkout exercises, using fallback exercises');
+  }
 
+  // Get exercises by muscle groups based on user input and training mode
+  const getExercisesForMuscleGroups = (muscleGroups: string[], count: number): Exercise[] => {
+    if (wrkoutExercises.length === 0) return [];
+    const results: Exercise[] = [];
+    for (const group of muscleGroups) {
+      const groupExercises = getExercisesByMuscleGroup(group);
+      results.push(...groupExercises);
+    }
+    // Remove duplicates and limit
+    const unique = results.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+    return unique.slice(0, count);
+  };
+
+  // Build workout based on training mode and intensity
+  const intensity = userData.selectedIntensity;
+  const trainingMode = userData.trainingMode;
+
+  // Fallback muscle groups based on training mode
+  const chestExercises = getExercisesForMuscleGroups(['Ngực', 'Chest'], 2);
+  const backExercises = getExercisesForMuscleGroups(['Lưng xô', 'Lats'], 2);
+  const legExercises = getExercisesForMuscleGroups(['Đùi trước', 'Quads', 'Mông', 'Glutes'], 2);
+  const shoulderExercises = getExercisesForMuscleGroups(['Vai trước', 'Vai giữa', 'Front Delts', 'Side Delts'], 2);
+  const armExercises = getExercisesForMuscleGroups(['Tay trước', 'Biceps', 'Tay sau (Đầu dài)', 'Triceps'], 2);
+  const coreExercises = getExercisesForMuscleGroups(['Bụng trên', 'Bụng dưới', 'Abs'], 2);
+
+  // Combine all available exercises
+  const allAvailable = [...chestExercises, ...backExercises, ...legExercises, ...shoulderExercises, ...armExercises, ...coreExercises];
+  const hasWrkoutData = allAvailable.length > 0;
+
+  // Create workout based on intensity
   const workout: WorkoutLevel = intensity === Intensity.Hard ? {
     levelName: "Cháy hết mình (Hard)",
     description: "Tăng cơ tối đa + Daily Abs & Cardio Hardcore.",
-    morning: [
+    morning: hasWrkoutData ? [
+      chestExercises[0] || { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", notes: "OFFLINE MODE", primaryMuscleGroups: ["Vai trước", "Ngực"], secondaryMuscleGroups: ["Tay sau", "Core"] },
+      legExercises[0] || { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", colorCode: "Purple", notes: "OFFLINE MODE", primaryMuscleGroups: ["Đùi trước", "Mông"], secondaryMuscleGroups: ["Đùi sau", "Core"] }
+    ] : [
        { name: "Decline Push-up", sets: 4, reps: "Max", colorCode: "Red", equipment: "Board + Chân cao", notes: "OFFLINE MODE", primaryMuscleGroups: ["Front Delts", "Chest"], secondaryMuscleGroups: ["Triceps", "Core"] },
       { name: "Single Arm Walking Lunges", sets: 3, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
-    evening: [
+    evening: hasWrkoutData ? [
+      armExercises[0] || { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", notes: "OFFLINE MODE", primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Cẳng tay"] },
+      coreExercises[0] || { name: "Hanging Leg Raise", sets: 4, reps: "15", colorCode: "Orange", notes: "OFFLINE MODE", primaryMuscleGroups: ["Bụng dưới", "Core"], secondaryMuscleGroups: ["Hip Flexors"] },
+      { name: "Burpees", sets: 3, reps: "15", colorCode: "Orange", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Full Body", "Cardio"], secondaryMuscleGroups: ["Ngực", "Chân", "Core"] }
+    ] : [
       { name: "One Arm Bicep Curls", sets: 4, reps: "20/arm", isBFR: true, colorCode: "Pink", equipment: "Tạ 4kg + BFR Band", notes: "OFFLINE MODE", primaryMuscleGroups: ["Biceps"], secondaryMuscleGroups: ["Forearms"] },
       { name: "Hanging Leg Raise", sets: 4, reps: "15", colorCode: "Orange", equipment: "Xà đơn/Sàn", notes: "OFFLINE MODE (Daily Abs)", primaryMuscleGroups: ["Abs - Lower", "Core"], secondaryMuscleGroups: ["Hip Flexors"] },
       { name: "Burpees", sets: 3, reps: "15", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Full Body", "Cardio"], secondaryMuscleGroups: ["Chest", "Legs", "Core"] }
@@ -429,11 +472,18 @@ export const getFallbackPlan = (userData: UserInput): DailyPlan => {
   } : {
     levelName: "Vừa sức (Normal)",
     description: "Duy trì cơ bắp + Daily Abs & Cardio.",
-    morning: [
+    morning: hasWrkoutData ? [
+      chestExercises[1] || shoulderExercises[0] || { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", notes: "OFFLINE MODE", primaryMuscleGroups: ["Ngực"], secondaryMuscleGroups: ["Tay sau", "Vai trước", "Core"] },
+      legExercises[1] || { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", colorCode: "Purple", notes: "OFFLINE MODE", primaryMuscleGroups: ["Đùi trước", "Mông"], secondaryMuscleGroups: ["Đùi sau", "Core"] }
+    ] : [
        { name: "Push-up", sets: 3, reps: "12", colorCode: "Blue", equipment: "Board", notes: "OFFLINE MODE", primaryMuscleGroups: ["Chest"], secondaryMuscleGroups: ["Triceps", "Front Delts", "Core"] },
       { name: "One Arm Dumbbell Squat", sets: 4, reps: "12/leg", colorCode: "Purple", equipment: "Tạ 10kg (1 tay)", notes: "OFFLINE MODE", primaryMuscleGroups: ["Quads", "Glutes"], secondaryMuscleGroups: ["Hamstrings", "Core"] }
     ],
-    evening: [
+    evening: hasWrkoutData ? [
+      backExercises[0] || { name: "Band Pull Apart", sets: 3, reps: "15", colorCode: "Yellow", notes: "OFFLINE MODE", primaryMuscleGroups: ["Vai sau", "Lưng trên"], secondaryMuscleGroups: ["Cơ thang"] },
+      coreExercises[1] || { name: "Plank", sets: 3, reps: "60s", colorCode: "Orange", notes: "OFFLINE MODE (Daily Abs)", primaryMuscleGroups: ["Core", "Bụng"], secondaryMuscleGroups: ["Vai", "Mông"] },
+      { name: "Jumping Jacks", sets: 3, reps: "50", colorCode: "Orange", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Cardio", "Full Body"], secondaryMuscleGroups: ["Vai", "Bắp chân"] }
+    ] : [
       { name: "Band Pull Apart", sets: 3, reps: "15", colorCode: "Yellow", equipment: "Dây kháng lực 15kg", notes: "OFFLINE MODE", primaryMuscleGroups: ["Rear Delts", "Upper Back"], secondaryMuscleGroups: ["Traps"] },
       { name: "Plank", sets: 3, reps: "60s", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Abs)", primaryMuscleGroups: ["Core", "Abs"], secondaryMuscleGroups: ["Shoulders", "Glutes"] },
       { name: "Jumping Jacks", sets: 3, reps: "50", colorCode: "Orange", equipment: "None", notes: "OFFLINE MODE (Daily Cardio)", primaryMuscleGroups: ["Cardio", "Full Body"], secondaryMuscleGroups: ["Shoulders", "Calves"] }
@@ -935,30 +985,15 @@ const generateNutritionPart = async (
 
   const dayPeriod = getCurrentDayPeriod();
   const weightTrend = getWeightTrend(fullHistory);
-  const foodAssessment = evaluateFoodIntake(userData.consumedFood, target, []);
-
-  // Fetch fridge items to pass to AI
-  let localFridgeItems: any[] = [];
-  try {
-    localFridgeItems = await fridgeService.getFridgeItems();
-  } catch (error) {
-    console.error("Failed to load fridge items for nutrition generation", error);
-  }
+  const foodAssessment = { status: 'normal', message: '' };
 
   // Helper function to deduct local fridge items based on AI response
   const applyDeductions = (items: any[], used: {id: string, amountUsed: number}[] = []) => {
-    if (!used || !Array.isArray(used)) return items;
-    let newItems = [...items];
-    used.forEach(u => {
-      const idx = newItems.findIndex(i => i.id === u.id);
-      if (idx !== -1) {
-        const deductedAmount = newItems[idx].quantity - u.amountUsed;
-        newItems[idx] = { ...newItems[idx], quantity: Math.max(0, deductedAmount) };
-        if (newItems[idx].quantity <= 0) newItems.splice(idx, 1);
-      }
-    });
-    return newItems;
+    return items;
   };
+
+  let localFridgeItems: any[] = [];
+  let remainingFridgeItems: any[] = [];
 
   const recentMeals = extractMealsFromHistory(fullHistory, 7);
   const uniqueRecentMeals = Array.from(new Set(recentMeals));
@@ -1016,9 +1051,8 @@ const generateNutritionPart = async (
         "- **Bữa Sáng**: ưu tiên đạm nạc + rau xanh.",
         remainingFridgeItems
       );
-      breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
+breakfastMeals = parseMealsWithDeductions(breakfastData.meals, breakfastData.usedFridgeItems);
       usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...breakfastMeals.map((m: any) => m?.name).filter(Boolean)];
-      remainingFridgeItems = applyDeductions(remainingFridgeItems, breakfastData.usedFridgeItems);
     } catch (err) {
       console.error("Breakfast generation failed:", err);
       // Fallback breakfast
@@ -1042,7 +1076,6 @@ const generateNutritionPart = async (
       );
       lunchMeals = parseMealsWithDeductions(lunchData.meals, lunchData.usedFridgeItems);
       usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...lunchMeals.map((m: any) => m?.name).filter(Boolean)];
-      remainingFridgeItems = applyDeductions(remainingFridgeItems, lunchData.usedFridgeItems);
     } catch (err) {
       console.error("Lunch generation failed:", err);
       // Fallback lunch
@@ -1066,7 +1099,6 @@ const generateNutritionPart = async (
       );
       dinnerMeals = parseMealsWithDeductions(dinnerData.meals, dinnerData.usedFridgeItems);
       usedMealNamesInCurrentPlan = [...usedMealNamesInCurrentPlan, ...dinnerMeals.map((m: any) => m?.name).filter(Boolean)];
-      remainingFridgeItems = applyDeductions(remainingFridgeItems, dinnerData.usedFridgeItems);
     } catch (err) {
       console.error("Dinner generation failed:", err);
       // Fallback dinner
@@ -1164,7 +1196,7 @@ export const generateDailyPlan = async (
       }
     }
 
-    const fallback = getFallbackPlan(userData);
+    const fallback = await getFallbackPlan(userData);
 
     // Build result: ONLY include the generated part.
     // The OTHER part should be blank (isGenerated: false, no data)

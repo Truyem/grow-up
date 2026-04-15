@@ -124,7 +124,6 @@ export function useWorkoutHistory(
     summary: string,
     completedExercises: string[],
     userNotes: string,
-    nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
   ) => {
     if (!userId) {
@@ -150,7 +149,6 @@ export function useWorkoutHistory(
     const existingTodayItems = workoutHistory.filter(h => h.date === todayDateStr || isSameDay(h.timestamp));
     const otherItems = workoutHistory.filter(h => h.date !== todayDateStr && !isSameDay(h.timestamp));
     const existingToday = existingTodayItems.length > 0 ? existingTodayItems[0] : null;
-    const mergedNutrition = existingToday?.nutrition || undefined;
 
     const newItem: WorkoutHistoryItem = {
       date: todayDateStr,
@@ -161,7 +159,6 @@ export function useWorkoutHistory(
       userNotes: userNotes || "",
       exercisesSummary,
       exerciseLogs: exerciseLogs || undefined,
-      nutrition: mergedNutrition,
       weight: userData.weight,
       recordType: 'workout'
     };
@@ -171,7 +168,7 @@ export function useWorkoutHistory(
       const bestExistingCount = existingToday.completedExercises ? existingToday.completedExercises.length : 0;
       const newCount = newItem.completedExercises ? newItem.completedExercises.length : 0;
       if (bestExistingCount > newCount) {
-        itemToSave = { ...existingToday, nutrition: mergedNutrition };
+        itemToSave = { ...existingToday };
       }
     }
 
@@ -225,7 +222,6 @@ export function useWorkoutHistory(
           console.warn('Failed to initialize user level');
         } else {
           const exerciseCount = completedExercises.length;
-          const hasNutrition = !!nutrition && nutrition.totalCalories && nutrition.totalCalories > 0;
           const consistencyStreak = userStats.streak || 0;
           
           let intensity: 'low' | 'medium' | 'hard' = 'medium';
@@ -239,8 +235,7 @@ export function useWorkoutHistory(
           const exerciseBonus = exerciseCount * XP_REWARDS.PER_EXERCISE;
           const difficultyBonus = XP_REWARDS.DIFFICULTY_BONUS[intensity] || 0;
           const consistencyBonus = consistencyStreak > 0 ? XP_REWARDS.CONSISTENCY_BONUS : 0;
-          const nutritionBonus = hasNutrition ? XP_REWARDS.NUTRITION_BONUS : 0;
-          const totalXP = baseXP + exerciseBonus + difficultyBonus + consistencyBonus + nutritionBonus;
+          const totalXP = baseXP + exerciseBonus + difficultyBonus + consistencyBonus;
 
           let updated = { ...userLevel };
           let currentLevelXP = updated.currentLevelXP + totalXP;
