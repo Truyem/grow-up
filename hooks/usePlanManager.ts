@@ -61,23 +61,6 @@ export function usePlanManager(
       return;
     }
 
-    if (type === 'workout') {
-      if (!plan?.nutrition) {
-        showToast?.('Vui lòng tạo Dinh dưỡng trước khi tạo Bài tập!', 'error');
-        return;
-      }
-      
-      const meals = plan.nutrition.meals || [];
-      const mainMealsEaten = meals.some(m => 
-        (m.name.includes('Sáng') || m.name.includes('Trưa') || m.name.includes('Tối')) && m.consumed
-      );
-      
-      if (!mainMealsEaten) {
-        showToast?.('Bạn phải hoàn thành (ăn) ít nhất 1 bữa chính (Sáng/Trưa/Tối) mới được tạo bài tập!', 'error');
-        return;
-      }
-    }
-
     console.log('[PlanManager] Starting generation for type:', type, 'userId:', userId);
     console.log('[PlanManager] userData:', userData);
 
