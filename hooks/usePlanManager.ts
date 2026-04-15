@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { DailyPlan, ExerciseLog, UserInput, WorkoutHistoryItem } from '../types';
-import { generateDailyPlan, getBasicNutritionPlan } from '../services/geminiService';
+import { generateDailyPlan } from '../services/geminiService';
 import { debouncedSavePlan, deletePlanByDate, loadPlanFromSupabase, savePlanToSupabase } from '../services/supabasePlanSync';
 import { enrichWorkoutWithWarmupCooldown } from '../services/warmupCooldownService';
 
-type ViewMode = 'workout' | 'nutrition' | 'history' | 'settings';
+type ViewMode = 'workout' | 'history' | 'settings';
 
 export interface UsePlanManagerReturn {
   plan: DailyPlan | null;
@@ -15,7 +15,7 @@ export interface UsePlanManagerReturn {
   viewMode: ViewMode;
   setViewMode: React.Dispatch<React.SetStateAction<ViewMode>>;
   handleGenerate: (type: ViewMode, currentHistory: WorkoutHistoryItem[]) => Promise<void>;
-  handleReset: (type: 'workout' | 'nutrition') => void;
+  handleReset: (type: 'workout') => void;
   handleStartTracking: () => void;
   handleUpdatePlan: (updatedPlan: DailyPlan) => void;
   handleRefreshPlan: () => Promise<void>;
@@ -68,10 +68,9 @@ export function usePlanManager(
     setIsStreaming(true);
     setStreamingText("");
 
-    const generationType = type === 'workout' ? 'workout' : 'nutrition';
     let generatedPartial: DailyPlan;
     try {
-      generatedPartial = await generateDailyPlan(userData, currentHistory, session?.user?.id, generationType, (chunkText) => {
+      generatedPartial = await generateDailyPlan(userData, currentHistory, session?.user?.id, 'workout', (chunkText) => {
         setStreamingText(chunkText);
       });
     } catch (error) {
@@ -87,26 +86,7 @@ export function usePlanManager(
 
     let finalPlan: DailyPlan = generatedPartial;
 
-    // Merge consumed meals from old plan when generating nutrition
-    if ((generationType === 'nutrition' || generationType === 'both') && plan?.nutrition?.meals) {
-      const consumedMeals = plan.nutrition.meals.filter(m => m.consumed);
-      if (consumedMeals.length > 0) {
-        const existingMealNames = new Set(finalPlan.nutrition.meals?.map(m => m.name) || []);
-        const newConsumedMeals = consumedMeals.map(m => ({ ...m, consumed: true }));
-        finalPlan.nutrition.meals = [
-          ...(finalPlan.nutrition.meals || []),
-          ...newConsumedMeals.filter(m => !existingMealNames.has(m.name))
-        ];
-        console.log('[PlanManager] Merged consumed meals from old plan:', consumedMeals.length);
-      }
-    }
-    
-    // Nếu có dữ liệu đã lưu (ví dụ userData.consumedFood), có thể xóa ở đây nếu cần.
-    // Xoá hoàn toàn dữ liệu kế hoạch cũ bằng cách ghi đè trực tiếp bằng kế hoạch mới được sinh ra.
-
-    if (generationType === 'workout') {
-      finalPlan.workoutProgress = undefined;
-    }
+    finalPlan.workoutProgress = undefined;
 
     setPlan(finalPlan);
     const saved = await savePlanToSupabase(userId, finalPlan, undefined);
@@ -117,13 +97,13 @@ export function usePlanManager(
       return;
     }
 
-    setViewMode(generationType);
+    setViewMode('workout');
     setLoading(false);
     setIsStreaming(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [plan, showToast, userData, userId]);
 
-  const handleReset = useCallback((type: 'workout' | 'nutrition') => {
+  const handleReset = useCallback((type: 'workout') => {
     if (!userId) {
       showToast?.('Bạn cần đăng nhập để reset kế hoạch.', 'error');
       return;
@@ -146,14 +126,7 @@ export function usePlanManager(
       updatedPlan.workoutProgress = undefined;
     }
 
-    if (type === 'nutrition') {
-      updatedPlan.nutrition = {
-        totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
-        advice: '', isGenerated: false, meals: []
-      };
-    }
-
-    const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
+    const bothBlank = !updatedPlan.workout?.isGenerated;
     if (bothBlank) {
       const dateKey = new Date().toISOString().split('T')[0];
       void deletePlanByDate(userId, dateKey);
@@ -165,24 +138,8 @@ export function usePlanManager(
   }, [plan, showToast, userId]);
 
   const handleStartTracking = useCallback(() => {
-    if (!userId) {
-      showToast?.('Bạn cần đăng nhập để lưu kế hoạch.', 'error');
-      return;
-    }
-    
-
-    const basicPlan = getBasicNutritionPlan(userData);
-
-    let finalPlan = basicPlan;
-    if (plan) {
-      finalPlan = { ...plan, nutrition: basicPlan.nutrition };
-    }
-
-    setPlan(finalPlan);
-    void savePlanToSupabase(userId, finalPlan, undefined);
-
-    setViewMode('nutrition');
-  }, [plan, showToast, userData, userId]);
+    setViewMode('workout');
+  }, []);
 
   const handleUpdatePlan = useCallback((updatedPlan: DailyPlan) => {
     if (!userId) {

@@ -65,10 +65,8 @@ export interface UseWorkoutHistoryReturn {
     summary: string,
     completedExercises: string[],
     userNotes: string,
-    nutrition: DailyPlan['nutrition'],
     exerciseLogs?: ExerciseLog[]
   ) => Promise<void>;
-  handleCompleteNutrition: (nutrition: DailyPlan['nutrition']) => Promise<void>;
   handleDeleteHistoryItem: (timestamp: number) => Promise<void>;
   handleRefreshHistory: () => Promise<void>;
   handleSickDay: () => Promise<void>;
@@ -195,7 +193,7 @@ export function useWorkoutHistory(
       updatedPlan.workoutProgress = undefined;
       const dateKey = now.toISOString().split('T')[0];
 
-      const bothBlank = !updatedPlan.workout?.isGenerated && !updatedPlan.nutrition?.isGenerated;
+      const bothBlank = !updatedPlan.workout?.isGenerated;
       if (bothBlank) {
         setPlan(null);
         await deletePlanByDate(userId, dateKey);

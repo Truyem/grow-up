@@ -395,7 +395,7 @@ export default function App() {
     isLoading: planLoading,
     workoutHistory,
     isRefreshing,
-    generatePlan: (type: 'workout' | 'nutrition' | 'history' | 'settings') => handleGenerate(type, workoutHistory),
+    generatePlan: (type: 'workout' | 'history' | 'settings') => handleGenerate(type, workoutHistory),
     resetPlan: handleReset,
     startTracking: handleStartTracking,
     updatePlan: handleUpdatePlan,
