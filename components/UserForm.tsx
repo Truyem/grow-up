@@ -4,7 +4,6 @@ import { Calendar, Ruler, Weight, Dumbbell } from 'lucide-react';
 import { WorkoutInput } from './forms/WorkoutInput';
 import { HistoryView } from './HistoryView';
 import { BodyMetricsCard } from './ui/BodyMetricsCard';
-import { GoalSettingCard } from './ui/GoalSettingCard';
 import { PersonalRecordCard } from './ui/PersonalRecordCard';
 import { SleepRecoveryCard } from './ui/SleepRecoveryCard';
 import { ActiveRecoveryCard } from './ui/ActiveRecoveryCard';
@@ -22,8 +21,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
     userData,
     setUserData,
     userStats,
-    userGoals,
-    setUserGoals,
     workoutHistory,
     achievements,
     saveSleep,
@@ -197,14 +194,6 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
             </div>
             {/* BMI/BMR/TDEE Card - realtime */}
             <BodyMetricsCard userData={userData} />
-            
-            {/* Mục tiêu dinh dưỡng */}
-            <GoalSettingCard
-              goals={userGoals}
-              onSave={setUserGoals}
-              history={workoutHistory}
-              userData={userData}
-            />
           </GlassCard>
         </div>
       )}

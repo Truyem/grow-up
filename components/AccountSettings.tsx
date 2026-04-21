@@ -5,6 +5,8 @@ import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, getPushSupportS
 import { User } from '@supabase/supabase-js';
 import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff, RefreshCw } from 'lucide-react';
 import { Toast } from './ui/Toast';
+import { GoalSettingCard } from './ui/GoalSettingCard';
+import { useApp } from '../context';
 
 interface LoginRecord {
     id: string;
@@ -24,6 +26,7 @@ interface AccountSettingsProps {
 }
 
 export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout, onSyncAll, isSyncing = false }) => {
+    const { userGoals, setUserGoals, workoutHistory, userData } = useAppContext();
     const [fullName, setFullName] = useState(user.user_metadata?.full_name || '');
     const [currentPassword, setCurrentPassword] = useState('');
     const [password, setPassword] = useState('');
@@ -419,6 +422,16 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                         </button>
                     </div>
                 )}
+
+                {/* Goals Section */}
+                <div className="pt-8 mt-8 border-t border-white/10">
+                    <GoalSettingCard
+                        goals={userGoals}
+                        onSave={setUserGoals}
+                        history={workoutHistory}
+                        userData={userData}
+                    />
+                </div>
             </div>
 
             {/* Login History Section */}
