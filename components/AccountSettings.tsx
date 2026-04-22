@@ -6,7 +6,7 @@ import { User } from '@supabase/supabase-js';
 import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff, RefreshCw } from 'lucide-react';
 import { Toast } from './ui/Toast';
 import { GoalSettingCard } from './ui/GoalSettingCard';
-import { useApp } from '../context';
+import { useAppContext } from '../context';
 
 interface LoginRecord {
     id: string;
