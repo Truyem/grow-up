@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { loadLoginHistory } from '../services/supabasePlanSync';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, getPushSupportStatus, listenForSubscriptionChanges } from '../services/pushNotification';
 import { User } from '@supabase/supabase-js';
-import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff, RefreshCw } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, LogOut, Loader2, Save, BadgeCheck, AlertCircle, Monitor, Smartphone, Clock, MapPin, Wifi, WifiOff, Globe, Bell, BellOff, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
 import { Toast } from './ui/Toast';
 import { GoalSettingCard } from './ui/GoalSettingCard';
 import { useAppContext } from '../context';
@@ -26,7 +26,7 @@ interface AccountSettingsProps {
 }
 
 export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout, onSyncAll, isSyncing = false }) => {
-    const { userGoals, setUserGoals, workoutHistory, userData } = useAppContext();
+    const { userGoals, setUserGoals, workoutHistory, userData, setUserData } = useAppContext();
     const [fullName, setFullName] = useState(user.user_metadata?.full_name || '');
     const [currentPassword, setCurrentPassword] = useState('');
     const [password, setPassword] = useState('');
@@ -423,15 +423,45 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onLogout
                     </div>
                 )}
 
-                {/* Goals Section */}
+                {/* Nutrition Goal Section */}
                 <div className="pt-8 mt-8 border-t border-white/10">
-                    <GoalSettingCard
-                        goals={userGoals}
-                        onSave={setUserGoals}
-                        history={workoutHistory}
-                        userData={userData}
-                    />
+                    <h3 className="text-lg font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                        <BadgeCheck className="w-5 h-5" /> Mục Tiêu Dinh Dưỡng
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => setUserData(prev => ({ ...prev, nutritionGoal: 'bulking' }))}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                                userData.nutritionGoal === 'bulking'
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                                    : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                            }`}
+                        >
+                            <TrendingUp className="w-8 h-8" />
+                            <div className="text-center">
+                                <div className="font-bold text-sm">Tăng Cân</div>
+                                <div className="text-[10px] opacity-70">Xây cơ</div>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setUserData(prev => ({ ...prev, nutritionGoal: 'cutting' }))}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                                userData.nutritionGoal === 'cutting'
+                                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+                                    : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
+                            }`}
+                        >
+                            <TrendingDown className="w-8 h-8" />
+                            <div className="text-center">
+                                <div className="font-bold text-sm">Giảm Cân</div>
+                                <div className="text-[10px] opacity-70">Giảm mỡ</div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
+
+                
             </div>
 
             {/* Login History Section */}
