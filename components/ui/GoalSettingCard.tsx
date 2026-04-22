@@ -235,7 +235,7 @@ export const GoalSettingCard: React.FC<GoalSettingProps> = ({ goals, onSave, his
                                 step="0.5"
                                 value={targetWeight}
                                 onChange={(e) => setTargetWeight(e.target.value)}
-                                placeholder={`VD: ${userData.nutritionGoal === 'cutting' ? userData.weight - 5 : userData.weight + 5}`}
+                                placeholder={userData.nutritionGoal === 'cutting' ? `Giảm cân (VD: ${userData.weight - 5}kg)` : `Tăng cân (VD: ${userData.weight + 5}kg)`}
                                 className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                             />
                         </div>
