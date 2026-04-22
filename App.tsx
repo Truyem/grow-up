@@ -20,6 +20,7 @@ const AccountSettings = lazy(() => import('./components/AccountSettings').then(m
 
 import { Toast } from './components/ui/Toast';
 import { LoadingAnimation } from './components/ui/LoadingAnimation';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { PlanTabs } from './components/ui/PlanTabs';
 import { XPStatusBar } from './components/ui/XPStatusBar';
 import { LevelUpAnimation } from './components/ui/LevelUpAnimation';
@@ -458,14 +459,15 @@ export default function App() {
                 <WeatherDisplay />
               </div>
 
-              <div className="transition-all duration-500 ease-in-out">
-                <div id="tour-tabs" className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
-                  <PlanTabs
-                    activeTab={viewMode}
-                    onTabChange={(tab) => setViewMode(tab)}
-                    className="shadow-2xl"
-                  />
-                </div>
+              <ErrorBoundary>
+                <div className="transition-all duration-500 ease-in-out">
+                  <div id="tour-tabs" className="sticky top-4 z-50 mb-8 max-w-2xl mx-auto">
+                    <PlanTabs
+                      activeTab={viewMode}
+                      onTabChange={(tab) => setViewMode(tab)}
+                      className="shadow-2xl"
+                    />
+                  </div>
 
                 {session?.user && (
                   <div className="max-w-2xl mx-auto mb-6">
@@ -532,8 +534,9 @@ export default function App() {
                     />
                   </Suspense>
                 )}
+                </div>
+                </ErrorBoundary>
               </div>
-            </div>
           </>
         )}
 

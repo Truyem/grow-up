@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 import { DailyPlan, UserGoals, UserInput, UserStats, WorkoutHistoryItem, AchievementBadge, SleepQuality } from '../types';
 
 const getTodayDateKey = (): string => {
@@ -55,6 +55,8 @@ export const savePlanToSupabase = async (
     workoutProgress?: Record<string, any>,
     planDateKey?: string
 ) : Promise<boolean> => {
+    if (!isSupabaseConfigured()) return false;
+    
     const dateKey = planDateKey || getPlanDateKey(plan?.date);
 
     // Extract workoutProgress from plan if embedded (from PlanDisplay toggle)
@@ -65,7 +67,7 @@ export const savePlanToSupabase = async (
 
     try {
         // Xóa tất cả các bản ghi cũ của ngày này để ghi đè bản mới nhất
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await supabase!
             .from('daily_plans')
             .delete()
             .eq('user_id', userId)
@@ -75,7 +77,7 @@ export const savePlanToSupabase = async (
             console.error('[PlanSync] Delete existing plan error:', deleteError);
         }
 
-        const { error } = await supabase.from('daily_plans').insert({
+        const { error } = await supabase!.from('daily_plans').insert({
             user_id: userId,
             date: dateKey,
             plan_data: cleanPlan,
@@ -103,10 +105,12 @@ export const loadPlanFromSupabase = async (
     userId: string,
     planDateKey?: string
 ): Promise<{ plan: DailyPlan | null; workoutProgress: Record<string, any> | null }> => {
+    if (!isSupabaseConfigured()) return { plan: null, workoutProgress: null };
+    
     const dateKey = planDateKey || getTodayDateKey();
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase!
             .from('daily_plans')
             .select('plan_data, workout_progress')
             .eq('user_id', userId)

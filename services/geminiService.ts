@@ -1,4 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry, FridgeItem } from "../types";
 import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } from './wrkoutExerciseService';
@@ -7,9 +6,12 @@ import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } f
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
 const NEMOTRON_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
-// Gemini API keys from environment (for food image analysis)
-// Multiple keys are injected via vite.config.ts
-const GEMINI_API_KEYS: string[] = (process.env.GEMINI_API_KEYS as unknown as string[]) || [];
+// Gemini Proxy endpoint (server side Netlify Function)
+const GEMINI_PROXY_ENDPOINT = "/.netlify/functions/gemini-proxy";
+
+// Client side rate limit tracking (synced with server response)
+let currentGeminiKeyIndex = 0;
+const rateLimitedGeminiKeys: Map<number, number> = new Map();
 
 // Model constants
 const MODELS = {
@@ -31,71 +33,25 @@ export interface ApiStatus {
   rateLimitedKeyIndexes: number[];
 }
 
-// Track current Gemini API key index
-let currentGeminiKeyIndex = 0;
 
-// Track rate-limited Gemini API keys (index -> timestamp)
-const rateLimitedGeminiKeys: Map<number, number> = new Map();
 
-// Get API status for UI display (shows Gemini keys status)
+// Get API status for UI display (shows Gemini keys status from server)
 export const getApiStatus = (): ApiStatus => {
   const rateLimitedKeyIndexes = Array.from(rateLimitedGeminiKeys.keys());
+  // Total keys count is not available client side anymore for security
   return {
-    totalKeys: GEMINI_API_KEYS.length,
+    totalKeys: 0,
     currentKeyIndex: currentGeminiKeyIndex,
-    activeKeysCount: GEMINI_API_KEYS.length - rateLimitedGeminiKeys.size,
+    activeKeysCount: 0,
     rateLimitedKeysCount: rateLimitedGeminiKeys.size,
     rateLimitedKeyIndexes
   };
 };
 
-// Get current Gemini API key
-const getCurrentGeminiApiKey = (): string | null => {
-  if (GEMINI_API_KEYS.length === 0) return null;
-  return GEMINI_API_KEYS[currentGeminiKeyIndex];
-};
-
 // Set current Gemini API key by index (for manual selection from UI)
 export const setCurrentApiKey = (index: number): boolean => {
-  if (index < 0 || index >= GEMINI_API_KEYS.length) {
-    console.error("Invalid Gemini API key index: " + index);
-    return false;
-  }
-  currentGeminiKeyIndex = index;
-  console.log("Manually switched to Gemini API key " + (currentGeminiKeyIndex + 1) + "/" + GEMINI_API_KEYS.length);
-  return true;
-};
-
-// Mark current Gemini key as rate limited and rotate to next
-const markGeminiKeyRateLimitedAndRotate = (): string | null => {
-  if (GEMINI_API_KEYS.length === 0) return null;
-
-  // Mark current key as rate limited
-  rateLimitedGeminiKeys.set(currentGeminiKeyIndex, Date.now());
-  console.log("Gemini API key " + (currentGeminiKeyIndex + 1) + " marked as rate limited");
-
-  // Find next available key that's not rate limited
-  let attempts = 0;
-  while (attempts < GEMINI_API_KEYS.length) {
-    currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
-    if (!rateLimitedGeminiKeys.has(currentGeminiKeyIndex)) {
-      console.log("Switched to Gemini API key " + (currentGeminiKeyIndex + 1) + "/" + GEMINI_API_KEYS.length);
-      return GEMINI_API_KEYS[currentGeminiKeyIndex];
-    }
-    attempts++;
-  }
-
-  // All keys are rate limited, clear oldest and use it
-  if (rateLimitedGeminiKeys.size > 0) {
-    const oldestKey = Array.from(rateLimitedGeminiKeys.entries())
-      .sort((a, b) => a[1] - b[1])[0][0];
-    rateLimitedGeminiKeys.delete(oldestKey);
-    currentGeminiKeyIndex = oldestKey;
-    console.log("All Gemini keys rate limited, retrying oldest key " + (currentGeminiKeyIndex + 1));
-    return GEMINI_API_KEYS[currentGeminiKeyIndex];
-  }
-
-  return null;
+  console.warn("Manual API key selection is not available when using server proxy");
+  return false;
 };
 
 // Helper function to call Nemotron API (plain-text response)
@@ -1593,124 +1549,114 @@ export const getBasicNutritionPlan = (userData: UserInput): DailyPlan => {
 };
 
 export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = false): Promise<Meal> => {
-  let apiKey = getCurrentGeminiApiKey();
-  if (!apiKey) {
-    throw new Error("No Gemini API keys configured for food image analysis");
+  // Detect and remove data URL prefix, extract mimeType
+  let cleanBase64 = base64Image;
+  let mimeType = "image/jpeg"; // Default for images
+
+  // Check for data URL format and extract mimeType
+  const dataUrlMatch = base64Image.match(/^data:([^;]+);base64,/);
+  if (dataUrlMatch) {
+    mimeType = dataUrlMatch[1]; // e.g., "video/webm" or "image/jpeg"
+    cleanBase64 = base64Image.replace(/^data:[^;]+;base64,/, "");
+  } else if (isVideo) {
+    mimeType = "video/webm";
   }
 
-  let retriesLeft = GEMINI_API_KEYS.length;
+  const recognitionPrompt = isVideo
+    ? `
+      Analyze this video of food and describe what you see in detail in Vietnamese.
+      - Identify all food items visible.
+      - Estimate portion sizes (e.g., 1 bowl, 200g, 1 piece).
+      - List visible ingredients.
+      Return ONLY the description. No intro/outro.
+    `
+    : `
+      Analyze this image and describe the food in detail in Vietnamese.
+      - Identify the main dish name.
+      - Estimate portion size (e.g., 1 bowl, 200g, 1 piece).
+      - List visible ingredients.
+      Return ONLY the description. No intro/outro.
+    `;
 
-  while (retriesLeft > 0) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
+  console.log(`Analyzing food with mimeType: ${mimeType}, isVideo: ${isVideo}`);
 
-      // STEP 1: RECOGNIZE FOOD (Vision -> Text)
-      // Model: Gemini 2.5 Flash-Lite
-      const recognitionModel = MODELS.FOOD_RECOGNITION;
+  // STEP 1: Call Netlify Proxy for food recognition
+  let foodDescription = "";
+  try {
+    const proxyResponse = await fetch(GEMINI_PROXY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base64Image: cleanBase64,
+        mimeType,
+        prompt: recognitionPrompt,
+        isVideo
+      })
+    });
 
-      const recognitionPrompt = isVideo
-        ? `
-          Analyze this video of food and describe what you see in detail in Vietnamese.
-          - Identify all food items visible.
-          - Estimate portion sizes (e.g., 1 bowl, 200g, 1 piece).
-          - List visible ingredients.
-          Return ONLY the description. No intro/outro.
-        `
-        : `
-          Analyze this image and describe the food in detail in Vietnamese.
-          - Identify the main dish name.
-          - Estimate portion size (e.g., 1 bowl, 200g, 1 piece).
-          - List visible ingredients.
-          Return ONLY the description. No intro/outro.
-        `;
-
-      // Detect and remove data URL prefix, extract mimeType
-      let cleanBase64 = base64Image;
-      let mimeType = "image/jpeg"; // Default for images
-
-      // Check for data URL format and extract mimeType
-      const dataUrlMatch = base64Image.match(/^data:([^;]+);base64,/);
-      if (dataUrlMatch) {
-        mimeType = dataUrlMatch[1]; // e.g., "video/webm" or "image/jpeg"
-        cleanBase64 = base64Image.replace(/^data:[^;]+;base64,/, "");
-      } else if (isVideo) {
-        mimeType = "video/webm";
-      }
-
-      console.log(`Analyzing food with mimeType: ${mimeType}, isVideo: ${isVideo}, using key ${currentGeminiKeyIndex + 1}`);
-
-      let foodDescription = "";
-      try {
-        const response = await ai.models.generateContent({
-          model: recognitionModel,
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: recognitionPrompt },
-                { inlineData: { mimeType: mimeType, data: cleanBase64 } }
-              ]
-            }
-          ],
-        });
-        foodDescription = response.text || "";
-        if (!foodDescription) throw new Error("Empty recognition response");
-        console.log("Food Recognition Result:", foodDescription);
-      } catch (error) {
-        console.error("Recognition Error:", error);
-        throw error;
-      }
-
-      // STEP 2: CALCULATE MACROS (Text -> JSON) using Nemotron
-      // Model: previously Gemini; switch to Nemotron for macro calc to avoid 3.1-preview issues
-      const macroPrompt = `
-        ACT AS A NUTRITIONIST.
-        Based on this food description: "${foodDescription}"
-        
-        Estimate nutritional content.
-        Return the result in JSON format AS A SINGLE-ELEMENT ARRAY.
-        
-        RULES:
-        - Name: Standard Vietnamese name.
-        - Calories: Estimated total.
-        - Macros: Protein, Carbs, Fat in grams.
-        - Description: Use the input description but refine it to be short and clear.
-        
-        Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
-      `;
-
-      try {
-        const responseText = await callNemotronAPI([
-          { role: "user", content: macroPrompt }
-        ]);
-        if (!responseText) throw new Error("Empty macro response");
-        let parsed = cleanAndParseJSON(responseText, "FoodAnalysis");
-        if (Array.isArray(parsed)) parsed = parsed[0];
-        return parsed;
-      } catch (error) {
-        console.error("Macro Calc Error:", error);
-        throw error;
-      }
-
-    } catch (error) {
-      console.error("Food Image Analysis Error (attempt " + (GEMINI_API_KEYS.length - retriesLeft + 1) + "):", error);
-
-      if (isRateLimitError(error) && retriesLeft > 1) {
-        const newKey = markGeminiKeyRateLimitedAndRotate();
-        if (newKey) {
-          console.log(`⚡ Rate limit detected on Gemini, switching to next API key...`);
-          apiKey = newKey;
-          retriesLeft--;
-          continue;
+    if (!proxyResponse.ok) {
+      const errorData = await proxyResponse.json();
+      const error = new Error(errorData.error || "Proxy request failed");
+      
+      if (errorData.isRateLimit) {
+        // Sync client side rate limit tracking
+        const activeKeys = errorData.apiStatus?.activeKeysCount || 0;
+        if (activeKeys > 0) {
+          // Continue retry, server will handle rotation
+          console.log(`⚡ Rate limit detected on proxy, retrying...`);
         }
+        throw error;
       }
-
-      // If one part fails or no more keys, throw error
+      
       throw error;
     }
+
+    const result = await proxyResponse.json();
+    foodDescription = result.foodDescription;
+    
+    if (!foodDescription) throw new Error("Empty recognition response from proxy");
+    console.log("Food Recognition Result:", foodDescription);
+
+    // Sync client side API status from server response
+    if (result.apiStatus) {
+      currentGeminiKeyIndex = result.apiStatus.currentKeyIndex || 0;
+    }
+
+  } catch (error) {
+    console.error("Proxy Recognition Error:", error);
+    throw error;
   }
 
-  throw new Error("All Gemini API keys exhausted for food image analysis");
+  // STEP 2: CALCULATE MACROS (Text -> JSON) using Nemotron
+  // Model: previously Gemini; switch to Nemotron for macro calc to avoid 3.1-preview issues
+  const macroPrompt = `
+    ACT AS A NUTRITIONIST.
+    Based on this food description: "${foodDescription}"
+    
+    Estimate nutritional content.
+    Return the result in JSON format AS A SINGLE-ELEMENT ARRAY.
+    
+    RULES:
+    - Name: Standard Vietnamese name.
+    - Calories: Estimated total.
+    - Macros: Protein, Carbs, Fat in grams.
+    - Description: Use the input description but refine it to be short and clear.
+    
+    Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
+  `;
+
+  try {
+    const responseText = await callNemotronAPI([
+      { role: "user", content: macroPrompt }
+    ]);
+    if (!responseText) throw new Error("Empty macro response");
+    let parsed = cleanAndParseJSON(responseText, "FoodAnalysis");
+    if (Array.isArray(parsed)) parsed = parsed[0];
+    return parsed;
+  } catch (error) {
+    console.error("Macro Calc Error:", error);
+    throw error;
+  }
 };
 
 // --- ANALYZE FOOD TEXT (Manual Input) ---

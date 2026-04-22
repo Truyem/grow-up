@@ -1,15 +1,15 @@
 import { UserLevel } from '../types';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
  * Tạo hoặc lấy user level từ Supabase
  */
 export async function initializeUserLevel(userId: string): Promise<UserLevel | null> {
-  if (!userId) return null;
+  if (!userId || !isSupabaseConfigured()) return null;
 
   try {
     // Lấy existing level
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('user_levels')
       .select('*')
       .eq('user_id', userId)
@@ -47,7 +47,7 @@ export async function initializeUserLevel(userId: string): Promise<UserLevel | n
       lifetimeXP: 0,
     };
 
-    const { error: insertError } = await supabase.from('user_levels').insert({
+    const { error: insertError } = await supabase!.from('user_levels').insert({
       user_id: userId,
       current_level: newLevel.currentLevel,
       current_rank_number: newLevel.currentRankNumber,
@@ -74,10 +74,10 @@ export async function initializeUserLevel(userId: string): Promise<UserLevel | n
  * Lưu user level lên Supabase
  */
 export async function saveUserLevel(userId: string, level: UserLevel): Promise<boolean> {
-  if (!userId) return false;
+  if (!userId || !isSupabaseConfigured()) return false;
 
   try {
-    const { error } = await supabase
+    const { error } = await supabase!
       .from('user_levels')
       .update({
         current_level: level.currentLevel,
@@ -142,10 +142,10 @@ export async function addXPToUser(
  * Lấy user level từ Supabase
  */
 export async function getUserLevel(userId: string): Promise<UserLevel | null> {
-  if (!userId) return null;
+  if (!userId || !isSupabaseConfigured()) return null;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('user_levels')
       .select('*')
       .eq('user_id', userId)

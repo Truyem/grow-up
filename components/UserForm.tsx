@@ -38,15 +38,22 @@ export const UserForm: React.FC<UserFormProps> = ({ activeTab }) => {
   // const [activeTab, setActiveTab] = useState<TabType>('workout'); // Removed internal state
 
   // Local state for weight input to handle commas/dots
-  const [weightInput, setWeightInput] = useState(userData.weight.toString());
+  const [weightInput, setWeightInput] = useState(() => {
+    const initialWeight = userData?.weight ?? 0;
+    return initialWeight > 0 ? initialWeight.toString() : '';
+  });
   const [sleepStart, setSleepStart] = useState('23:00');
   const [sleepEnd, setSleepEnd] = useState('07:00');
 
   useEffect(() => {
-    if (Math.abs(parseFloat(weightInput.replace(',', '.')) - userData.weight) > 0.01) {
-      setWeightInput(userData.weight.toString());
+    const currentWeight = userData?.weight ?? 0;
+    if (currentWeight > 0) {
+      const parsed = parseFloat(weightInput.replace(',', '.'));
+      if (isNaN(parsed) || Math.abs(parsed - currentWeight) > 0.01) {
+        setWeightInput(currentWeight.toString());
+      }
     }
-  }, [userData.weight]);
+  }, [userData?.weight]);
 
   useEffect(() => {
     const now = new Date();

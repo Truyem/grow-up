@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 export interface UseAuthReturn {
   session: any;
@@ -16,10 +16,15 @@ export function useAuth(): UseAuthReturn {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setIsAuthChecking(false);
+      return;
+    }
+
     const initializeAuth = async () => {
       setIsAuthChecking(true);
       try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        const { data: { session: currentSession }, error } = await supabase!.auth.getSession();
         if (error) {
           console.error('[Auth] Failed to get session:', error);
           setSession(null);
@@ -36,7 +41,7 @@ export function useAuth(): UseAuthReturn {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
@@ -46,7 +51,9 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   return { session, isAuthChecking, signOut };
