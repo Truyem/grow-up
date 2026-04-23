@@ -131,27 +131,6 @@ export interface Exercise {
   secondaryMuscleGroups?: string[];  // Supporting muscles
 }
 
-export interface Meal {
-  name: string;
-  calories: number;
-  protein: number;
-  description: string;
-  carbs?: number;
-  fat?: number;
-  consumed?: boolean;
-  usedFridgeItems?: { id: string; amountUsed: number }[];
-  fridgeDeducted?: boolean;
-}
-
-export interface FridgeItem {
-  id: string;
-  user_id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  created_at?: string;
-}
-
 export interface WorkoutLevel {
   levelName: string;
   description: string;

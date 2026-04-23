@@ -6,7 +6,7 @@ import { GlassCard } from './ui/GlassCard';
 import { RestTimer } from './ui/RestTimer';
 import { HumanBodyMuscleMap } from './ui/HumanBodyMuscleMap';
 import { AddExerciseModal } from './AddExerciseModal';
-import { suggestNextExercises, suggestAlternativeExercise } from '../services/geminiService';
+import { suggestNextExercises, suggestAlternativeExercise } from '../services/aiService';
 import { useAppContext } from '../context';
 
 

@@ -5,7 +5,7 @@ import { ActivityRings } from './ui/ActivityRings';
 import { RankShowcase } from './ui/RankShowcase';
 import { Calendar, Dumbbell, FileText, Trophy, Trash2, Utensils, Weight, Activity, TrendingUp, Award, Target, Flame, ChevronDown, ChevronUp, Sparkles, BarChart2, LayoutList, RefreshCw, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react';
 import { HabitTracker } from './dashboard/HabitTracker';
-import { generateAIOverview } from '../services/geminiService';
+import { generateAIOverview } from '../services/aiService';
 import { DEFAULT_SLEEP_HOURS, MAX_SLEEP_HOURS, MIN_SLEEP_HOURS, getSleepQualityLabel } from '../services/sleepRecoveryService';
 import { useLevelSystem } from '../hooks';
 

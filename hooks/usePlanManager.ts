@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { DailyPlan, ExerciseLog, UserInput, WorkoutHistoryItem } from '../types';
-import { generateDailyPlan } from '../services/geminiService';
+import { generateDailyPlan } from '../services/aiService';
 import { debouncedSavePlan, deletePlanByDate, loadPlanFromSupabase, savePlanToSupabase } from '../services/supabasePlanSync';
 import { enrichWorkoutWithWarmupCooldown } from '../services/warmupCooldownService';
 

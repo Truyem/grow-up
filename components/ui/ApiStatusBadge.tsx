@@ -1,6 +1,6 @@
 import React from 'react';
 import { Wifi, WifiOff, Zap, AlertTriangle } from 'lucide-react';
-import { ApiStatus, setCurrentApiKey } from '../../services/geminiService';
+import { ApiStatus, setCurrentApiKey } from '../../services/aiService';
 
 interface ApiStatusBadgeProps {
     status: ApiStatus;

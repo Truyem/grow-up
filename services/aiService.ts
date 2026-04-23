@@ -1,4 +1,4 @@
-import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry, FridgeItem } from "../types";
+import { UserInput, DailyPlan, WorkoutHistoryItem, Intensity, WorkoutLevel, FatigueLevel, MuscleGroup, AIOverview, Exercise, Meal, SleepRecoveryEntry } from "../types";
 import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } from './wrkoutExerciseService';
 
@@ -6,21 +6,10 @@ import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } f
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
 const NEMOTRON_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
-// Gemini Proxy endpoint (server side Netlify Function)
-const GEMINI_PROXY_ENDPOINT = "/.netlify/functions/gemini-proxy";
-
-// Client side rate limit tracking (synced with server response)
-let currentGeminiKeyIndex = 0;
-const rateLimitedGeminiKeys: Map<number, number> = new Map();
-
 // Model constants
 const MODELS = {
   WORKOUT: "nemotron",
   OVERVIEW: "nemotron",
-  MENU: "@cf/google/gemma-4-26b-a4b-it",
-  FOOD_RECOGNITION: "gemini-2.5-flash-lite",
-  MACRO_CALC: "nemotron",
-  FOOD_SUGGEST: "@cf/google/gemma-4-26b-a4b-it",
 };
 
 
@@ -34,23 +23,19 @@ export interface ApiStatus {
 }
 
 
-
-// Get API status for UI display (shows Gemini keys status from server)
+// Get API status for UI display (Nemotron doesn't need keys)
 export const getApiStatus = (): ApiStatus => {
-  const rateLimitedKeyIndexes = Array.from(rateLimitedGeminiKeys.keys());
-  // Total keys count is not available client side anymore for security
   return {
     totalKeys: 0,
-    currentKeyIndex: currentGeminiKeyIndex,
+    currentKeyIndex: 0,
     activeKeysCount: 0,
-    rateLimitedKeysCount: rateLimitedGeminiKeys.size,
-    rateLimitedKeyIndexes
+    rateLimitedKeysCount: 0,
+    rateLimitedKeyIndexes: []
   };
 };
 
-// Set current Gemini API key by index (for manual selection from UI)
+// Set current API key (no-op for Nemotron)
 export const setCurrentApiKey = (index: number): boolean => {
-  console.warn("Manual API key selection is not available when using server proxy");
   return false;
 };
 
@@ -1546,234 +1531,6 @@ export const getBasicNutritionPlan = (userData: UserInput): DailyPlan => {
       meals: [] // Empty meals to start
     }
   };
-};
-
-export const analyzeFoodImage = async (base64Image: string, isVideo: boolean = false): Promise<Meal> => {
-  // Detect and remove data URL prefix, extract mimeType
-  let cleanBase64 = base64Image;
-  let mimeType = "image/jpeg"; // Default for images
-
-  // Check for data URL format and extract mimeType
-  const dataUrlMatch = base64Image.match(/^data:([^;]+);base64,/);
-  if (dataUrlMatch) {
-    mimeType = dataUrlMatch[1]; // e.g., "video/webm" or "image/jpeg"
-    cleanBase64 = base64Image.replace(/^data:[^;]+;base64,/, "");
-  } else if (isVideo) {
-    mimeType = "video/webm";
-  }
-
-  const recognitionPrompt = isVideo
-    ? `
-      Analyze this video of food and describe what you see in detail in Vietnamese.
-      - Identify all food items visible.
-      - Estimate portion sizes (e.g., 1 bowl, 200g, 1 piece).
-      - List visible ingredients.
-      Return ONLY the description. No intro/outro.
-    `
-    : `
-      Analyze this image and describe the food in detail in Vietnamese.
-      - Identify the main dish name.
-      - Estimate portion size (e.g., 1 bowl, 200g, 1 piece).
-      - List visible ingredients.
-      Return ONLY the description. No intro/outro.
-    `;
-
-  console.log(`Analyzing food with mimeType: ${mimeType}, isVideo: ${isVideo}`);
-
-  // STEP 1: Call Netlify Proxy for food recognition
-  let foodDescription = "";
-  try {
-    const proxyResponse = await fetch(GEMINI_PROXY_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        base64Image: cleanBase64,
-        mimeType,
-        prompt: recognitionPrompt,
-        isVideo
-      })
-    });
-
-    if (!proxyResponse.ok) {
-      const errorData = await proxyResponse.json();
-      const error = new Error(errorData.error || "Proxy request failed");
-      
-      if (errorData.isRateLimit) {
-        // Sync client side rate limit tracking
-        const activeKeys = errorData.apiStatus?.activeKeysCount || 0;
-        if (activeKeys > 0) {
-          // Continue retry, server will handle rotation
-          console.log(`⚡ Rate limit detected on proxy, retrying...`);
-        }
-        throw error;
-      }
-      
-      throw error;
-    }
-
-    const result = await proxyResponse.json();
-    foodDescription = result.foodDescription;
-    
-    if (!foodDescription) throw new Error("Empty recognition response from proxy");
-    console.log("Food Recognition Result:", foodDescription);
-
-    // Sync client side API status from server response
-    if (result.apiStatus) {
-      currentGeminiKeyIndex = result.apiStatus.currentKeyIndex || 0;
-    }
-
-  } catch (error) {
-    console.error("Proxy Recognition Error:", error);
-    throw error;
-  }
-
-  // STEP 2: CALCULATE MACROS (Text -> JSON) using Nemotron
-  // Model: previously Gemini; switch to Nemotron for macro calc to avoid 3.1-preview issues
-  const macroPrompt = `
-    ACT AS A NUTRITIONIST.
-    Based on this food description: "${foodDescription}"
-    
-    Estimate nutritional content.
-    Return the result in JSON format AS A SINGLE-ELEMENT ARRAY.
-    
-    RULES:
-    - Name: Standard Vietnamese name.
-    - Calories: Estimated total.
-    - Macros: Protein, Carbs, Fat in grams.
-    - Description: Use the input description but refine it to be short and clear.
-    
-    Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
-  `;
-
-  try {
-    const responseText = await callNemotronAPI([
-      { role: "user", content: macroPrompt }
-    ]);
-    if (!responseText) throw new Error("Empty macro response");
-    let parsed = cleanAndParseJSON(responseText, "FoodAnalysis");
-    if (Array.isArray(parsed)) parsed = parsed[0];
-    return parsed;
-  } catch (error) {
-    console.error("Macro Calc Error:", error);
-    throw error;
-  }
-};
-
-// --- ANALYZE FOOD TEXT (Manual Input) ---
-// Phân tích đồ ăn từ text nhập tay, tính calo/macros
-export const analyzeFoodText = async (foodText: string): Promise<Meal> => {
-  const model = MODELS.FOOD_SUGGEST;
-
-  const prompt = `
-    ACT AS A NUTRITIONIST.
-    Analyze this food item/meal: "${foodText}"
-    
-    Estimate nutritional content accurately.
-    Return the result in JSON format.
-    
-    RULES:
-    - Name: Standard Vietnamese name for the food (e.g., "Phở bò", "Cơm sườn")
-    - Calories: Estimated total calories (number only)
-    - Protein: Grams of protein (number only)
-    - Carbs: Grams of carbs (number only)  
-    - Fat: Grams of fat (number only)
-    - Description: Short Vietnamese description (e.g., "1 tô lớn với thịt bò tái")
-    
-    Be accurate with Vietnamese portion sizes and common ingredients.
-    
-    Return format: [{ "name": "...", "calories": number, "protein": number, "carbs": number, "fat": number, "description": "..." }]
-  `;
-
-  try {
-    const responseText = await callNemotronAPI([
-      { role: "user", content: prompt }
-    ], { maxTokens: 50000 });
-
-    if (!responseText) throw new Error("Empty food analysis response");
-
-    let result = cleanAndParseJSON(responseText, "FoodTextAnalysis");
-    if (Array.isArray(result)) result = result[0];
-    console.log("Analyzed food text:", result);
-    return result;
-  } catch (error) {
-    console.error("Food Text Analysis Error:", error);
-    throw error;
-  }
-};
-
-/**
- * Generate food calories analysis prompt for Nemotron
- * Used by Edge Functions to calculate nutrition from food input
- */
-export const generateFoodCaloriesPrompt = (foodDescription: string): string => {
-  return `Bạn là một nutritionist chuyên gia. Phân tích các thức ăn sau:
-"${foodDescription}"
-
-Hãy:
-1. Xác định các loại thức phẩm và khối lượng
-2. Tính toán tổng calo và macro (protein, carbs, fats)
-3. Sử dụng dữ liệu từ bảng thành phần thức phẩm phổ biến
-
-Vui lòng trả về JSON dạng:
-{
-  "foods": [
-    {"name": "...", "quantity": "...", "unit": "..."},
-    ...
-  ],
-  "total_calories": 0,
-  "macros": {
-    "protein": 0,
-    "carbs": 0,
-    "fats": 0
-  }
-}`;
-};
-
-/**
- * Generate daily workout plan prompt for Nemotron
- * Incorporates muscle group conflict detection and weight goal optimization
- */
-export const parseAndDeductFridge = async (
-  mealName: string, 
-  fridgeItems: FridgeItem[]
-): Promise<{ id: string, amount: number }[]> => {
-  if (fridgeItems.length === 0) return [];
-
-  const prompt = `
-    USER MEAL/INGREDIENT: "${mealName}"
-    
-    FRIDGE INVENTORY:
-    ${JSON.stringify(fridgeItems.map(f => ({ id: f.id, name: f.name, quantity: f.quantity, unit: f.unit })))}
-    
-    TASK:
-    Identify if the user meal/ingredient consumes any items from the fridge inventory.
-    Estimate how much quantity is consumed for each matching item based on the food name.
-    Units convention: 
-    - "g", "kg" -> convert to gam (g)
-    - "ml", "l" -> convert to ml
-    - "qty" or "số lượng" (quả, trái, chùm, con, chiếc, cái...) -> quantity/pieces (e.g. 1 quả trứng = 1, 2 trái chuối = 2, 1 chùm nho = 1).
-    Make sure the deducted amount matches the fridge item's unit.
-    If the text says "500g thit bo" and there is "thịt bò" (unit: g) in the fridge, deduct 500. 
-    If the text says "2 quả trứng" and there is "trứng" (unit: qty) in the fridge, deduct 2.
-    If the text says "1 tô phở bò", estimate the beef (e.g. 100) and deduct it if beef is in the fridge.
-    
-    CRITICAL: Return ONLY a valid JSON array of deductions: [{ "id": "string", "amount": number }]
-    Do not include markdown blocks like \`\`\`json, just the raw JSON array.
-    If nothing matches, return [].
-  `;
-
-  try {
-    const response = await callNemotronAPI([{ role: 'user', content: prompt }]);
-    const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
-    const result = JSON.parse(jsonStr);
-    
-    if (Array.isArray(result)) {
-      return result;
-    }
-  } catch (err) {
-    console.error('Error parsing fridge deductions:', err);
-  }
-  return [];
 };
 
 export const generateDailyWorkoutPrompt = (
