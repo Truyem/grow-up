@@ -4,7 +4,7 @@ import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } f
 
 // Nemotron API endpoint (no API keys needed, service provides access)
 const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
-const NEMOTRON_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const NEMOTRON_MODEL = "@cf/moonshotai/kimi-k2.6";
 
 // Model constants
 const MODELS = {
