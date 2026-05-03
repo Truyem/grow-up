@@ -3,7 +3,7 @@ import { loadSleepRecoveryFromSupabase } from './supabasePlanSync';
 import { loadExercisesFromWrkout, getExercisesByMuscleGroup, getAllExercises } from './wrkoutExerciseService';
 
 // Nemotron API endpoint (no API keys needed, service provides access)
-const NEMOTRON_ENDPOINT = "https://wuxia-api.vdt99.workers.dev/v1/nemotron";
+const NEMOTRON_ENDPOINT = "https://wuxia-api.vudinhtrungv1010.workers.dev/v1/nemotron";
 const NEMOTRON_MODEL = "@cf/moonshotai/kimi-k2.6";
 
 // Model constants
